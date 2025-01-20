@@ -1,6 +1,6 @@
-# nayifat_app_2025_new
+# Nayifat App
 
-A new Flutter project.
+This is the Nayifat App.
 
 ## Getting Started
 
