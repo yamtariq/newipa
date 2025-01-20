@@ -1,0 +1,17 @@
+{
+    "applinks": {
+        "apps": [],
+        "details": [
+            {
+                "appID": "$(TeamIdentifier).com.nayifat.app",
+                "paths": [
+                    "/loan/*",
+                    "/profile/*",
+                    "/dashboard/*",
+                    "NOT /api/*",
+                    "*"
+                ]
+            }
+        ]
+    }
+} 

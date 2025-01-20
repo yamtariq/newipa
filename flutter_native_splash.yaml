@@ -1,0 +1,22 @@
+flutter_native_splash:
+  color: "#ffffff"
+  #background_image: "assets/background.png"
+  
+  image: assets/images/splash_logo.png
+  branding: assets/images/nayifatlogowords-nobg.png
+  
+  image_dark: assets/images/splash_logo.png
+  branding_dark: assets/images/nayifatlogowords-nobg.png
+
+  android_12:
+    image: assets/images/splash_logo.png
+    icon_background_color: "#ffffff"
+    image_dark: assets/images/splash_logo.png
+    
+  android: true
+  ios: true
+  web: false
+  
+  android_gravity: center
+  ios_content_mode: center
+  fullscreen: true
