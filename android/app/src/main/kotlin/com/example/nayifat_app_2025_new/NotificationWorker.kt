@@ -12,6 +12,8 @@ import android.os.Build
 import org.json.JSONObject
 import java.net.URL
 import javax.net.ssl.HttpsURLConnection
+import android.app.Notification
+import android.app.PendingIntent
 
 class NotificationWorker(
     private val context: Context,
@@ -207,13 +209,55 @@ class NotificationWorker(
                 description = "Notifications from Nayifat App"
                 enableLights(true)
                 enableVibration(true)
+                setShowBadge(true)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                setBypassDnd(true)
             }
             notificationManager.createNotificationChannel(channel)
             Log.d(TAG, "Step 8.3: Notification channel created")
         }
 
+        // Create intent to open the app
+        Log.d(TAG, "Step 8.4: Creating intent to open app")
+        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            // Add the route if available
+            notification["route"]?.let { route ->
+                if (route.isNotEmpty()) {
+                    Log.d(TAG, "Step 8.4.1: Adding route to intent: $route")
+                    putExtra("initial_route", route)
+                    // Get isArabic from SharedPreferences
+                    val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+                    val isArabic = prefs.getBoolean("flutter.isArabic", false)
+                    Log.d(TAG, "Step 8.4.2: Retrieved isArabic from SharedPreferences: $isArabic")
+                    
+                    // Store route and language preference
+                    prefs.edit().apply {
+                        putString("flutter.pending_notification_route", route)
+                        putBoolean("flutter.pending_notification_is_arabic", isArabic)
+                        apply()
+                    }
+                    Log.d(TAG, "Step 8.4.3: Stored route in SharedPreferences: $route")
+                }
+            }
+        }
+
+        // Create pending intent
+        val pendingIntent = if (intent != null) {
+            Log.d(TAG, "Step 8.4.4: Creating PendingIntent")
+            PendingIntent.getActivity(
+                context,
+                notification["id"]?.toInt() ?: 1,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        } else {
+            Log.e(TAG, "Step Error 8.4.5: Could not create launch intent")
+            null
+        }
+
         // Create notification
-        Log.d(TAG, "Step 8.4: Building notification with title: ${notification["title"]}")
+        Log.d(TAG, "Step 8.5: Building notification with title: ${notification["title"]}")
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(notification["title"])
@@ -223,10 +267,15 @@ class NotificationWorker(
             .setVibrate(longArrayOf(1000, 1000, 1000))
             .setOnlyAlertOnce(false)
 
+        // Set the pending intent if available
+        pendingIntent?.let {
+            builder.setContentIntent(it)
+        }
+
         // Show the notification
         val notificationId = notification["id"]?.toInt() ?: 1
-        Log.d(TAG, "Step 8.5: Displaying notification with ID: $notificationId")
+        Log.d(TAG, "Step 8.6: Displaying notification with ID: $notificationId")
         notificationManager.notify(notificationId, builder.build())
-        Log.d(TAG, "Step 8.6: Notification displayed successfully")
+        Log.d(TAG, "Step 8.7: Notification displayed successfully")
     }
 } 

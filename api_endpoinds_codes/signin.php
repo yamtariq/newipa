@@ -77,65 +77,6 @@ try {
         }
     }
 
-    // 3. Check if device exists for any user
-    $stmt = $con->prepare("SELECT national_id FROM user_devices WHERE deviceId = ? AND status = 'active'");
-    $stmt->bind_param("s", $deviceId);
-    $stmt->execute();
-    $device_result = $stmt->get_result();
-    
-    if ($device_result->num_rows > 0) {
-        $registered_device = $device_result->fetch_assoc();
-        if ($registered_device['national_id'] !== $national_id) {
-            log_auth_attempt($con, $national_id, $deviceId, 'failed', 'Device registered to another user');
-            echo json_encode([
-                'status' => 'error',
-                'code' => 'DEVICE_REGISTERED_TO_OTHER',
-                'message' => 'This device is registered to another user'
-            ]);
-            exit();
-        }
-    }
-
-    // 4. Check if this device is registered and active for this user
-    $stmt = $con->prepare("SELECT status FROM user_devices WHERE national_id = ? AND deviceId = ? AND status = 'active'");
-    $stmt->bind_param("ss", $national_id, $deviceId);
-    $stmt->execute();
-    $user_device = $stmt->get_result();
-
-    if ($user_device->num_rows === 0) {
-        // If this is password authentication and device is not registered/active
-        if ($isPasswordAuth) {
-            // Check if user has any other active devices
-            $stmt = $con->prepare("
-                SELECT deviceId, platform, model, manufacturer 
-                FROM user_devices 
-                WHERE national_id = ? AND status = 'active'
-            ");
-            $stmt->bind_param("s", $national_id);
-            $stmt->execute();
-            $existing_device = $stmt->get_result()->fetch_assoc();
-
-            if ($existing_device) {
-                // Return device replacement option
-                echo json_encode([
-                    'status' => 'error',
-                    'code' => 'REQUIRES_DEVICE_REPLACEMENT',
-                    'message' => 'User has another registered device',
-                    'existing_device' => $existing_device
-                ]);
-                exit();
-            }
-        }
-
-        log_auth_attempt($con, $national_id, $deviceId, 'failed', 'Device not registered');
-        echo json_encode([
-            'status' => 'error',
-            'code' => 'DEVICE_NOT_REGISTERED',
-            'message' => 'Device is not registered for this user'
-        ]);
-        exit();
-    }
-
     // If we reach here, authentication is successful
     // Expire existing sessions
     $stmt = $con->prepare("
@@ -157,7 +98,7 @@ try {
     $stmt->bind_param("sss", $national_id, $deviceId, $token);
     $stmt->execute();
 
-    // Update last used timestamp
+    // Update last used timestamp for device
     $stmt = $con->prepare("
         UPDATE user_devices 
         SET last_used_at = NOW()

@@ -7,6 +7,8 @@ import '../main_page.dart';
 import 'registration_success_dialog.dart';
 import 'package:provider/provider.dart';
 import '../../providers/session_provider.dart';
+import '../../providers/theme_provider.dart';
+import '../../utils/constants.dart';
 
 class BiometricSetupScreen extends StatefulWidget {
   final String nationalId;
@@ -114,14 +116,22 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
     } catch (e) {
       print('Error enabling biometrics: $e');
       if (mounted) {
+        final isDarkMode = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+        final errorColor = Color(isDarkMode 
+            ? Constants.darkFormBorderColor 
+            : Constants.lightFormBorderColor);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               widget.isArabic
                   ? 'حدث خطأ أثناء تفعيل السمات الحيوية'
                   : 'Error enabling biometrics',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: errorColor,
           ),
         );
       }
@@ -198,51 +208,88 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
         print('   - Updated signed in state: $updatedSignedIn');
         print('=== SESSION INITIALIZED IN PROVIDER ===\n');
 
+        final isDarkMode = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+        final themeColor = Color(isDarkMode 
+            ? Constants.darkPrimaryColor 
+            : Constants.lightPrimaryColor);
+        final surfaceColor = Color(isDarkMode 
+            ? Constants.darkSurfaceColor 
+            : Constants.lightSurfaceColor);
+        final labelTextColor = Color(isDarkMode 
+            ? Constants.darkLabelTextColor 
+            : Constants.lightLabelTextColor);
+
         await showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) => RegistrationSuccessDialog(
-            isArabic: widget.isArabic,
-            enableBiometric: _isBiometricsEnabled,
-            onContinue: () async {
-              Navigator.of(context).pop();
-              
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => MainPage(
-                    isArabic: widget.isArabic,
-                    userData: <String, dynamic>{
-                      ...userData,
-                      'deviceRegistered': true,
-                      'deviceUserId': widget.nationalId,
-                    },
+          builder: (context) => Theme(
+            data: Theme.of(context).copyWith(
+              dialogBackgroundColor: surfaceColor,
+            ),
+            child: RegistrationSuccessDialog(
+              isArabic: widget.isArabic,
+              enableBiometric: _isBiometricsEnabled,
+              onContinue: () async {
+                Navigator.of(context).pop();
+                
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => MainPage(
+                      isArabic: widget.isArabic,
+                      onLanguageChanged: (bool value) {},
+                      userData: <String, dynamic>{
+                        ...userData,
+                        'deviceRegistered': true,
+                        'deviceUserId': widget.nationalId,
+                      },
+                      initialRoute: '',
+                      isDarkMode: isDarkMode,
+                    ),
                   ),
-                ),
-                (route) => false,
-              );
-            },
+                  (route) => false,
+                );
+              },
+            ),
           ),
         );
       } else {
+        final isDarkMode = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+        final errorColor = Color(isDarkMode 
+            ? Constants.darkFormBorderColor 
+            : Constants.lightFormBorderColor);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               widget.isArabic
                   ? 'فشل في إكمال التسجيل'
                   : 'Failed to complete registration',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: errorColor,
           ),
         );
       }
     } catch (e) {
+      final isDarkMode = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+      final errorColor = Color(isDarkMode 
+          ? Constants.darkFormBorderColor 
+          : Constants.lightFormBorderColor);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            widget.isArabic ? 'حدث خطأ' : 'An error occurred: ${e.toString()}',
+            widget.isArabic 
+                ? 'حدث خطأ' 
+                : 'An error occurred: ${e.toString()}',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-          backgroundColor: Colors.red,
+          backgroundColor: errorColor,
         ),
       );
     } finally {
@@ -254,8 +301,34 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = const Color(0xFF0077B6);
-    final backgroundColor = const Color(0xFFF5F6FA);
+    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
+    final themeColor = Color(isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final backgroundColor = Color(isDarkMode 
+        ? Constants.darkBackgroundColor 
+        : Constants.lightBackgroundColor);
+    final surfaceColor = Color(isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
+    final labelTextColor = Color(isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
+    final hintTextColor = Color(isDarkMode 
+        ? Constants.darkHintTextColor 
+        : Constants.lightHintTextColor);
+    final formBackgroundColor = Color(isDarkMode 
+        ? Constants.darkFormBackgroundColor 
+        : Constants.lightFormBackgroundColor);
+    final formBorderColor = Color(isDarkMode 
+        ? Constants.darkFormBorderColor 
+        : Constants.lightFormBorderColor);
+    final inactiveColor = Color(isDarkMode 
+        ? Constants.darkFormBackgroundColor 
+        : Constants.lightFormBackgroundColor);
+    final inactiveBorderColor = Color(isDarkMode 
+        ? Constants.darkFormBorderColor 
+        : Constants.lightFormBorderColor);
 
     return WillPopScope(
       onWillPop: () async => false,
@@ -279,16 +352,22 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                         // Background Logo
                         Positioned(
                           top: -75,
-                          right: widget.isArabic ? null : -75,
-                          left: widget.isArabic ? -75 : null,
-                          child: Opacity(
-                            opacity: 0.2,
-                            child: Image.asset(
-                              'assets/images/nayifatlogocircle-nobg.png',
-                              width: 200,
-                              height: 200,
-                            ),
-                          ),
+                          right: widget.isArabic ? null : -100,
+                          left: widget.isArabic ? -100 : null,
+                          child: isDarkMode
+                            ? Image.asset(
+                                'assets/images/nayifat-circle-grey.png',
+                                width: 240,
+                                height: 240,
+                              )
+                            : Opacity(
+                                opacity: 0.2,
+                                child: Image.asset(
+                                  'assets/images/nayifatlogocircle-nobg.png',
+                                  width: 240,
+                                  height: 240,
+                                ),
+                              ),
                         ),
 
                         Column(
@@ -301,9 +380,10 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                                 children: [
                                   Text(
                                     widget.isArabic ? 'السمات الحيوية' : 'Biometrics',
-                                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                    style: TextStyle(
+                                      fontSize: 24,
                                       fontWeight: FontWeight.bold,
-                                      color: primaryColor,
+                                      color: themeColor,
                                     ),
                                     textAlign: TextAlign.center,
                                   ),
@@ -312,7 +392,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                                     width: 60,
                                     height: 4,
                                     decoration: BoxDecoration(
-                                      color: primaryColor,
+                                      color: themeColor,
                                       borderRadius: BorderRadius.circular(2),
                                     ),
                                   ),
@@ -338,9 +418,18 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                                             height: 40,
                                             decoration: BoxDecoration(
                                               shape: BoxShape.circle,
-                                              color: isActive || isPast
-                                                  ? primaryColor
-                                                  : Colors.grey[300],
+                                              color: isActive || isPast ? themeColor : inactiveColor,
+                                              border: Border.all(
+                                                color: isActive || isPast ? themeColor : inactiveBorderColor,
+                                                width: 1,
+                                              ),
+                                              boxShadow: isActive ? [
+                                                BoxShadow(
+                                                  color: themeColor.withOpacity(0.3),
+                                                  blurRadius: 8,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ] : null,
                                             ),
                                             child: Center(
                                               child: Text(
@@ -349,18 +438,30 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                                                     : '${stepIndex + 1}',
                                                 style: TextStyle(
                                                   color: isActive || isPast
-                                                      ? Colors.white
-                                                      : Colors.grey[600],
+                                                      ? (isDarkMode ? Colors.black : Colors.white)
+                                                      : labelTextColor,
                                                   fontWeight: FontWeight.bold,
                                                 ),
                                               ),
                                             ),
                                           );
                                         } else {
+                                          final stepIndex = index ~/ 2;
+                                          final isPastLine = stepIndex < 2;
                                           return Container(
                                             width: 60,
                                             height: 2,
-                                            color: Colors.grey[300],
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                colors: isPastLine ? [
+                                                  themeColor,
+                                                  themeColor,
+                                                ] : [
+                                                  themeColor.withOpacity(0.5),
+                                                  inactiveBorderColor,
+                                                ],
+                                              ),
+                                            ),
                                             margin: const EdgeInsets.symmetric(horizontal: 4),
                                           );
                                         }
@@ -376,32 +477,39 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                                               ? ['رمز الدخول', 'كلمة المرور', 'معلومات']
                                               : ['Basic', 'Password', 'MPIN'];
                                           final isActive = stepIndex == 2;
+                                          final isPast = stepIndex < 2;
                                           return SizedBox(
                                             width: 80,
                                             child: Text(
                                               steps[stepIndex],
                                               textAlign: TextAlign.center,
                                               style: TextStyle(
-                                                color: isActive ? primaryColor : (stepIndex < 2 ? primaryColor : Colors.grey[600]),
-                                                fontWeight: isActive ? FontWeight.bold : (stepIndex < 2 ? FontWeight.bold : FontWeight.normal),
+                                                color: isActive || isPast 
+                                                    ? themeColor 
+                                                    : labelTextColor,
+                                                fontWeight: isActive || isPast 
+                                                    ? FontWeight.bold 
+                                                    : FontWeight.normal,
                                                 fontSize: 14,
                                               ),
                                             ),
                                           );
                                         } else {
-                                          return SizedBox(width: 40);
+                                          return const SizedBox(width: 40);
                                         }
                                       }),
                                     ),
                                   ],
                                 ),
                               ),
-                              const Divider(height: 1),
+                              Divider(
+                                height: 1,
+                                color: inactiveBorderColor,
+                              ),
                             ],
 
                             Expanded(
                               child: Column(
-                                // mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   const SizedBox(height: 40),
                                   Container(
@@ -414,14 +522,14 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                                             Icon(
                                               Icons.fingerprint,
                                               size: 84,
-                                              color: _isBiometricsEnabled ? Colors.green : primaryColor,
+                                              color: _isBiometricsEnabled ? Colors.green : themeColor,
                                             ),
                                             const SizedBox(width: 5),
                                             Text(
                                               '/',
                                               style: TextStyle(
                                                 fontSize: 90,
-                                                color: _isBiometricsEnabled ? Colors.green : primaryColor,
+                                                color: _isBiometricsEnabled ? Colors.green : themeColor,
                                                 fontWeight: FontWeight.w200,
                                               ),
                                             ),
@@ -434,7 +542,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                                                   'assets/images/faceid.png',
                                                   width: 70,
                                                   height: 70,
-                                                  color: _isBiometricsEnabled ? Colors.green : primaryColor,
+                                                  color: _isBiometricsEnabled ? Colors.green : themeColor,
                                                 ),
                                               ),
                                             ),
@@ -445,8 +553,10 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                                           widget.isArabic
                                               ? 'تسجيل الدخول بالسمات الحيوية'
                                               : 'Biometric Login',
-                                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                          style: TextStyle(
+                                            fontSize: 20,
                                             fontWeight: FontWeight.bold,
+                                            color: labelTextColor,
                                           ),
                                           textAlign: TextAlign.center,
                                         ),
@@ -457,18 +567,50 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                                               : 'You can sign in using your fingerprint or face ID',
                                           style: TextStyle(
                                             fontSize: 16,
-                                            color: Colors.grey[600],
+                                            color: hintTextColor,
                                           ),
                                           textAlign: TextAlign.center,
                                         ),
                                         const SizedBox(height: 32),
                                         if (!_isBiometricsAvailable)
-                                          Text(
-                                            widget.isArabic
-                                                ? 'السمات الحيوية غير متوفرة على هذا الجهاز'
-                                                : 'Biometrics not available on this device',
-                                            style: TextStyle(color: Colors.red),
-                                            textAlign: TextAlign.center,
+                                          Container(
+                                            padding: const EdgeInsets.all(16),
+                                            decoration: BoxDecoration(
+                                              color: formBackgroundColor,
+                                              borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
+                                              border: Border.all(
+                                                color: formBorderColor,
+                                                width: 1,
+                                              ),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: themeColor.withOpacity(0.1),
+                                                  blurRadius: 4,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ],
+                                            ),
+                                            child: Column(
+                                              children: [
+                                                const Icon(
+                                                  Icons.warning_amber_rounded,
+                                                  color: Colors.orange,
+                                                  size: 48,
+                                                ),
+                                                const SizedBox(height: 16),
+                                                Text(
+                                                  widget.isArabic
+                                                      ? 'السمات الحيوية غير متوفرة على هذا الجهاز'
+                                                      : 'Biometrics not available on this device',
+                                                  style: TextStyle(
+                                                    fontSize: 18,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: labelTextColor,
+                                                  ),
+                                                  textAlign: TextAlign.center,
+                                                ),
+                                              ],
+                                            ),
                                           )
                                         else if (!_isBiometricsEnabled)
                                           Container(
@@ -477,32 +619,34 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                                             child: ElevatedButton(
                                               onPressed: _isLoading ? null : _enableBiometrics,
                                               style: ElevatedButton.styleFrom(
-                                                backgroundColor: primaryColor,
+                                                backgroundColor: themeColor,
+                                                foregroundColor: isDarkMode ? Colors.black : Colors.white,
+                                                elevation: 0,
                                                 padding: const EdgeInsets.symmetric(
                                                   horizontal: 32,
                                                   vertical: 16,
                                                 ),
                                                 shape: RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.circular(12),
+                                                  borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
                                                 ),
                                               ),
                                               child: _isLoading
-                                                  ? const SizedBox(
+                                                  ? SizedBox(
                                                       width: 20,
                                                       height: 20,
                                                       child: CircularProgressIndicator(
                                                         strokeWidth: 2,
                                                         valueColor: AlwaysStoppedAnimation<Color>(
-                                                            Colors.white),
+                                                            isDarkMode ? Colors.black : Colors.white),
                                                       ),
                                                     )
                                                   : Text(
                                                       widget.isArabic
                                                           ? 'تفعيل'
                                                           : 'Enable',
-                                                      style: const TextStyle(
+                                                      style: TextStyle(
                                                         fontSize: 16,
-                                                        color: Colors.white,
+                                                        color: isDarkMode ? Colors.black : Colors.white,
                                                         fontWeight: FontWeight.bold,
                                                       ),
                                                     ),
@@ -511,7 +655,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                                         else
                                           Column(
                                             children: [
-                                              Icon(
+                                              const Icon(
                                                 Icons.check_circle_outline,
                                                 color: Colors.green,
                                                 size: 48,
@@ -521,7 +665,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                                                 widget.isArabic
                                                     ? 'تم تفعيل السمات الحيوية بنجاح'
                                                     : 'Biometrics enabled successfully',
-                                                style: TextStyle(
+                                                style: const TextStyle(
                                                   color: Colors.green,
                                                   fontSize: 16,
                                                   fontWeight: FontWeight.bold,
@@ -540,12 +684,23 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                             Container(
                               padding: const EdgeInsets.all(24),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: surfaceColor,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: primaryColor.withOpacity(0.05),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, -5),
+                                    color: Color(isDarkMode 
+                                        ? Constants.darkNavbarShadowPrimary
+                                        : Constants.lightNavbarShadowPrimary),
+                                    offset: const Offset(0, -2),
+                                    blurRadius: 6,
+                                    spreadRadius: 2,
+                                  ),
+                                  BoxShadow(
+                                    color: Color(isDarkMode 
+                                        ? Constants.darkNavbarShadowSecondary
+                                        : Constants.lightNavbarShadowSecondary),
+                                    offset: const Offset(0, -1),
+                                    blurRadius: 4,
+                                    spreadRadius: 0,
                                   ),
                                 ],
                               ),
@@ -555,17 +710,19 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                                     child: ElevatedButton(
                                       onPressed: _handleSetup,
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: primaryColor,
+                                        backgroundColor: themeColor,
+                                        foregroundColor: isDarkMode ? Colors.black : Colors.white,
+                                        elevation: 0,
                                         padding: const EdgeInsets.symmetric(vertical: 16),
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
                                         ),
                                       ),
                                       child: Text(
                                         widget.isArabic ? 'التالي' : 'Next',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 16,
-                                          color: Colors.white,
+                                          color: isDarkMode ? Colors.black : Colors.white,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),

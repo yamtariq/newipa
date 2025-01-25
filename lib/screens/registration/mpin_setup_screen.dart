@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 import '../../services/auth_service.dart';
 import '../../services/registration_service.dart';
 import 'biometric_setup_screen.dart';
+import 'package:provider/provider.dart';
+import '../../providers/theme_provider.dart';
+import '../../utils/constants.dart';
 
 class MPINSetupScreen extends StatefulWidget {
   final String nationalId;
@@ -28,7 +31,6 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
   bool _isConfirming = false;
   bool _isLoading = false;
   String? _errorMessage;
-  final Color primaryColor = const Color(0xFF0077B6);
   final AuthService _authService = AuthService();
 
   void _handleDigit(String value) {
@@ -138,6 +140,14 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
   }
 
   Widget _buildPINDisplay(List<String> digits) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final inactiveColor = themeProvider.isDarkMode 
+        ? Colors.grey[700]
+        : Colors.grey[300];
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(6, (index) {
@@ -151,7 +161,7 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
             shape: BoxShape.circle,
             color: isFilled ? primaryColor : Colors.transparent,
             border: Border.all(
-              color: isFilled ? primaryColor : Colors.grey[300]!,
+              color: isFilled ? primaryColor : inactiveColor!,
               width: 2,
             ),
             boxShadow: isFilled ? [
@@ -167,9 +177,121 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
     );
   }
 
-  Widget _buildNumpad() {
-    final primaryColor = const Color(0xFF0077B6);
+  Widget _buildNumpadButton(String value, {bool isSpecial = false}) {
+    final isDarkMode = Provider.of<ThemeProvider>(context, listen: true).isDarkMode;
+    final themeColor = isDarkMode 
+        ? Color(Constants.darkPrimaryColor) 
+        : Color(Constants.lightPrimaryColor);
+    final bool isBackspace = value == '⌫';
+    final bool isClear = value == 'C';
     
+    return GestureDetector(
+      onTapDown: (_) => setState(() {}),
+      onTapUp: (_) => setState(() {}),
+      onTapCancel: () => setState(() {}),
+      child: Container(
+        width: 75,
+        height: 75,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isDarkMode 
+              ? Color(Constants.darkFormBackgroundColor)
+              : (isSpecial ? themeColor : Colors.white),
+          gradient: !isSpecial ? LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isDarkMode ? [
+              Color(Constants.darkGradientStartColor),
+              Color(Constants.darkGradientEndColor),
+            ] : [
+              Colors.white,
+              Colors.white,
+            ],
+          ) : null,
+          boxShadow: [
+            BoxShadow(
+              color: isDarkMode 
+                  ? Color(Constants.darkPrimaryShadowColor)
+                  : Color(Constants.lightPrimaryShadowColor),
+              blurRadius: 10,
+              spreadRadius: 1,
+              offset: const Offset(0, 2),
+            ),
+            BoxShadow(
+              color: isDarkMode 
+                  ? Color(Constants.darkSecondaryShadowColor)
+                  : Color(Constants.lightSecondaryShadowColor),
+              blurRadius: 10,
+              spreadRadius: 1,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: ClipOval(
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _isLoading
+                  ? null
+                  : () {
+                      if (isBackspace) {
+                        _handleBackspace();
+                      } else if (isClear) {
+                        _handleClear();
+                      } else {
+                        _handleDigit(value);
+                      }
+                    },
+              splashColor: themeColor.withOpacity(0.1),
+              highlightColor: themeColor.withOpacity(0.05),
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isDarkMode 
+                        ? Color(Constants.darkFormBorderColor)
+                        : Color(Constants.lightFormBorderColor),
+                    width: 1,
+                  ),
+                ),
+                child: Center(
+                  child: isBackspace
+                      ? Icon(
+                          Icons.backspace_rounded,
+                          color: isDarkMode ? themeColor : (isSpecial ? Colors.white : themeColor),
+                          size: 28,
+                        )
+                      : isClear
+                          ? Text(
+                              'C',
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w100,
+                                color: isDarkMode ? themeColor : (isSpecial ? Colors.white : themeColor),
+                                letterSpacing: 1,
+                              ),
+                            )
+                          : Text(
+                              value,
+                              style: TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.w500,
+                                color: isDarkMode 
+                                    ? Color(Constants.darkLabelTextColor)
+                                    : Color(Constants.lightLabelTextColor),
+                                letterSpacing: 1,
+                              ),
+                            ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNumpad() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
       child: Column(
@@ -209,303 +331,228 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
     );
   }
 
-  Widget _buildNumpadButton(String value, {bool isSpecial = false}) {
-    final bool isBackspace = value == '⌫';
-    final bool isClear = value == 'C';
-    final primaryColor = const Color(0xFF0077B6);
-    
-    return GestureDetector(
-      onTapDown: (_) => setState(() {}),
-      onTapUp: (_) => setState(() {}),
-      onTapCancel: () => setState(() {}),
-      child: Container(
-        width: 75,
-        height: 75,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white,
-          gradient: !isSpecial ? LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.white,
-              Colors.grey.shade50,
-            ],
-          ) : null,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              spreadRadius: 1,
-              offset: const Offset(0, 2),
-            ),
-            BoxShadow(
-              color: Colors.white.withOpacity(0.8),
-              blurRadius: 10,
-              spreadRadius: 1,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: ClipOval(
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: _isLoading
-                  ? null
-                  : () {
-                      if (isBackspace) {
-                        _handleBackspace();
-                      } else if (isClear) {
-                        _handleClear();
-                      } else {
-                        _handleDigit(value);
-                      }
-                    },
-              splashColor: primaryColor.withOpacity(0.1),
-              highlightColor: primaryColor.withOpacity(0.05),
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.grey.withOpacity(0.1),
-                    width: 1,
-                  ),
-                ),
-                child: Center(
-                  child: isBackspace
-                      ? Icon(
-                          Icons.backspace_rounded,
-                          color: primaryColor,
-                          size: 28,
-                        )
-                      : isClear
-                          ? Text(
-                              'C',
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w100,
-                                color: primaryColor,
-                                letterSpacing: 1,
-                              ),
-                            )
-                          : Text(
-                              value,
-                              style: TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.black87,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final primaryColor = const Color(0xFF0077B6);
-    final backgroundColor = const Color(0xFFF5F6FA);
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final backgroundColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkBackgroundColor 
+        : Constants.lightBackgroundColor);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final surfaceColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
 
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              physics: constraints.maxHeight < 600 
-                  ? const AlwaysScrollableScrollPhysics() 
-                  : const NeverScrollableScrollPhysics(),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: constraints.maxHeight,
-                  minWidth: constraints.maxWidth,
-                ),
-                child: IntrinsicHeight(
-                  child: Stack(
-                    children: [
-                      // Background Logo
-                      Positioned(
-                        top: -75,
-                        right: widget.isArabic ? null : -75,
-                        left: widget.isArabic ? -75 : null,
-                        child: Opacity(
-                          opacity: 0.2,
-                          child: Image.asset(
-                            'assets/images/nayifatlogocircle-nobg.png',
-                            width: 200,
-                            height: 200,
+    return WillPopScope(
+      onWillPop: () async => false,
+      child: Scaffold(
+        backgroundColor: backgroundColor,
+        body: SafeArea(
+          child: Stack(
+            children: [
+              // Background Logo
+              Positioned(
+                top: -100,
+                right: widget.isArabic ? null : -100,
+                left: widget.isArabic ? -100 : null,
+                child: themeProvider.isDarkMode
+                  ? Image.asset(
+                      'assets/images/nayifat-circle-grey.png',
+                      width: 240,
+                      height: 240,
+                    )
+                  : Opacity(
+                      opacity: 0.2,
+                      child: Image.asset(
+                        'assets/images/nayifatlogocircle-nobg.png',
+                        width: 240,
+                        height: 240,
+                      ),
+                    ),
+              ),
+
+              // Main Content
+              Column(
+                children: [
+                  const SizedBox(height: 40),
+                  // Title
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    child: Column(
+                      children: [
+                        Text(
+                          widget.isArabic ? 'إنشاء رمز الدخول' : 'Create MPIN',
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: primaryColor,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: 60,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: primaryColor,
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
-                      ),
+                      ],
+                    ),
+                  ),
 
-                      // Main Content
-                      Column(
+                  if (widget.showSteps) ...[
+                    // Progress Indicator
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                      child: Column(
                         children: [
-                          const SizedBox(height: 40),
-                          // Title with decoration
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                            child: Column(
-                              children: [
-                                Text(
-                                  _isConfirming
-                                      ? (widget.isArabic ? 'تأكيد رمز الدخول' : 'Confirm MPIN')
-                                      : (widget.isArabic ? 'إنشاء رمز دخول سريع' : 'Create MPIN'),
-                                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: primaryColor,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 8),
-                                Container(
-                                  width: 60,
-                                  height: 4,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(3 * 2 - 1, (index) {
+                              if (index % 2 == 0) {
+                                final stepIndex = index ~/ 2;
+                                final isActive = stepIndex == 2;
+                                final isPast = stepIndex < 2;
+                                return Container(
+                                  width: 40,
+                                  height: 40,
                                   decoration: BoxDecoration(
-                                    color: primaryColor,
-                                    borderRadius: BorderRadius.circular(2),
+                                    shape: BoxShape.circle,
+                                    color: isActive || isPast ? primaryColor : surfaceColor,
+                                    border: Border.all(
+                                      color: isActive || isPast ? primaryColor : Colors.grey[300]!,
+                                      width: 1,
+                                    ),
+                                    boxShadow: isActive ? [
+                                      BoxShadow(
+                                        color: primaryColor.withOpacity(0.3),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ] : null,
                                   ),
-                                ),
-                              ],
-                            ),
+                                  child: Center(
+                                    child: Text(
+                                      widget.isArabic 
+                                          ? '${3 - stepIndex}'
+                                          : '${stepIndex + 1}',
+                                      style: TextStyle(
+                                        color: isActive || isPast
+                                            ? (themeProvider.isDarkMode ? Colors.black : Colors.white)
+                                            : Colors.grey[600],
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              } else {
+                                final stepIndex = index ~/ 2;
+                                final isPastLine = stepIndex < 2;
+                                return Container(
+                                  width: 60,
+                                  height: 2,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: isPastLine ? [
+                                        primaryColor,
+                                        primaryColor,
+                                      ] : [
+                                        primaryColor.withOpacity(0.5),
+                                        Colors.grey[300]!,
+                                      ],
+                                    ),
+                                  ),
+                                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                                );
+                              }
+                            }),
                           ),
-
-                          if (widget.showSteps) ...[
-                            // Progress Indicator
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                              child: Column(
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: List.generate(3 * 2 - 1, (index) {
-                                      if (index % 2 == 0) {
-                                        final stepIndex = index ~/ 2;
-                                        final isActive = stepIndex == 2;
-                                        final isPast = stepIndex < 2;
-                                        return Container(
-                                          width: 40,
-                                          height: 40,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: isActive || isPast
-                                                ? primaryColor
-                                                : Colors.grey[300],
-                                          ),
-                                          child: Center(
-                                            child: Text(
-                                              widget.isArabic 
-                                                  ? '${3 - stepIndex}'
-                                                  : '${stepIndex + 1}',
-                                              style: TextStyle(
-                                                color: isActive || isPast
-                                                    ? Colors.white
-                                                    : Colors.grey[600],
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                        );
-                                      } else {
-                                        return Container(
-                                          width: 60,
-                                          height: 2,
-                                          color: Colors.grey[300],
-                                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                                        );
-                                      }
-                                    }),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: List.generate(3 * 2 - 1, (index) {
-                                      if (index % 2 == 0) {
-                                        final stepIndex = index ~/ 2;
-                                        final steps = widget.isArabic
-                                            ? ['رمز الدخول', 'كلمة المرور', 'معلومات']
-                                            : ['Basic', 'Password', 'MPIN'];
-                                        final isActive = stepIndex == 2;
-                                        return SizedBox(
-                                          width: 80,
-                                          child: Text(
-                                            steps[stepIndex],
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              color: isActive ? primaryColor : (stepIndex < 2 ? primaryColor : Colors.grey[600]),
-                                              fontWeight: isActive ? FontWeight.bold : (stepIndex < 2 ? FontWeight.bold : FontWeight.normal),
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                        );
-                                      } else {
-                                        return SizedBox(width: 40);
-                                      }
-                                    }),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const Divider(height: 1),
-                          ],
-
-                          Expanded(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const SizedBox(height: 40),
-                                Text(
-                                  _isConfirming
-                                      ? (widget.isArabic ? 'أدخل رمز الدخول مرة أخرى للتأكيد' : 'Enter MPIN again to confirm')
-                                      : (widget.isArabic ? 'أدخل رمز دخول مكون من 6 أرقام' : 'Enter a 6-digit MPIN'),
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                                const SizedBox(height: 40),
-                                _buildPINDisplay(_isConfirming ? _confirmPin : _pin),
-                                if (_errorMessage != null) ...[
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    _errorMessage!,
-                                    style: const TextStyle(
-                                      color: Colors.red,
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(3 * 2 - 1, (index) {
+                              if (index % 2 == 0) {
+                                final stepIndex = index ~/ 2;
+                                final steps = widget.isArabic
+                                    ? ['رمز الدخول', 'كلمة المرور', 'معلومات']
+                                    : ['Basic', 'Password', 'MPIN'];
+                                final isActive = stepIndex == 2;
+                                final isPast = stepIndex < 2;
+                                return SizedBox(
+                                  width: 80,
+                                  child: Text(
+                                    steps[stepIndex],
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: isActive || isPast 
+                                          ? primaryColor 
+                                          : Colors.grey[600],
+                                      fontWeight: isActive || isPast 
+                                          ? FontWeight.bold 
+                                          : FontWeight.normal,
                                       fontSize: 14,
                                     ),
                                   ),
-                                ],
-                                const SizedBox(height: 40),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: primaryColor.withOpacity(0.05),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, -5),
-                                ),
-                              ],
-                            ),
-                            child: _buildNumpad(),
+                                );
+                              } else {
+                                return const SizedBox(width: 40);
+                              }
+                            }),
                           ),
                         ],
                       ),
-                    ],
+                    ),
+                    Divider(
+                      height: 1,
+                      color: Colors.grey[600],
+                    ),
+                  ],
+
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const SizedBox(height: 40),
+                              Text(
+                                _isConfirming
+                                    ? (widget.isArabic ? 'أدخل رمز الدخول مرة أخرى للتأكيد' : 'Enter MPIN again to confirm')
+                                    : (widget.isArabic ? 'أدخل رمز دخول مكون من 6 أرقام' : 'Enter a 6-digit MPIN'),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              _buildPINDisplay(_isConfirming ? _confirmPin : _pin),
+                              if (_errorMessage != null) ...[
+                                const SizedBox(height: 12),
+                                Text(
+                                  _errorMessage!,
+                                  style: const TextStyle(
+                                    color: Colors.red,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 20),
+                            ],
+                          ),
+                          _buildNumpad(),
+                          // Add some bottom padding for scrolling
+                          const SizedBox(height: 20),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-            );
-          },
+            ],
+          ),
         ),
       ),
     );

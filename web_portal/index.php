@@ -317,7 +317,7 @@ if ($result) {
                 <i class="fas fa-credit-card"></i>
                 <span>Card Applications</span>
             </a>
-            <a href="users.php" class="nav-link">
+            <a href="pages/users.php" class="nav-link">
                 <i class="fas fa-users"></i>
                 <span>Users</span>
             </a>
@@ -341,6 +341,24 @@ if ($result) {
     </button>
 
     <div class="main-content">
+        <?php if (isset($_SESSION['login_message'])): ?>
+            <div class="welcome-message" style="
+                background: #e6f3f8;
+                padding: 1rem;
+                border-radius: 0.5rem;
+                margin-bottom: 2rem;
+                border: 1px solid #b3e5fc;
+                color: #0A71A3;
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+            ">
+                <i class="fas fa-check-circle"></i>
+                <span><?php echo $_SESSION['login_message']; ?></span>
+            </div>
+            <?php unset($_SESSION['login_message']); ?>
+        <?php endif; ?>
+        
         <div class="stats-container">
             <div class="stat-card">
                 <h3>Total Loan Applications</h3>

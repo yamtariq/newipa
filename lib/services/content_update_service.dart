@@ -9,6 +9,7 @@ import '../utils/constants.dart';
 import '../models/slide.dart';
 import '../models/contact_details.dart';
 import 'package:flutter/foundation.dart' as foundation;
+import 'package:path/path.dart';
 
 class ContentUpdateService extends ChangeNotifier {
   static String get updateCheckUrl => Constants.masterFetchUrl;
@@ -24,7 +25,24 @@ class ContentUpdateService extends ChangeNotifier {
   // Track if initial content is loaded
   bool _initialLoadDone = false;
   
-  ContentUpdateService._internal();
+  // Cache directory
+  Directory? _cacheDir;
+  
+  ContentUpdateService._internal() {
+    _initCacheDir();
+  }
+
+  Future<void> _initCacheDir() async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      _cacheDir = Directory('${directory.path}/content_cache');
+      if (!await _cacheDir!.exists()) {
+        await _cacheDir!.create(recursive: true);
+      }
+    } catch (e) {
+      _log('Error initializing cache directory: $e');
+    }
+  }
 
   // In-memory cache
   final Map<String, dynamic> _memoryCache = {};
@@ -207,19 +225,18 @@ class ContentUpdateService extends ChangeNotifier {
                   if (slides[i]['image_url'] != null) {
                     final imageUrl = slides[i]['image_url'];
                     if (imageUrl.startsWith('http')) {
-                      final slideId = slides[i]['slide_id'];
                       final imageKey = keyName == 'slideshow_content_ar' 
-                          ? 'slide_ar_${slideId}_image' 
-                          : 'slide_${slideId}_image';
-                      _log('TTT_Downloading slide image: $imageUrl');
+                          ? 'slide_ar_${i}_image' 
+                          : 'slide_${i}_image';
+                      _log('TTT_Downloading slide image for slide $i: $imageUrl');
                       await _downloadAndCacheImage(imageKey, imageUrl);
                       
                       // Verify the image was cached
                       final cachedImageKey = '${imageKey}_bytes';
                       if (_memoryCache[cachedImageKey] == null) {
-                        _log('TTT_Warning: Failed to cache image for slide $slideId');
+                        _log('TTT_Warning: Failed to cache image for slide $i');
                       } else {
-                        _log('TTT_Successfully cached image for slide $slideId');
+                        _log('TTT_Successfully cached image for slide $i');
                       }
                     }
                   }
@@ -734,41 +751,38 @@ class ContentUpdateService extends ChangeNotifier {
 
   Future<void> _downloadAndCacheImage(String key, String url) async {
     try {
-      _log('Downloading image for $key from $url');
+      if (_cacheDir == null) {
+        await _initCacheDir();
+      }
+      
+      _log('TTT_Downloading image for $key from $url');
+      
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         final bytes = response.bodyBytes;
+        _log('TTT_Downloaded image size: ${bytes.length} bytes');
+        
+        // Cache in memory with unique key
         final cacheKey = '${key}_bytes';
         _memoryCache[cacheKey] = bytes;
-        _log('Downloaded image size: ${bytes.length} bytes');
-        _log('Cached with key: $cacheKey');
+        _log('TTT_Cached with key: $cacheKey');
         
-        // Save to file system immediately
-        final directory = await getApplicationDocumentsDirectory();
-        final contentDir = Directory('${directory.path}/content_cache');
-        if (!await contentDir.exists()) {
-          await contentDir.create(recursive: true);
-        }
-        
-        final file = File('${contentDir.path}/$key.bin');
+        // Save to file system
+        final file = File(join(_cacheDir!.path, '$key.bin'));
         await file.writeAsBytes(bytes);
-        _log('Image cached successfully for $key at: ${file.path}');
+        _log('TTT_Image cached successfully for $key at: ${file.path}');
         
-        // Save updated cache state
-        await _saveContentToCache();
-        
-        // Verify the cached data
-        final cachedBytes = _memoryCache[cacheKey];
-        if (cachedBytes != null) {
-          _log('Verified cached image size: ${(cachedBytes as Uint8List).length} bytes');
-        } else {
-          _log('Warning: Image bytes not found in memory cache after saving');
+        // Verify the file was written correctly
+        if (await file.exists()) {
+          final savedBytes = await file.readAsBytes();
+          _log('TTT_Verified cached image size: ${savedBytes.length} bytes');
+          
+          // Notify listeners to update UI after successful cache
+          notifyListeners();
         }
-      } else {
-        _log('Failed to download image for $key: ${response.statusCode}');
       }
     } catch (e) {
-      _log('Error downloading image for $key: $e');
+      _log('TTT_Error downloading image: $e');
     }
   }
 
@@ -822,20 +836,23 @@ class ContentUpdateService extends ChangeNotifier {
   }
 
   List<Slide> getSlides({bool isArabic = false}) {
-    final key = isArabic ? 'slideshow_content_ar' : 'slideshow_content';
-    final slidesData = _memoryCache[key];
+    final slidesData = _memoryCache[isArabic ? 'slideshow_content_ar' : 'slideshow_content'];
+    
     if (slidesData != null) {
       _log('\nTTT_=== Getting Slides ===');
       _log('TTT_Available cache keys: ${_memoryCache.keys.where((k) => k.contains('bytes')).join(', ')}');
       
-      return (slidesData as List).map((item) {
-        final slideData = Map<String, dynamic>.from(item);
+      final slides = (slidesData as List).asMap().map((index, slideData) {
+        final slideId = slideData['slide_id'] ?? index.toString();
         final imageUrl = slideData['image_url'];
-        final slideId = slideData['slide_id'];
+        final baseKey = isArabic ? 'slide_ar_${index}_image' : 'slide_${index}_image';
+        final cacheKey = '${baseKey}_bytes';
+        
+        _log('TTT_Processing slide $index (ID: $slideId) with cache key: $cacheKey');
         
         // Create the slide with all data
         final slide = Slide(
-          id: slideId ?? 0,
+          id: int.tryParse(slideId.toString()) ?? index,
           imageUrl: imageUrl ?? '',
           link: slideData['link'] ?? '',
           leftTitle: slideData['leftTitle'] ?? '',
@@ -845,24 +862,22 @@ class ContentUpdateService extends ChangeNotifier {
         
         // Only look for cached image if it's a URL
         if (imageUrl != null && imageUrl.startsWith('http')) {
-          final imageKey = isArabic ? 'slide_ar_${slideId}_image_bytes' : 'slide_${slideId}_image_bytes';
-          final imageBytes = _memoryCache[imageKey];
-          _log('TTT_Looking for cached image with key: $imageKey');
+          final imageBytes = _memoryCache[cacheKey];
           
           if (imageBytes != null) {
-            _log('TTT_Found cached image: ${(imageBytes as Uint8List).length} bytes');
-            return slide.copyWith(imageBytes: (imageBytes as Uint8List).toList());
+            _log('TTT_Found cached image for slide $index: ${(imageBytes as Uint8List).length} bytes');
+            return MapEntry(index, slide.copyWith(imageBytes: imageBytes.toList()));
           } else {
-            _log('TTT_No cached image found for $imageKey - will trigger download');
-            // If we don't have the image cached, trigger a download
-            _downloadAndCacheImage(
-              isArabic ? 'slide_ar_${slideId}_image' : 'slide_${slideId}_image',
-              imageUrl
-            );
+            _log('TTT_No cached image found for slide $index - downloading from $imageUrl');
+            _downloadAndCacheImage(baseKey, imageUrl);
           }
         }
-        return slide;
-      }).toList();
+        
+        return MapEntry(index, slide);
+      }).values.toList();
+      
+      _log('TTT_Returning ${slides.length} slides');
+      return slides;
     }
     
     _log('TTT_No slides data found - using static slides');
@@ -1006,8 +1021,9 @@ class ContentUpdateService extends ChangeNotifier {
           // Download and cache all images
           for (var slide in slides) {
             if (slide['image_url'] != null && slide['image_url'].startsWith('http')) {
-              final slideId = slide['slide_id'];
+              final slideId = slide['slide_id'] ?? '0';
               final imageKey = isArabic ? 'slide_ar_${slideId}_image' : 'slide_${slideId}_image';
+              _log('TTT_Downloading slide image for slide $slideId: ${slide['image_url']}');
               await _downloadAndCacheImage(imageKey, slide['image_url']);
             }
           }

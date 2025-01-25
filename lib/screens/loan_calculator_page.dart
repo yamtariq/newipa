@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
+import '../utils/constants.dart';
 
 class LoanCalculatorPage extends StatefulWidget {
   const LoanCalculatorPage({super.key});
@@ -63,28 +64,19 @@ class _LoanCalculatorPageState extends State<LoanCalculatorPage> {
   }
 
   Widget _buildHeader() {
-    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
-    final themeColor = isDarkMode ? Colors.black : const Color(0xFF0077B6);
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final textColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
 
     return Container(
       padding: const EdgeInsets.all(16.0),
       child: Row(
         children: [
-          isDarkMode 
-            ? ColorFiltered(
-                colorFilter: const ColorFilter.mode(
-                  Colors.black,
-                  BlendMode.srcIn,
-                ),
-                child: SvgPicture.asset(
-                  'assets/images/nayifat-logo.svg',
-                  height: 40,
-                ),
-              )
-            : SvgPicture.asset(
-                'assets/images/nayifat-logo.svg',
-                height: 40,
-              ),
+          Image.asset(
+            'assets/images/nayifat-logo-no-bg.png',
+            height: MediaQuery.of(context).size.height * 0.06,
+          ),
           Expanded(
             child: Center(
               child: Text(
@@ -92,7 +84,7 @@ class _LoanCalculatorPageState extends State<LoanCalculatorPage> {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: themeColor,
+                  color: textColor,
                 ),
               ),
             ),
@@ -100,7 +92,7 @@ class _LoanCalculatorPageState extends State<LoanCalculatorPage> {
           IconButton(
             icon: Icon(
               Icons.arrow_forward,
-              color: themeColor,
+              color: textColor,
             ),
             onPressed: () {
               Navigator.pop(context);
@@ -113,11 +105,25 @@ class _LoanCalculatorPageState extends State<LoanCalculatorPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
-    final themeColor = isDarkMode ? Colors.black : const Color(0xFF0077B6);
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final textColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
+    final backgroundColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkBackgroundColor 
+        : Constants.lightBackgroundColor);
+    final surfaceColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
+    final borderColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkFormBorderColor 
+        : Constants.lightFormBorderColor);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
 
     return Scaffold(
-      backgroundColor: isDarkMode ? Colors.grey[100] : Colors.white,
+      backgroundColor: backgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
@@ -128,14 +134,16 @@ class _LoanCalculatorPageState extends State<LoanCalculatorPage> {
                 margin: const EdgeInsets.all(16.0),
                 padding: const EdgeInsets.all(20.0),
                 decoration: BoxDecoration(
-                  color: isDarkMode ? Colors.grey[100] : Colors.white,
-                  borderRadius: BorderRadius.circular(12.0),
+                  color: surfaceColor,
+                  borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
                   border: Border.all(
-                    color: themeColor.withOpacity(0.2),
+                    color: borderColor,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: isDarkMode ? Colors.grey[400]! : Colors.black.withOpacity(0.05),
+                      color: Color(themeProvider.isDarkMode 
+                          ? Constants.darkPrimaryShadowColor 
+                          : Constants.lightPrimaryShadowColor),
                       blurRadius: 5,
                       offset: const Offset(0, 2),
                     ),
@@ -153,7 +161,7 @@ class _LoanCalculatorPageState extends State<LoanCalculatorPage> {
                           'Loan Details',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: themeColor,
+                            color: textColor,
                             fontSize: 16,
                           ),
                         ),
@@ -161,9 +169,9 @@ class _LoanCalculatorPageState extends State<LoanCalculatorPage> {
                       const SizedBox(height: 16),
                       Container(
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(Constants.formBorderRadius),
                           border: Border.all(
-                            color: themeColor.withOpacity(0.2),
+                            color: borderColor,
                           ),
                         ),
                         child: TextFormField(
@@ -172,10 +180,12 @@ class _LoanCalculatorPageState extends State<LoanCalculatorPage> {
                             labelText: 'Loan Amount (SAR)',
                             border: InputBorder.none,
                             contentPadding: const EdgeInsets.all(12),
-                            prefixIcon: Icon(Icons.attach_money, color: themeColor),
-                            labelStyle: TextStyle(color: themeColor.withOpacity(0.7)),
+                            prefixIcon: Icon(Icons.attach_money, color: primaryColor),
+                            labelStyle: TextStyle(color: Color(themeProvider.isDarkMode 
+                                ? Constants.darkHintTextColor 
+                                : Constants.lightHintTextColor)),
                           ),
-                          style: TextStyle(color: isDarkMode ? Colors.black87 : Colors.black87),
+                          style: TextStyle(color: textColor),
                           keyboardType: TextInputType.number,
                           inputFormatters: [
                             FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
@@ -191,9 +201,9 @@ class _LoanCalculatorPageState extends State<LoanCalculatorPage> {
                       const SizedBox(height: 16),
                       Container(
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(Constants.formBorderRadius),
                           border: Border.all(
-                            color: themeColor.withOpacity(0.2),
+                            color: borderColor,
                           ),
                         ),
                         child: TextFormField(
@@ -202,10 +212,12 @@ class _LoanCalculatorPageState extends State<LoanCalculatorPage> {
                             labelText: 'Interest Rate (%)',
                             border: InputBorder.none,
                             contentPadding: const EdgeInsets.all(12),
-                            prefixIcon: Icon(Icons.percent, color: themeColor),
-                            labelStyle: TextStyle(color: themeColor.withOpacity(0.7)),
+                            prefixIcon: Icon(Icons.percent, color: primaryColor),
+                            labelStyle: TextStyle(color: Color(themeProvider.isDarkMode 
+                                ? Constants.darkHintTextColor 
+                                : Constants.lightHintTextColor)),
                           ),
-                          style: TextStyle(color: isDarkMode ? Colors.black87 : Colors.black87),
+                          style: TextStyle(color: textColor),
                           keyboardType: TextInputType.number,
                           inputFormatters: [
                             FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
@@ -221,9 +233,9 @@ class _LoanCalculatorPageState extends State<LoanCalculatorPage> {
                       const SizedBox(height: 16),
                       Container(
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(Constants.formBorderRadius),
                           border: Border.all(
-                            color: themeColor.withOpacity(0.2),
+                            color: borderColor,
                           ),
                         ),
                         child: TextFormField(
@@ -232,10 +244,12 @@ class _LoanCalculatorPageState extends State<LoanCalculatorPage> {
                             labelText: 'Loan Tenure (months)',
                             border: InputBorder.none,
                             contentPadding: const EdgeInsets.all(12),
-                            prefixIcon: Icon(Icons.calendar_today, color: themeColor),
-                            labelStyle: TextStyle(color: themeColor.withOpacity(0.7)),
+                            prefixIcon: Icon(Icons.calendar_today, color: primaryColor),
+                            labelStyle: TextStyle(color: Color(themeProvider.isDarkMode 
+                                ? Constants.darkHintTextColor 
+                                : Constants.lightHintTextColor)),
                           ),
-                          style: TextStyle(color: isDarkMode ? Colors.black87 : Colors.black87),
+                          style: TextStyle(color: textColor),
                           keyboardType: TextInputType.number,
                           inputFormatters: [
                             FilteringTextInputFormatter.digitsOnly,
@@ -257,12 +271,12 @@ class _LoanCalculatorPageState extends State<LoanCalculatorPage> {
                                 Navigator.pop(context);
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: isDarkMode ? Colors.black.withOpacity(0.1) : Colors.white,
+                                backgroundColor: surfaceColor,
                                 padding: const EdgeInsets.symmetric(vertical: 16),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
                                   side: BorderSide(
-                                    color: themeColor.withOpacity(0.5),
+                                    color: borderColor,
                                   ),
                                 ),
                               ),
@@ -271,7 +285,7 @@ class _LoanCalculatorPageState extends State<LoanCalculatorPage> {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: themeColor,
+                                  color: textColor,
                                 ),
                               ),
                             ),
@@ -281,13 +295,10 @@ class _LoanCalculatorPageState extends State<LoanCalculatorPage> {
                             child: ElevatedButton(
                               onPressed: _calculateLoan,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: isDarkMode ? Colors.black.withOpacity(0.1) : const Color(0xFF0077B6),
+                                backgroundColor: primaryColor,
                                 padding: const EdgeInsets.symmetric(vertical: 16),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  side: BorderSide(
-                                    color: isDarkMode ? Colors.black : Colors.transparent,
-                                  ),
+                                  borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
                                 ),
                               ),
                               child: Text(
@@ -295,7 +306,7 @@ class _LoanCalculatorPageState extends State<LoanCalculatorPage> {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: isDarkMode ? Colors.black : Colors.white,
+                                  color: themeProvider.isDarkMode ? backgroundColor : surfaceColor,
                                 ),
                               ),
                             ),
@@ -311,14 +322,16 @@ class _LoanCalculatorPageState extends State<LoanCalculatorPage> {
                   margin: const EdgeInsets.symmetric(horizontal: 16.0),
                   padding: const EdgeInsets.all(20.0),
                   decoration: BoxDecoration(
-                    color: isDarkMode ? Colors.grey[100] : Colors.white,
-                    borderRadius: BorderRadius.circular(12.0),
+                    color: surfaceColor,
+                    borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
                     border: Border.all(
-                      color: themeColor.withOpacity(0.2),
+                      color: borderColor,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: isDarkMode ? Colors.grey[400]! : Colors.black.withOpacity(0.05),
+                        color: Color(themeProvider.isDarkMode 
+                            ? Constants.darkPrimaryShadowColor 
+                            : Constants.lightPrimaryShadowColor),
                         blurRadius: 5,
                         offset: const Offset(0, 2),
                       ),
@@ -334,7 +347,7 @@ class _LoanCalculatorPageState extends State<LoanCalculatorPage> {
                           'Calculation Results',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: themeColor,
+                            color: textColor,
                             fontSize: 16,
                           ),
                         ),
@@ -343,19 +356,19 @@ class _LoanCalculatorPageState extends State<LoanCalculatorPage> {
                       _ResultTile(
                         title: 'Monthly EMI',
                         value: _formatCurrency(_emi),
-                        color: themeColor,
+                        color: primaryColor,
                       ),
                       const Divider(),
                       _ResultTile(
                         title: 'Total Interest',
                         value: _formatCurrency(_totalInterest),
-                        color: themeColor,
+                        color: primaryColor,
                       ),
                       const Divider(),
                       _ResultTile(
                         title: 'Total Payment',
                         value: _formatCurrency(_totalPayment),
-                        color: themeColor,
+                        color: primaryColor,
                       ),
                     ],
                   ),
@@ -382,6 +395,11 @@ class _ResultTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final textColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
@@ -389,9 +407,10 @@ class _ResultTile extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,
+              color: textColor,
             ),
           ),
           Text(

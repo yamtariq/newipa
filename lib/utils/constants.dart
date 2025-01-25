@@ -143,7 +143,115 @@ class Constants {
 
   // Colors
   static const int primaryColorValue = 0xFF0077B6;
-  // static const int primaryColorValue = 0xFF00A650;
+  
+  // Theme Base Colors
+  // Light Theme
+  static const int lightPrimaryColor = 0xFF0077B6;    // Primary blue 
+  static const int lightBackgroundColor = 0xFFE3F2FD; // Light baby blue background
+  static const int lightSurfaceColor = 0xFFFFFFFF;    // Pure white surface
+
+  // Dark Theme
+  static const int darkPrimaryColor = 0xFF0099E6;     // Lighter blue for dark mode
+  static const int darkBackgroundColor = 0xFF121212;  // Dark gray/black
+  static const int darkSurfaceColor = 0xFF242424;     // Slightly lighter dark gray
+
+  // Form and UI Colors with Opacity
+  // Light Theme Form Colors
+  static const int lightFormBackgroundColor = 0xFFFFFFFF;  // Pure white for forms
+  static const int lightFormBorderColor = 0x330077B6;      // Primary blue with 20% opacity
+  static const int lightFormFocusedBorderColor = 0x800077B6; // Primary blue with 50% opacity
+  static const int lightLabelTextColor = 0xFF0077B6;       // Primary blue (full opacity)
+  static const int lightHintTextColor = 0x800077B6;        // Primary blue with 50% opacity
+  static const int lightIconColor = 0xFF0077B6;            // Primary blue (full opacity)
+
+  // Dark Theme Form Colors
+  static const int darkFormBackgroundColor = 0x140099E6;   // Dark blue with 8% opacity
+  static const int darkFormBorderColor = 0x330099E6;       // Dark blue with 20% opacity
+  static const int darkFormFocusedBorderColor = 0x800099E6; // Dark blue with 50% opacity
+  static const int darkLabelTextColor = 0xCC0099E6;        // Dark blue with 80% opacity
+  static const int darkHintTextColor = 0x800099E6;         // Dark blue with 50% opacity
+  static const int darkIconColor = 0xCC0099E6;             // Dark blue with 80% opacity
+
+  // Switch Colors
+  static const int lightSwitchTrackColor = 0x4D0077B6;     // Primary blue with 30% opacity
+  static const int lightSwitchInactiveTrackColor = 0x1A0077B6; // Primary blue with 10% opacity
+  static const int lightSwitchInactiveThumbColor = primaryColorValue; // the circle in the toggle button Primary blue with 70% opacity
+  static const int lightSwitchTrackOutlineColor = 0x1A0077B6; // Primary blue with 10% opacity (matching track)
+  
+  static const int darkSwitchTrackColor = 0x4D0099E6;      // Dark blue with 30% opacity
+  static const int darkSwitchInactiveTrackColor = 0x1A0099E6; // Dark blue with 10% opacity
+  static const int darkSwitchInactiveThumbColor = 0xB30099E6; // Dark blue with 70% opacity
+  static const int darkSwitchTrackOutlineColor = 0x1A0099E6; // Dark blue with 10% opacity (matching track)
+
+  // Gradient Colors
+  static const int lightGradientStartColor = 0x1A0077B6;   // Primary blue with 10% opacity
+  static const int lightGradientEndColor = 0x0D0077B6;     // Primary blue with 5% opacity
+  
+  static const int darkGradientStartColor = 0x1A0099E6;    // Dark blue with 10% opacity
+  static const int darkGradientEndColor = 0x0D0099E6;      // Dark blue with 5% opacity
+
+  // Shadow Colors
+  static const int lightPrimaryShadowColor = 0x330077B6;   // Primary blue with 20% opacity
+  static const int lightSecondaryShadowColor = 0x1A0077B6; // Primary blue with 10% opacity
+  
+  static const int darkPrimaryShadowColor = 0x330099E6;    // Dark blue with 20% opacity
+  static const int darkSecondaryShadowColor = 0x1A0099E6;  // Dark blue with 10% opacity
+
+  // Navigation Bar Colors
+  // Light Theme Navbar
+  static const int lightNavbarBackground = 0xFFFFFFFF;     // White background
+  static const int lightNavbarPageBackground = 0xFFFFFFFF;  // White page background
+  static const int lightNavbarGradientStart = lightBackgroundColor;  // Primary blue with 10% opacity
+  static const int lightNavbarGradientEnd = lightBackgroundColor;    // Primary blue with 5% opacity
+  static const int lightNavbarShadowPrimary = lightBackgroundColor;  // Primary blue with 20% opacity
+  static const int lightNavbarShadowSecondary = lightBackgroundColor;// Primary blue with 10% opacity
+  static const int lightNavbarActiveIcon = 0xFF0077B6;     // Primary blue (full opacity)
+  static const int lightNavbarInactiveIcon = 0xFF0077B6;   // Primary blue with 50% opacity
+  static const int lightNavbarActiveText = 0xFF0077B6;     // Primary blue (full opacity)
+  static const int lightNavbarInactiveText = 0xFF0077B6;   // Primary blue with 50% opacity
+
+  // Dark Theme Navbar
+  static const int darkNavbarBackground = darkBackgroundColor;      // Dark surface color
+  static const int darkNavbarGradientStart = 0x1A0099E6;   // Dark blue with 10% opacity
+  static const int darkNavbarGradientEnd = 0x0D0099E6;     // Dark blue with 5% opacity
+  static const int darkNavbarShadowPrimary = 0x330099E6;   // Dark blue with 20% opacity
+  static const int darkNavbarShadowSecondary = 0x1A0099E6; // Dark blue with 10% opacity
+  static const int darkNavbarActiveIcon = 0xFF0099E6;      // Dark blue (full opacity)
+  static const int darkNavbarInactiveIcon = 0x800099E6;    // Dark blue with 50% opacity
+  static const int darkNavbarActiveText = 0xFF0099E6;      // Dark blue (full opacity)
+  static const int darkNavbarInactiveText = 0x800099E6;    // Dark blue with 50% opacity
+
+  // Border Radii
+  static const double containerBorderRadius = 12.0;
+  static const double formBorderRadius = 8.0;
+  static const double buttonBorderRadius = 15.0;
+
+  // Form and UI Element Constants
+  // Background Opacities
+  static const double formBackgroundOpacityDark = 0.08;  // For dark mode form backgrounds
+  static const double formBackgroundOpacityLight = 0.04; // For light mode form backgrounds
+  
+  // Border Opacities
+  static const double formBorderOpacity = 0.2;          // For form borders
+  static const double formFocusedBorderOpacity = 0.5;   // For focused form borders
+  
+  // Text Opacities
+  static const double labelTextOpacity = 0.8;           // For form labels
+  static const double hintTextOpacity = 0.5;            // For hint text
+  
+  // Switch and Interactive Elements
+  static const double activeTrackOpacity = 0.3;         // For switch tracks when active
+  static const double inactiveTrackOpacity = 0.1;       // For switch tracks when inactive
+  static const double inactiveThumbOpacity = 0.7;       // For switch thumbs when inactive
+  
+  // Gradient Opacities
+  static const double gradientStartOpacity = 0.1;       // For gradient start color
+  static const double gradientEndOpacity = 0.05;        // For gradient end color
+  
+  // Shadow Opacities
+  static const double primaryShadowOpacity = 0.2;       // For primary shadows
+  static const double secondaryShadowOpacity = 0.1;     // For secondary shadows
+
   // Asset paths
   static const String termsAndConditionsPath = 'assets/docs/terms.pdf';
   static const String privacyPolicyPath = 'assets/docs/privacy.pdf';
@@ -234,4 +342,8 @@ class Constants {
       'instagram': 'https://www.instagram.com/nayifatcompany/',
     },
   };
+
+  // Error Colors
+  static const int darkErrorColor = 0xFFFF5252;  // Red shade for dark theme
+  static const int lightErrorColor = 0xFFD32F2F;  // Darker red for light theme
 } 

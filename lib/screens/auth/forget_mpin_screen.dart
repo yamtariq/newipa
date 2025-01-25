@@ -8,6 +8,8 @@ import 'biometric_setup_screen.dart';
 import '../main_page.dart';
 import 'package:provider/provider.dart';
 import '../../providers/session_provider.dart';
+import '../../providers/theme_provider.dart';
+import '../../utils/constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ForgetMPINScreen extends StatefulWidget {
@@ -48,6 +50,11 @@ class _ForgetMPINScreenState extends State<ForgetMPINScreen> {
 
   void _showErrorBanner(String message) {
     if (!mounted) return;
+    
+    final isDarkMode = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+    final themeColor = isDarkMode 
+        ? Color(Constants.darkPrimaryColor) 
+        : Color(Constants.lightPrimaryColor);
     
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -93,11 +100,13 @@ class _ForgetMPINScreenState extends State<ForgetMPINScreen> {
             ],
           ),
         ),
-        backgroundColor: Colors.red[700],
+        backgroundColor: isDarkMode 
+            ? Color(Constants.darkSurfaceColor)
+            : Colors.red[700],
         duration: const Duration(seconds: 4),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
         ),
         margin: const EdgeInsets.all(16),
       ),
@@ -121,7 +130,7 @@ class _ForgetMPINScreenState extends State<ForgetMPINScreen> {
 
     try {
       // First verify the password
-      final loginResponse = await _authService.login(
+      final loginResponse = await _authService.signIn(
         nationalId: _nationalIdController.text,
         password: _passwordController.text,
       );
@@ -137,7 +146,7 @@ class _ForgetMPINScreenState extends State<ForgetMPINScreen> {
 
       // Generate OTP
       final response = await http.post(
-        Uri.parse('${AuthService.baseUrl}/otp_generate.php'),
+        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPGenerate}'),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'api-key': AuthService.apiKey,
@@ -159,7 +168,7 @@ class _ForgetMPINScreenState extends State<ForgetMPINScreen> {
               isArabic: widget.isArabic,
               onResendOTP: () async {
                 final response = await http.post(
-                  Uri.parse('${AuthService.baseUrl}/otp_generate.php'),
+                  Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPGenerate}'),
                   headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                     'api-key': AuthService.apiKey,
@@ -172,7 +181,7 @@ class _ForgetMPINScreenState extends State<ForgetMPINScreen> {
               },
               onVerifyOTP: (otp) async {
                 final response = await http.post(
-                  Uri.parse('${AuthService.baseUrl}/otp_verification.php'),
+                  Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPVerification}'),
                   headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                     'api-key': AuthService.apiKey,
@@ -238,12 +247,17 @@ class _ForgetMPINScreenState extends State<ForgetMPINScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = const Color(0xFF0077B6);
+    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
+    final themeColor = isDarkMode 
+        ? Color(Constants.darkPrimaryColor) 
+        : Color(Constants.lightPrimaryColor);
 
     return Directionality(
       textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF5F6FA),
+        backgroundColor: isDarkMode 
+            ? Color(Constants.darkBackgroundColor)
+            : Color(Constants.lightBackgroundColor),
         body: SafeArea(
           child: Stack(
             children: [
@@ -252,25 +266,32 @@ class _ForgetMPINScreenState extends State<ForgetMPINScreen> {
                 top: -100,
                 right: widget.isArabic ? null : -100,
                 left: widget.isArabic ? -100 : null,
-                child: Opacity(
-                  opacity: 0.2,
-                  child: Image.asset(
-                    'assets/images/nayifatlogocircle-nobg.png',
-                    width: 240,
-                    height: 240,
-                  ),
-                ),
+                child: isDarkMode
+                  ? Image.asset(
+                      'assets/images/nayifat-circle-grey.png',
+                      width: 240,
+                      height: 240,
+                    )
+                  : Opacity(
+                      opacity: 0.2,
+                      child: Image.asset(
+                        'assets/images/nayifatlogocircle-nobg.png',
+                        width: 240,
+                        height: 240,
+                      ),
+                    ),
               ),
 
               // Main Content
               SingleChildScrollView(
+                
                 padding: const EdgeInsets.all(24.0),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 90),
 
                       // Title
                       Text(
@@ -280,7 +301,7 @@ class _ForgetMPINScreenState extends State<ForgetMPINScreen> {
                             .headlineMedium
                             ?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: primaryColor,
+                              color: themeColor,
                             ),
                         textAlign: TextAlign.center,
                       ),
@@ -290,7 +311,7 @@ class _ForgetMPINScreenState extends State<ForgetMPINScreen> {
                           width: 60,
                           height: 4,
                           decoration: BoxDecoration(
-                            color: primaryColor,
+                            color: themeColor,
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
@@ -304,7 +325,9 @@ class _ForgetMPINScreenState extends State<ForgetMPINScreen> {
                             : 'To reset your MPIN, please enter your National ID and password',
                         style: TextStyle(
                           fontSize: 16,
-                          color: Colors.grey[600],
+                          color: isDarkMode 
+                              ? Color(Constants.darkLabelTextColor)
+                              : Color(Constants.lightLabelTextColor),
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -317,18 +340,44 @@ class _ForgetMPINScreenState extends State<ForgetMPINScreen> {
                         decoration: InputDecoration(
                           labelText: widget.isArabic ? 'رقم الهوية أو الإقامة' : 'National or Iqama ID',
                           hintText: widget.isArabic ? 'أدخل رقم الهوية أو الإقامة' : 'Enter your National or Iqama ID',
-                          prefixIcon: const Icon(Icons.person_outline),
+                          prefixIcon: Icon(Icons.person_outline, color: themeColor),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                            borderSide: BorderSide(
+                              color: isDarkMode 
+                                  ? Color(Constants.darkFormBorderColor)
+                                  : Color(Constants.lightFormBorderColor),
+                            ),
                           ),
                           filled: true,
-                          fillColor: Colors.grey[100],
+                          fillColor: isDarkMode 
+                              ? Color(Constants.darkFormBackgroundColor)
+                              : Color(Constants.lightFormBackgroundColor),
                           disabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: Colors.grey[300]!),
+                            borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                            borderSide: BorderSide(
+                              color: isDarkMode 
+                                  ? Color(Constants.darkFormBorderColor)
+                                  : Color(Constants.lightFormBorderColor),
+                            ),
+                          ),
+                          labelStyle: TextStyle(
+                            color: isDarkMode 
+                                ? Color(Constants.darkLabelTextColor)
+                                : Color(Constants.lightLabelTextColor),
+                          ),
+                          hintStyle: TextStyle(
+                            color: isDarkMode 
+                                ? Color(Constants.darkHintTextColor)
+                                : Color(Constants.lightHintTextColor),
                           ),
                         ),
                         keyboardType: TextInputType.number,
+                        style: TextStyle(
+                          color: isDarkMode 
+                              ? Color(Constants.darkLabelTextColor)
+                              : Color(Constants.lightLabelTextColor),
+                        ),
                       ),
                       const SizedBox(height: 20),
 
@@ -338,14 +387,52 @@ class _ForgetMPINScreenState extends State<ForgetMPINScreen> {
                         decoration: InputDecoration(
                           labelText: widget.isArabic ? 'كلمة المرور' : 'Password',
                           hintText: widget.isArabic ? 'أدخل كلمة المرور' : 'Enter your password',
-                          prefixIcon: const Icon(Icons.lock_outline),
+                          prefixIcon: Icon(Icons.lock_outline, color: themeColor),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                            borderSide: BorderSide(
+                              color: isDarkMode 
+                                  ? Color(Constants.darkFormBorderColor)
+                                  : Color(Constants.lightFormBorderColor),
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                            borderSide: BorderSide(
+                              color: isDarkMode 
+                                  ? Color(Constants.darkFormBorderColor)
+                                  : Color(Constants.lightFormBorderColor),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                            borderSide: BorderSide(
+                              color: isDarkMode 
+                                  ? Color(Constants.darkFormFocusedBorderColor)
+                                  : Color(Constants.lightFormFocusedBorderColor),
+                            ),
                           ),
                           filled: true,
-                          fillColor: Colors.white,
+                          fillColor: isDarkMode 
+                              ? Color(Constants.darkFormBackgroundColor)
+                              : Color(Constants.lightFormBackgroundColor),
+                          labelStyle: TextStyle(
+                            color: isDarkMode 
+                                ? Color(Constants.darkLabelTextColor)
+                                : Color(Constants.lightLabelTextColor),
+                          ),
+                          hintStyle: TextStyle(
+                            color: isDarkMode 
+                                ? Color(Constants.darkHintTextColor)
+                                : Color(Constants.lightHintTextColor),
+                          ),
                         ),
                         obscureText: true,
+                        style: TextStyle(
+                          color: isDarkMode 
+                              ? Color(Constants.darkLabelTextColor)
+                              : Color(Constants.lightLabelTextColor),
+                        ),
                       ),
                       const SizedBox(height: 40),
 
@@ -353,11 +440,13 @@ class _ForgetMPINScreenState extends State<ForgetMPINScreen> {
                       ElevatedButton(
                         onPressed: _isLoading ? null : _onNextPressed,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor,
+                          backgroundColor: themeColor,
+                          foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
                           ),
+                          elevation: 0,
                         ),
                         child: _isLoading
                             ? const SizedBox(
@@ -391,7 +480,9 @@ class _ForgetMPINScreenState extends State<ForgetMPINScreen> {
                         child: Text(
                           widget.isArabic ? 'إلغاء' : 'Cancel',
                           style: TextStyle(
-                            color: Colors.grey[600],
+                            color: isDarkMode 
+                                ? Color(Constants.darkLabelTextColor)
+                                : Color(Constants.lightLabelTextColor),
                             fontSize: 16,
                           ),
                         ),

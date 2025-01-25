@@ -10,6 +10,9 @@ import 'card_application/card_application_details_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:lottie/lottie.dart';
 import '../screens/main_page.dart';
+import 'package:provider/provider.dart';
+import '../providers/theme_provider.dart';
+import '../widgets/otp_dialog.dart';
 
 class ApplicationLandingScreen extends StatefulWidget {
   final bool isArabic;
@@ -29,176 +32,132 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
   final _formKey = GlobalKey<FormState>();
   final _storage = const FlutterSecureStorage();
   bool _isLoading = false;
-  bool _isDarkMode = false;
+  final _otpController = TextEditingController();
   
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _idNumberController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _salaryController = TextEditingController();
-
-  final Color primaryColor = const Color(0xFF0077B6);
-  final Color primaryLightColor = const Color(0xFFE6F3F8);  // Lightest shade for background
-  final Color primaryMediumColor = const Color(0xFF0077B6).withOpacity(0.2);  // Medium shade for containers
-  final Color primaryDarkColor = const Color(0xFF005B8D);  // Darker shade for emphasis
-
-  @override
-  void initState() {
-    super.initState();
-    _loadTheme();
-  }
-
-  Future<void> _loadTheme() async {
-    final isDark = await ThemeService.isDarkMode();
-    if (mounted) {
-      setState(() {
-        _isDarkMode = isDark;
-      });
-    }
-  }
+  final TextEditingController _phoneController = TextEditingController();
 
   @override
   void dispose() {
     _nameController.dispose();
     _idNumberController.dispose();
-    _emailController.dispose();
-    _salaryController.dispose();
+    _phoneController.dispose();
+    _otpController.dispose();
     super.dispose();
   }
 
-  Future<void> _showResultDialog(bool isSuccess) async {
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.black,  // Black
-                  Colors.black,  // Black
-                  const Color(0xFF00A650),  // Nayifat green
-                ],
-                stops: const [0.0, 0.7, 1.0],
-              ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.2),
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 15,
-                  spreadRadius: -8,
-                ),
-              ],
+  Future<bool> _verifyOTP(String otp) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPVerification}'),
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'api-key': Constants.apiKey,
+        },
+        body: {
+          'national_id': _idNumberController.text,
+          'otp_code': otp,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['status'] == 'success';
+      }
+      return false;
+    } catch (e) {
+      print('Error verifying OTP: $e');
+      return false;
+    }
+  }
+
+  Future<bool> _sendOTP() async {
+    try {
+      final response = await http.post(
+        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPGenerate}'),
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'api-key': Constants.apiKey,
+        },
+        body: {
+          'national_id': _idNumberController.text,
+        },
+      );
+
+      print('OTP Generation Response: ${response.body}'); // Debug log
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['status'] == 'success';
+      }
+      return false;
+    } catch (e) {
+      print('Error sending OTP: $e');
+      return false;
+    }
+  }
+
+  Future<bool> _showOTPDialog() async {
+    bool isVerified = false;
+    
+    // Send OTP first
+    final otpSent = await _sendOTP();
+    if (!otpSent) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              widget.isArabic
+                  ? 'فشل في إرسال رمز التحقق. الرجاء المحاولة مرة أخرى'
+                  : 'Failed to send OTP. Please try again',
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Lottie Animation
-                Container(
-                  width: 200,
-                  height: 200,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(100),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.2),
-                      width: 1,
-                    ),
-                  ),
-                  child: Lottie.asset(
-                    'assets/animations/celebration.json',
-                    repeat: isSuccess,
-                    reverse: isSuccess,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                
-                // Message
-                Text(
-                  isSuccess
-                      ? (widget.isArabic
-                          ? 'تم تقديم طلبك بنجاح'
-                          : 'Your application has been submitted successfully')
-                      : (widget.isArabic
-                          ? 'حدث خطأ أثناء تقديم طلبك'
-                          : 'There was an error submitting your application'),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                // OK Button
-                Container(
-                  width: double.infinity,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        const Color(0xFF00A650),  // Nayifat green
-                        Colors.black,  // Black
-                      ],
-                      stops: const [0.0, 1.0],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF00A650).withOpacity(0.3),
-                        blurRadius: 12,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop(); // Close dialog
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => MainPage(
-                            isArabic: widget.isArabic,
-                            userData: const {},
-                            onLanguageChanged: null,
-                          ),
-                        ),
-                        (route) => false,
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Text(
-                      widget.isArabic ? 'حسناً' : 'OK',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            backgroundColor: Colors.red,
           ),
         );
-      },
+      }
+      return false;
+    }
+
+    if (!mounted) return false;
+
+    final otpVerified = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => OTPDialog(
+        nationalId: _idNumberController.text,
+        isArabic: widget.isArabic,
+        onResendOTP: () async {
+          final response = await http.post(
+            Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPGenerate}'),
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'api-key': Constants.apiKey,
+            },
+            body: {
+              'national_id': _idNumberController.text,
+            },
+          );
+          return json.decode(response.body);
+        },
+        onVerifyOTP: (otp) async {
+          final response = await http.post(
+            Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPVerification}'),
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'api-key': Constants.apiKey,
+            },
+            body: {
+              'national_id': _idNumberController.text,
+              'otp_code': otp,
+            },
+          );
+          return json.decode(response.body);
+        },
+      ),
     );
+
+    return otpVerified ?? false;
   }
 
   Future<void> _submitForm() async {
@@ -208,11 +167,19 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
       });
 
       try {
+        // First verify phone with OTP
+        final verified = await _showOTPDialog();
+        if (!verified) {
+          setState(() {
+            _isLoading = false;
+          });
+          return;
+        }
+
         final applicationData = {
           'name': _nameController.text,
           'id_number': _idNumberController.text,
-          'email': _emailController.text,
-          'salary': double.parse(_salaryController.text),
+          'phone': _phoneController.text,
           'application_no': "0",
         };
 
@@ -247,7 +214,7 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
           print('Payload: ${jsonEncode(loanData)}');
 
           final response = await http.post(
-            Uri.parse('${Constants.apiBaseUrl}/update_loan_application.php'),
+            Uri.parse('${Constants.apiBaseUrl}${Constants.endpointUpdateLoanApplication}'),
             headers: {
               'Content-Type': 'application/json',
               'api-key': Constants.apiKey,
@@ -285,7 +252,7 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
           print('Payload: ${jsonEncode(cardData)}');
 
           final response = await http.post(
-            Uri.parse('${Constants.apiBaseUrl}/update_cards_application.php'),
+            Uri.parse('${Constants.apiBaseUrl}${Constants.endpointUpdateCardApplication}'),
             headers: {
               'Content-Type': 'application/json',
               'api-key': Constants.apiKey,
@@ -320,9 +287,166 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
     }
   }
 
+  Future<void> _showResultDialog(bool isSuccess) async {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final surfaceColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
+    final textColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
+    final borderColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkFormBorderColor 
+        : Constants.lightFormBorderColor);
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: surfaceColor,
+              borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
+              border: Border.all(
+                color: borderColor,
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Color(themeProvider.isDarkMode 
+                      ? Constants.darkPrimaryShadowColor 
+                      : Constants.lightPrimaryShadowColor),
+                  blurRadius: 15,
+                  spreadRadius: -8,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Lottie Animation
+                Container(
+                  width: 200,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: surfaceColor,
+                    borderRadius: BorderRadius.circular(100),
+                    border: Border.all(
+                      color: borderColor,
+                      width: 1,
+                    ),
+                  ),
+                  child: Lottie.asset(
+                    'assets/animations/celebration.json',
+                    repeat: isSuccess,
+                    reverse: isSuccess,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                // Message
+                Text(
+                  isSuccess
+                      ? (widget.isArabic
+                          ? 'تم تقديم طلبك بنجاح'
+                          : 'Your application has been submitted successfully')
+                      : (widget.isArabic
+                          ? 'حدث خطأ أثناء تقديم طلبك'
+                          : 'There was an error submitting your application'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                // OK Button
+                Container(
+                  width: double.infinity,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
+                    color: primaryColor,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color(themeProvider.isDarkMode 
+                            ? Constants.darkPrimaryShadowColor 
+                            : Constants.lightPrimaryShadowColor),
+                        blurRadius: 12,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(); // Close dialog
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => MainPage(
+                            isArabic: widget.isArabic,
+                            onLanguageChanged: (bool value) {},
+                            userData: {},
+                            initialRoute: '',
+                            isDarkMode: Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
+                          ),
+                        ),
+                        (route) => false,
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
+                      ),
+                    ),
+                    child: Text(
+                      widget.isArabic ? 'حسناً' : 'OK',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: surfaceColor,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final themeColor = _isDarkMode ? Colors.black : primaryColor;
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final backgroundColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkBackgroundColor 
+        : Constants.lightBackgroundColor);
+    final surfaceColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
+    final textColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
+    final hintColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkHintTextColor 
+        : Constants.lightHintTextColor);
+    final borderColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkFormBorderColor 
+        : Constants.lightFormBorderColor);
 
     // Helper function to create label text with required asterisk
     Widget _buildLabel(String label) {
@@ -331,14 +455,14 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
           Text(
             label,
             style: TextStyle(
-              color: _isDarkMode ? Colors.black87 : primaryDarkColor,
+              color: textColor,
               fontWeight: FontWeight.w500,
             ),
           ),
           Text(
             ' *',
             style: TextStyle(
-              color: _isDarkMode ? themeColor.withOpacity(0.7) : primaryColor,
+              color: primaryColor,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -347,7 +471,7 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
     }
 
     return Scaffold(
-      backgroundColor: _isDarkMode ? Colors.grey[100] : primaryLightColor,
+      backgroundColor: backgroundColor,
       body: Container(
         child: Stack(
           children: [
@@ -361,16 +485,10 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
                       padding: const EdgeInsets.all(16),
                       child: Row(
                         children: [
-                          _isDarkMode 
-                            ? ColorFiltered(
-                                colorFilter: const ColorFilter.mode(
-                                  Colors.black,
-                                  BlendMode.srcIn,
-                                ),
-                                child: Image.asset(
-                                  'assets/images/nayifat-logo-no-bg.png',
-                                  height: 45,
-                                ),
+                          themeProvider.isDarkMode 
+                            ? Image.asset(
+                                'assets/images/nayifat-logo-no-bg.png',
+                                height: 45,
                               )
                             : Image.asset(
                                 'assets/images/nayifat-logo-no-bg.png',
@@ -384,10 +502,10 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
                       margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       decoration: BoxDecoration(
-                        color: _isDarkMode ? Colors.grey[100] : primaryMediumColor,
-                        borderRadius: BorderRadius.circular(15),
+                        color: surfaceColor,
+                        borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
                         border: Border.all(
-                          color: _isDarkMode ? themeColor.withOpacity(0.2) : primaryColor.withOpacity(0.2),
+                          color: borderColor,
                         ),
                       ),
                       child: Text(
@@ -397,7 +515,7 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
                         style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
-                          color: _isDarkMode ? Colors.black87 : primaryColor,
+                          color: primaryColor,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -415,14 +533,16 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
                                 // Form fields with glass effect container
                                 Container(
                                   decoration: BoxDecoration(
-                                    color: _isDarkMode ? Colors.white : Colors.white,
-                                    borderRadius: BorderRadius.circular(20),
+                                    color: surfaceColor,
+                                    borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
                                     border: Border.all(
-                                      color: _isDarkMode ? themeColor.withOpacity(0.2) : primaryColor.withOpacity(0.2),
+                                      color: borderColor,
                                     ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: _isDarkMode ? Colors.grey[400]! : Colors.black.withOpacity(0.05),
+                                        color: Color(themeProvider.isDarkMode 
+                                            ? Constants.darkPrimaryShadowColor 
+                                            : Constants.lightPrimaryShadowColor),
                                         blurRadius: 15,
                                         spreadRadius: -8,
                                       ),
@@ -436,24 +556,27 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
                                       TextFormField(
                                         controller: _nameController,
                                         style: TextStyle(
-                                          color: _isDarkMode ? Colors.black87 : primaryDarkColor,
+                                          color: textColor,
                                         ),
                                         decoration: InputDecoration(
                                           label: _buildLabel(widget.isArabic ? 'الاسم' : 'Name'),
                                           border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                            borderSide: BorderSide(color: _isDarkMode ? themeColor.withOpacity(0.3) : primaryMediumColor),
+                                            borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                                            borderSide: BorderSide(color: borderColor),
                                           ),
                                           enabledBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                            borderSide: BorderSide(color: _isDarkMode ? themeColor.withOpacity(0.3) : primaryMediumColor),
+                                            borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                                            borderSide: BorderSide(color: borderColor),
                                           ),
                                           focusedBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                            borderSide: BorderSide(color: themeColor, width: 2),
+                                            borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                                            borderSide: BorderSide(
+                                              color: primaryColor,
+                                              width: 2,
+                                            ),
                                           ),
                                           filled: true,
-                                          fillColor: _isDarkMode ? Colors.grey[100] : primaryLightColor,
+                                          fillColor: surfaceColor,
                                           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                                         ),
                                         validator: (value) {
@@ -471,7 +594,7 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
                                       TextFormField(
                                         controller: _idNumberController,
                                         style: TextStyle(
-                                          color: _isDarkMode ? Colors.black87 : primaryDarkColor,
+                                          color: textColor,
                                         ),
                                         keyboardType: TextInputType.number,
                                         maxLength: 10,
@@ -479,19 +602,22 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
                                         decoration: InputDecoration(
                                           label: _buildLabel(widget.isArabic ? 'رقم الهوية' : 'ID Number'),
                                           border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                            borderSide: BorderSide(color: _isDarkMode ? themeColor.withOpacity(0.3) : primaryMediumColor),
+                                            borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                                            borderSide: BorderSide(color: borderColor),
                                           ),
                                           enabledBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                            borderSide: BorderSide(color: _isDarkMode ? themeColor.withOpacity(0.3) : primaryMediumColor),
+                                            borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                                            borderSide: BorderSide(color: borderColor),
                                           ),
                                           focusedBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                            borderSide: BorderSide(color: themeColor, width: 2),
+                                            borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                                            borderSide: BorderSide(
+                                              color: primaryColor,
+                                              width: 2,
+                                            ),
                                           ),
                                           filled: true,
-                                          fillColor: _isDarkMode ? Colors.grey[100] : primaryLightColor,
+                                          fillColor: surfaceColor,
                                           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                                           counterText: '',
                                         ),
@@ -516,88 +642,54 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
                                       ),
                                       const SizedBox(height: 20),
 
-                                      // Email Field
+                                      // Phone Field
                                       TextFormField(
-                                        controller: _emailController,
+                                        controller: _phoneController,
                                         style: TextStyle(
-                                          color: _isDarkMode ? Colors.black87 : primaryDarkColor,
+                                          color: textColor,
                                         ),
-                                        keyboardType: TextInputType.emailAddress,
-                                        decoration: InputDecoration(
-                                          label: _buildLabel(widget.isArabic ? 'البريد الإلكتروني' : 'Email'),
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                            borderSide: BorderSide(color: _isDarkMode ? themeColor.withOpacity(0.3) : primaryMediumColor),
-                                          ),
-                                          enabledBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                            borderSide: BorderSide(color: _isDarkMode ? themeColor.withOpacity(0.3) : primaryMediumColor),
-                                          ),
-                                          focusedBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                            borderSide: BorderSide(color: themeColor, width: 2),
-                                          ),
-                                          filled: true,
-                                          fillColor: _isDarkMode ? Colors.grey[100] : primaryLightColor,
-                                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                                        ),
-                                        validator: (value) {
-                                          if (value == null || value.isEmpty) {
-                                            return widget.isArabic
-                                                ? 'الرجاء إدخال البريد الإلكتروني'
-                                                : 'Please enter your email';
-                                          }
-                                          if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                                              .hasMatch(value)) {
-                                            return widget.isArabic
-                                                ? 'الرجاء إدخال بريد إلكتروني صحيح'
-                                                : 'Please enter a valid email';
-                                          }
-                                          return null;
-                                        },
-                                      ),
-                                      const SizedBox(height: 20),
-
-                                      // Salary Field
-                                      TextFormField(
-                                        controller: _salaryController,
-                                        style: TextStyle(
-                                          color: _isDarkMode ? Colors.black87 : primaryDarkColor,
-                                        ),
-                                        keyboardType: TextInputType.number,
+                                        keyboardType: TextInputType.phone,
+                                        maxLength: 10,
                                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                                         decoration: InputDecoration(
-                                          label: _buildLabel(widget.isArabic ? 'الراتب الشهري' : 'Monthly Salary'),
+                                          label: _buildLabel(widget.isArabic ? 'رقم الهاتف' : 'Phone Number'),
                                           border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                            borderSide: BorderSide(color: _isDarkMode ? themeColor.withOpacity(0.3) : primaryMediumColor),
+                                            borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                                            borderSide: BorderSide(color: borderColor),
                                           ),
                                           enabledBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                            borderSide: BorderSide(color: _isDarkMode ? themeColor.withOpacity(0.3) : primaryMediumColor),
+                                            borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                                            borderSide: BorderSide(color: borderColor),
                                           ),
                                           focusedBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                            borderSide: BorderSide(color: themeColor, width: 2),
+                                            borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                                            borderSide: BorderSide(
+                                              color: primaryColor,
+                                              width: 2,
+                                            ),
                                           ),
                                           filled: true,
-                                          fillColor: _isDarkMode ? Colors.grey[100] : primaryLightColor,
-                                          prefixText: widget.isArabic ? '' : 'SAR ',
-                                          suffixText: widget.isArabic ? ' ريال' : '',
-                                          prefixStyle: TextStyle(color: _isDarkMode ? Colors.black87 : primaryDarkColor),
-                                          suffixStyle: TextStyle(color: _isDarkMode ? Colors.black87 : primaryDarkColor),
+                                          fillColor: surfaceColor,
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                                          prefixText: widget.isArabic ? '' : '+966 ',
+                                          prefixStyle: TextStyle(color: textColor),
+                                          counterText: '',
                                         ),
                                         validator: (value) {
                                           if (value == null || value.isEmpty) {
                                             return widget.isArabic
-                                                ? 'الرجاء إدخال الراتب الشهري'
-                                                : 'Please enter your monthly salary';
+                                                ? 'الرجاء إدخال رقم الهاتف'
+                                                : 'Please enter your phone number';
                                           }
-                                          final salary = double.tryParse(value);
-                                          if (salary == null || salary < 2000) {
+                                          if (value.length != 10) {
                                             return widget.isArabic
-                                                ? 'الراتب يجب أن يكون 2000 ريال على الأقل'
-                                                : 'Salary must be at least 2000 SAR';
+                                                ? 'رقم الهاتف يجب أن يكون 10 أرقام'
+                                                : 'Phone number must be 10 digits';
+                                          }
+                                          if (!value.startsWith('05')) {
+                                            return widget.isArabic
+                                                ? 'رقم الهاتف يجب أن يبدأ بـ 05'
+                                                : 'Phone number must start with 05';
                                           }
                                           return null;
                                         },
@@ -611,21 +703,19 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
                                 ElevatedButton(
                                   onPressed: _isLoading ? null : _submitForm,
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: _isDarkMode ? Colors.black.withOpacity(0.1) : primaryColor,
+                                    backgroundColor: primaryColor,
                                     minimumSize: const Size(double.infinity, 56),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      side: BorderSide(
-                                        color: _isDarkMode ? Colors.black : Colors.transparent,
-                                      ),
+                                      borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
                                     ),
+                                    elevation: themeProvider.isDarkMode ? 0 : 2,
                                   ),
                                   child: Text(
                                     widget.isArabic ? 'متابعة' : 'Continue',
                                     style: TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
-                                      color: _isDarkMode ? Colors.black : Colors.white,
+                                      color: surfaceColor,
                                     ),
                                   ),
                                 ),
@@ -640,7 +730,7 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
                                     shadowColor: Colors.transparent,
                                     minimumSize: const Size(double.infinity, 56),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
                                     ),
                                   ),
                                   child: Text(
@@ -648,7 +738,7 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
-                                      color: _isDarkMode ? themeColor : primaryDarkColor,
+                                      color: primaryColor,
                                     ),
                                   ),
                                 ),

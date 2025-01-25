@@ -14,6 +14,10 @@ import 'password_setup_screen.dart';
 import '../main_page.dart';
 import '../../widgets/device_dialogs.dart';
 import 'package:lottie/lottie.dart';
+import 'package:provider/provider.dart';
+import '../../providers/theme_provider.dart';
+import '../../utils/constants.dart';
+import '../../widgets/nafath_verification_dialog.dart';
 
 class InitialRegistrationScreen extends StatefulWidget {
   final bool isArabic;
@@ -59,7 +63,20 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> {
   Widget _buildStepIndicator() {
     final steps = widget.isArabic ? _stepsAr : _stepsEn;
     final currentStep = 0; // First step
-    final primaryColor = Color(0xFF0077B6);
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final activeColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final inactiveColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor
+        : Constants.lightSurfaceColor);
+    final inactiveBorderColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkFormBorderColor 
+        : Constants.lightFormBorderColor);
+    final activeTextColor = themeProvider.isDarkMode ? Colors.black : Colors.white;
+    final inactiveTextColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
 
     return Column(
       children: [
@@ -79,13 +96,26 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> {
                       height: 40,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isActive ? primaryColor : Colors.grey[300],
+                        color: isActive ? activeColor : inactiveColor,
+                        border: Border.all(
+                          color: isActive ? activeColor : inactiveBorderColor,
+                          width: 1,
+                        ),
+                        boxShadow: isActive ? [
+                          BoxShadow(
+                            color: activeColor.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ] : null,
                       ),
                       child: Center(
                         child: Text(
                           '${stepIndex + 1}',
                           style: TextStyle(
-                            color: isActive ? Colors.white : Colors.grey[600],
+                            color: isActive 
+                                ? activeTextColor
+                                : inactiveTextColor,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -95,7 +125,14 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> {
                     return Container(
                       width: 60,
                       height: 2,
-                      color: Colors.grey[300],
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            activeColor.withOpacity(0.5),
+                            inactiveBorderColor,
+                          ],
+                        ),
+                      ),
                       margin: const EdgeInsets.symmetric(horizontal: 4),
                     );
                   }
@@ -115,7 +152,9 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> {
                         steps[stepIndex],
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: isActive ? primaryColor : Colors.grey[600],
+                          color: isActive 
+                              ? activeColor
+                              : inactiveTextColor,
                           fontWeight:
                               isActive ? FontWeight.bold : FontWeight.normal,
                           fontSize: 14,
@@ -123,14 +162,17 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> {
                       ),
                     );
                   } else {
-                    return SizedBox(width: 40);
+                    return const SizedBox(width: 40);
                   }
                 }),
               ),
             ],
           ),
         ),
-        const Divider(height: 1),
+        Divider(
+          height: 1,
+          color: inactiveBorderColor,
+        ),
       ],
     );
   }
@@ -291,166 +333,125 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> {
         _nationalIdController.text,
       );
 
-      print('Registration check response: $registrationCheck'); // Add debug print
+      print('Registration check response: $registrationCheck');
 
-      if (registrationCheck['status'] == 'error' &&
-          (registrationCheck['message'] == 'This ID already registered' ||
-           registrationCheck['message']?.contains('already registered') == true)) {
-        // Show dialog to sign in
-        if (!mounted) return;
-        final result = await showDialog<bool>(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Animation
-                SizedBox(
-                  height: 100,
-                  child: Lottie.asset(
-                    'assets/animations/caution.json',
-                    repeat: true,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Title
-                
-                const SizedBox(height: 16),
-                // Message
-                Text(
-                  widget.isArabic
-                      ? 'هذه الهوية/الإقامة مسجلة بالفعل. هل تريد تسجيل الدخول إلى حسابك؟'
-                      : 'This National/Iqama ID is already registered. Would you like to sign in to your account?',
-                  style: const TextStyle(fontSize: 16),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                ),
-                child: Text(
-                  widget.isArabic ? 'إلغاء' : 'Cancel',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF0077B6),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  widget.isArabic ? 'تسجيل الدخول' : 'Sign In',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-            ],
-          ),
-        );
-
-        if (result == true) {
+      // Check if user is already registered before proceeding with Nafath
+      if (registrationCheck['status'] == 'error') {
+        if (registrationCheck['message'] == 'This ID already registered' ||
+            registrationCheck['message']?.contains('already registered') == true) {
+          // Show dialog to sign in
           if (!mounted) return;
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => SignInScreen(
-                isArabic: widget.isArabic,
-                nationalId: _nationalIdController.text,
-                startWithPassword: true,
-              ),
-            ),
-          );
-        } else {
-          if (!mounted) return;
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MainPage(
-                isArabic: widget.isArabic,
-                userData: {'nationalId': _nationalIdController.text},
-              ),
-            ),
-          );
-        }
-        return;
-      }
-
-      // Step 2: Generate OTP
-      final otpResponse = await _registrationService.generateOTP(_nationalIdController.text);
-      
-      if (otpResponse['status'] != 'success') {
-        if (otpResponse['message']?.contains('rate limit exceeded') == true) {
-          if (!mounted) return;
-          await showDialog(
+          final result = await showDialog<bool>(
             context: context,
+            barrierDismissible: false,
             builder: (context) => AlertDialog(
-              title: Text(
-                widget.isArabic ? 'خطأ' : 'Error',
-                style: const TextStyle(color: Colors.red),
-                textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-              content: Directionality(
-                textDirection: widget.isArabic ? ui.TextDirection.rtl : ui.TextDirection.ltr,
-                child: Text(
-                  widget.isArabic 
-                      ? 'لقد تجاوزت الحد المسموح به من المحاولات. يرجى الانتظار قبل المحاولة مرة أخرى.'
-                      : otpResponse['message'],
-                  textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
-                ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    height: 100,
+                    child: Lottie.asset(
+                      'assets/animations/caution.json',
+                      repeat: true,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    widget.isArabic
+                        ? 'هذه الهوية/الإقامة مسجلة بالفعل. هل تريد تسجيل الدخول إلى حسابك؟'
+                        : 'This National/Iqama ID is already registered. Would you like to sign in to your account?',
+                    style: const TextStyle(fontSize: 16),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(widget.isArabic ? 'حسناً' : 'OK'),
+                  onPressed: () => Navigator.pop(context, false),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  ),
+                  child: Text(
+                    widget.isArabic ? 'إلغاء' : 'Cancel',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF0077B6),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    widget.isArabic ? 'تسجيل الدخول' : 'Sign In',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
               ],
             ),
           );
+
+          if (result == true) {
+            if (!mounted) return;
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SignInScreen(
+                  isArabic: widget.isArabic,
+                  nationalId: _nationalIdController.text,
+                  startWithPassword: true,
+                ),
+              ),
+            );
+          }
           return;
+        } else {
+          throw Exception(registrationCheck['message'] ?? 'Registration check failed');
         }
-        throw Exception(widget.isArabic
-            ? 'فشل في إرسال رمز التحقق'
-            : 'Failed to send verification code');
       }
 
+      // Step 2: Show Nafath verification dialog
       if (!mounted) return;
-
-      // Show OTP Dialog regardless of whether otp_code is null (in production it will be null)
-      final otpVerified = await showDialog<bool>(
+      final nafathResult = await showDialog<Map<String, dynamic>>(
         context: context,
         barrierDismissible: false,
-        builder: (context) => OTPDialog(
+        builder: (context) => NafathVerificationDialog(
           nationalId: _nationalIdController.text,
           isArabic: widget.isArabic,
-          onResendOTP: () =>
-              _registrationService.generateOTP(_nationalIdController.text),
-          onVerifyOTP: (otp) =>
-              _registrationService.verifyOTP(_nationalIdController.text, otp),
+          onCancel: () {
+            setState(() {
+              _isLoading = false;
+            });
+          },
         ),
       );
 
-      if (otpVerified != true) {
-        throw Exception('OTP verification failed');
+      if (nafathResult == null || nafathResult['verified'] != true) {
+        throw Exception(widget.isArabic
+            ? 'فشل التحقق من نفاذ'
+            : 'Nafath verification failed');
       }
+
+      // Store Nafath verification data
+      final nafathData = {
+        'transId': nafathResult['transId'],
+        'random': nafathResult['random'],
+        'response': nafathResult['response'],
+      };
 
       // Step 3: Get government data
       final govData = await _registrationService.getGovernmentData(
@@ -463,15 +464,16 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> {
             : 'Sorry, registration is not possible at this time');
       }
 
-      // Store data locally
+      // Store data locally with Nafath verification
       await _registrationService.storeRegistrationData(
         nationalId: _nationalIdController.text,
         email: _emailController.text.trim(),
         phone: _phoneController.text,
         userData: govData['data'],
+        nafathData: nafathData,
       );
 
-      // Navigate to password setup
+      // Navigate to password setup using pushReplacement to prevent going back
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
@@ -495,41 +497,83 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = Color(0xFFF5F6FA);
-    final primaryColor = Color(0xFF0077B6);
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final backgroundColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkBackgroundColor 
+        : Constants.lightBackgroundColor);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final surfaceColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
     final inputDecorationTheme = InputDecorationTheme(
       filled: true,
-      fillColor: Colors.white,
+      fillColor: Color(themeProvider.isDarkMode 
+          ? Constants.darkFormBackgroundColor 
+          : Constants.lightFormBackgroundColor),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+        borderSide: BorderSide(
+          color: Color(themeProvider.isDarkMode 
+              ? Constants.darkFormBorderColor 
+              : Constants.lightFormBorderColor),
+        ),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+        borderSide: BorderSide(
+          color: Color(themeProvider.isDarkMode 
+              ? Constants.darkFormBorderColor 
+              : Constants.lightFormBorderColor),
+        ),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: primaryColor, width: 2),
+        borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+        borderSide: BorderSide(
+          color: Color(themeProvider.isDarkMode 
+              ? Constants.darkPrimaryColor 
+              : Constants.lightPrimaryColor),
+          width: 2,
+        ),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.red[300]!, width: 1),
+        borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+        borderSide: BorderSide(
+          color: Colors.red[300]!,
+          width: 1,
+        ),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.red[300]!, width: 2),
+        borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+        borderSide: BorderSide(
+          color: Colors.red[300]!,
+          width: 2,
+        ),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      labelStyle: TextStyle(color: Colors.grey[700]),
-      hintStyle: TextStyle(color: Colors.grey[400]),
+      labelStyle: TextStyle(
+        color: Color(themeProvider.isDarkMode 
+            ? Constants.darkLabelTextColor 
+            : Constants.lightLabelTextColor),
+      ),
+      hintStyle: TextStyle(
+        color: Color(themeProvider.isDarkMode 
+            ? Constants.darkHintTextColor 
+            : Constants.lightHintTextColor),
+      ),
+      prefixIconColor: Color(themeProvider.isDarkMode 
+          ? Constants.darkIconColor 
+          : Constants.lightIconColor),
     );
 
     return Directionality(
       textDirection:
           widget.isArabic ? ui.TextDirection.rtl : ui.TextDirection.ltr,
       child: Scaffold(
-        backgroundColor: backgroundColor,
+        backgroundColor: Color(themeProvider.isDarkMode 
+            ? Constants.darkBackgroundColor 
+            : Constants.lightBackgroundColor),
         body: SafeArea(
           child: Stack(
             children: [
@@ -538,14 +582,21 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> {
                 top: -100,
                 right: widget.isArabic ? null : -100,
                 left: widget.isArabic ? -100 : null,
-                child: Opacity(
-                  opacity: 0.2,
-                  child: Image.asset(
-                    'assets/images/nayifatlogocircle-nobg.png',
-                    width: 240,
-                    height: 240,
-                  ),
-                ),
+                child: themeProvider.isDarkMode
+                  ? Image.asset(
+                      'assets/images/nayifat-circle-grey.png',
+                      width: 240,
+                      height: 240,
+                      
+                    )
+                  : Opacity(
+                      opacity: 0.2,
+                      child: Image.asset(
+                        'assets/images/nayifatlogocircle-nobg.png',
+                        width: 240,
+                        height: 240,
+                      ),
+                    ),
               ),
 
               // Main Content
@@ -565,7 +616,9 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> {
                               .headlineMedium
                               ?.copyWith(
                                 fontWeight: FontWeight.bold,
-                                color: primaryColor,
+                                color: Color(themeProvider.isDarkMode 
+                                    ? Constants.darkPrimaryColor 
+                                    : Constants.lightPrimaryColor),
                               ),
                           textAlign: TextAlign.center,
                         ),
@@ -574,7 +627,9 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> {
                           width: 60,
                           height: 4,
                           decoration: BoxDecoration(
-                            color: primaryColor,
+                            color: Color(themeProvider.isDarkMode 
+                                ? Constants.darkPrimaryColor 
+                                : Constants.lightPrimaryColor),
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
@@ -781,12 +836,25 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> {
                   Container(
                     padding: const EdgeInsets.all(24.0),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Color(themeProvider.isDarkMode 
+                          ? Constants.darkSurfaceColor 
+                          : Constants.lightSurfaceColor),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, -5),
+                          color: Color(themeProvider.isDarkMode 
+                              ? Constants.darkNavbarShadowPrimary
+                              : Constants.lightNavbarShadowPrimary),
+                          offset: const Offset(0, -2),
+                          blurRadius: 6,
+                          spreadRadius: 2,
+                        ),
+                        BoxShadow(
+                          color: Color(themeProvider.isDarkMode 
+                              ? Constants.darkNavbarShadowSecondary
+                              : Constants.lightNavbarShadowSecondary),
+                          offset: const Offset(0, -1),
+                          blurRadius: 4,
+                          spreadRadius: 0,
                         ),
                       ],
                     ),
@@ -796,18 +864,31 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> {
                           child: ElevatedButton(
                             onPressed: () => Navigator.of(context).pop(),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.grey[100],
-                              foregroundColor: Colors.black87,
+                              backgroundColor: Color(themeProvider.isDarkMode 
+                                  ? Constants.darkFormBackgroundColor
+                                  : Constants.lightFormBackgroundColor),
+                              foregroundColor: Color(themeProvider.isDarkMode 
+                                  ? Constants.darkLabelTextColor 
+                                  : Constants.lightLabelTextColor),
                               elevation: 0,
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
+                                side: BorderSide(
+                                  color: Color(themeProvider.isDarkMode 
+                                      ? Constants.darkFormBorderColor 
+                                      : Constants.lightFormBorderColor),
+                                ),
                               ),
                             ),
                             child: Text(
                               widget.isArabic ? 'إلغاء' : 'Cancel',
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(themeProvider.isDarkMode 
+                                    ? Constants.darkLabelTextColor 
+                                    : Constants.lightLabelTextColor),
+                              ),
                             ),
                           ),
                         ),
@@ -816,29 +897,32 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> {
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : _handleNext,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: primaryColor,
+                              backgroundColor: Color(themeProvider.isDarkMode 
+                                  ? Constants.darkPrimaryColor 
+                                  : Constants.lightPrimaryColor),
+                              foregroundColor: Colors.white,
                               elevation: 0,
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
                               ),
                             ),
                             child: _isLoading
-                                ? const SizedBox(
+                                ? SizedBox(
                                     height: 20,
                                     width: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
                                       valueColor: AlwaysStoppedAnimation<Color>(
-                                          Colors.white),
+                                          themeProvider.isDarkMode ? Colors.black : Colors.white),
                                     ),
                                   )
                                 : Text(
                                     widget.isArabic ? 'التالي' : 'Next',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 16,
-                                      color: Colors.white,
+                                      color: themeProvider.isDarkMode ? Colors.black : Colors.white,
                                     ),
                                   ),
                           ),

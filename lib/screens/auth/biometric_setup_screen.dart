@@ -3,6 +3,9 @@ import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/auth_service.dart';
 import '../main_page.dart';
+import 'package:provider/provider.dart';
+import '../../providers/theme_provider.dart';
+import '../../utils/constants.dart';
 
 class SignInBiometricSetupScreen extends StatefulWidget {
   final String nationalId;
@@ -25,14 +28,13 @@ class _SignInBiometricSetupScreenState extends State<SignInBiometricSetupScreen>
   bool _isLoading = false;
   bool _isBiometricsAvailable = false;
   bool _isBiometricsEnabled = false;
-  final Color primaryColor = const Color(0xFF0077B6);
-  final Color backgroundColor = const Color(0xFFF5F6FA);
   final _localAuth = LocalAuthentication();
 
   @override
   void initState() {
     super.initState();
     _checkBiometrics();
+    _loadBiometricStatus();
   }
 
   Future<void> _checkBiometrics() async {
@@ -67,11 +69,20 @@ class _SignInBiometricSetupScreenState extends State<SignInBiometricSetupScreen>
     }
   }
 
+  Future<void> _loadBiometricStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final enabled = prefs.getBool('biometrics_enabled_${widget.nationalId}') ?? false;
+    if (mounted) {
+      setState(() {
+        _isBiometricsEnabled = enabled;
+      });
+    }
+  }
+
   Future<void> _enableBiometrics() async {
     setState(() => _isLoading = true);
 
     try {
-      // Get available biometrics
       final List<BiometricType> availableBiometrics = await _localAuth.getAvailableBiometrics();
       print('Available biometrics: $availableBiometrics');
 
@@ -101,8 +112,14 @@ class _SignInBiometricSetupScreenState extends State<SignInBiometricSetupScreen>
 
       if (didAuthenticate) {
         print('Biometric authentication successful');
+        // Save biometric status to both API and local storage
         await _authService.enableBiometric(widget.nationalId);
-        setState(() => _isBiometricsEnabled = true);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('biometrics_enabled_${widget.nationalId}', true);
+        
+        if (mounted) {
+          setState(() => _isBiometricsEnabled = true);
+        }
         print('Biometrics enabled successfully');
       }
     } catch (e, stackTrace) {
@@ -183,249 +200,248 @@ class _SignInBiometricSetupScreenState extends State<SignInBiometricSetupScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
+    final themeColor = isDarkMode 
+        ? Color(Constants.darkPrimaryColor) 
+        : Color(Constants.lightPrimaryColor);
+    
     return Scaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor: isDarkMode 
+          ? Color(Constants.darkBackgroundColor)
+          : Color(Constants.lightBackgroundColor),
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              physics: constraints.maxHeight < 600 
-                  ? const AlwaysScrollableScrollPhysics() 
-                  : const NeverScrollableScrollPhysics(),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: constraints.maxHeight,
-                  minWidth: constraints.maxWidth,
-                ),
-                child: IntrinsicHeight(
-                  child: Stack(
-                    children: [
-                      // Background Logo
-                      Positioned(
-                        top: -75,
-                        right: widget.isArabic ? null : -75,
-                        left: widget.isArabic ? -75 : null,
-                        child: Opacity(
-                          opacity: 0.2,
-                          child: Image.asset(
-                            'assets/images/nayifatlogocircle-nobg.png',
-                            width: 200,
-                            height: 200,
-                          ),
+        child: Column(
+          children: [
+            const SizedBox(height: 100),
+            // Title with decoration
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Column(
+                children: [
+                  Text(
+                    widget.isArabic ? 'السمات الحيوية' : 'Biometrics',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: themeColor,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 60,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: themeColor,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    if (_isBiometricsEnabled) 
+                      Container(
+                        width: double.infinity,
+                        alignment: Alignment.center,
+                        child: Icon(
+                          Icons.check_circle_outline_rounded,
+                          size: 120,
+                          color: themeColor,
+                        ),
+                      )
+                    else
+                      Container(
+                        width: double.infinity,
+                        alignment: Alignment.center,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.fingerprint,
+                              size: 84,
+                              color: themeColor,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              '/',
+                              style: TextStyle(
+                                fontSize: 90,
+                                color: themeColor,
+                                fontWeight: FontWeight.w200,
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            SizedBox(
+                              width: 84,
+                              height: 84,
+                              child: Center(
+                                child: Image.asset(
+                                  'assets/images/faceid.png',
+                                  width: 70,
+                                  height: 70,
+                                  color: themeColor,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-
-                      Column(
-                        children: [
-                          const SizedBox(height: 100),
-                          // Title with decoration
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                            child: Column(
-                              children: [
-                                Text(
-                                  widget.isArabic ? 'السمات الحيوية' : 'Biometrics',
-                                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: primaryColor,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 8),
-                                Container(
-                                  width: 60,
-                                  height: 4,
-                                  decoration: BoxDecoration(
-                                    color: primaryColor,
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          Expanded(
-                            child: Column(
-                              children: [
-                                const SizedBox(height: 40),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                                  child: Column(
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.fingerprint,
-                                            size: 84,
-                                            color: _isBiometricsEnabled ? Colors.green : primaryColor,
-                                          ),
-                                          const SizedBox(width: 5),
-                                          Text(
-                                            '/',
-                                            style: TextStyle(
-                                              fontSize: 90,
-                                              color: _isBiometricsEnabled ? Colors.green : primaryColor,
-                                              fontWeight: FontWeight.w200,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 5),
-                                          SizedBox(
-                                            width: 84,
-                                            height: 84,
-                                            child: Center(
-                                              child: Image.asset(
-                                                'assets/images/faceid.png',
-                                                width: 70,
-                                                height: 70,
-                                                color: _isBiometricsEnabled ? Colors.green : primaryColor,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 24),
-                                      Text(
-                                        widget.isArabic
-                                            ? 'تسجيل الدخول بالسمات الحيوية'
-                                            : 'Biometric Login',
-                                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                      const SizedBox(height: 16),
-                                      Text(
-                                        widget.isArabic
-                                            ? 'يمكنك تسجيل الدخول باستخدام بصمة الإصبع أو بصمة الوجه'
-                                            : 'You can sign in using your fingerprint or face ID',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          color: Colors.grey[600],
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                      const SizedBox(height: 32),
-                                      if (!_isBiometricsAvailable)
-                                        Text(
-                                          widget.isArabic
-                                              ? 'السمات الحيوية غير متوفرة على هذا الجهاز'
-                                              : 'Biometrics not available on this device',
-                                          style: TextStyle(color: Colors.red),
-                                          textAlign: TextAlign.center,
-                                        )
-                                      else if (!_isBiometricsEnabled)
-                                        Container(
-                                          width: double.infinity,
-                                          padding: const EdgeInsets.symmetric(horizontal: 100),
-                                          child: ElevatedButton(
-                                            onPressed: _isLoading ? null : _enableBiometrics,
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: primaryColor,
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 32,
-                                                vertical: 16,
-                                              ),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(12),
-                                              ),
-                                            ),
-                                            child: _isLoading
-                                                ? const SizedBox(
-                                                    width: 20,
-                                                    height: 20,
-                                                    child: CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                                          Colors.white),
-                                                    ),
-                                                  )
-                                                : Text(
-                                                    widget.isArabic
-                                                        ? 'تفعيل'
-                                                        : 'Enable',
-                                                    style: const TextStyle(
-                                                      fontSize: 16,
-                                                      color: Colors.white,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
-                                          ),
-                                        )
-                                      else
-                                        Column(
-                                          children: [
-                                            Icon(
-                                              Icons.check_circle_outline,
-                                              color: Colors.green,
-                                              size: 48,
-                                            ),
-                                            const SizedBox(height: 16),
-                                            Text(
-                                              widget.isArabic
-                                                  ? 'تم تفعيل السمات الحيوية بنجاح'
-                                                  : 'Biometrics enabled successfully',
-                                              style: TextStyle(
-                                                color: Colors.green,
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // Bottom button
-                          Container(
-                            padding: const EdgeInsets.all(24),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: primaryColor.withOpacity(0.05),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, -5),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: _handleSetup,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: primaryColor,
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      widget.isArabic ? 'تم' : 'Done',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                    const SizedBox(height: 40),
+                    Text(
+                      _isBiometricsEnabled
+                          ? (widget.isArabic 
+                              ? 'تم تفعيل السمات الحيوية بنجاح'
+                              : 'Biometrics enabled successfully')
+                          : (widget.isArabic
+                              ? 'قم بتفعيل السمات الحيوية للدخول السريع'
+                              : 'Enable biometrics for quick sign-in'),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                        color: isDarkMode 
+                            ? Color(Constants.darkLabelTextColor)
+                            : Color(Constants.lightLabelTextColor),
                       ),
-                    ],
-                  ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _isBiometricsEnabled
+                          ? (widget.isArabic
+                              ? 'يمكنك الآن استخدام السمات الحيوية لتسجيل الدخول'
+                              : 'You can now use biometrics to sign in')
+                          : (widget.isArabic
+                              ? 'استخدم السمات الحيوية لتسجيل الدخول بسرعة وأمان'
+                              : 'Use biometrics for quick and secure sign-in'),
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: isDarkMode 
+                            ? Color(Constants.darkHintTextColor)
+                            : Color(Constants.lightHintTextColor),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 40),
+                    if (!_isBiometricsEnabled && _isBiometricsAvailable)
+                      ElevatedButton(
+                        onPressed: _isLoading ? null : _enableBiometrics,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: themeColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 48,
+                            vertical: 16,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white),
+                                ),
+                              )
+                            : Text(
+                                widget.isArabic
+                                    ? 'تفعيل السمات الحيوية'
+                                    : 'Enable Biometrics',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                      ),
+                    if (!_isBiometricsAvailable)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDarkMode 
+                              ? Color(Constants.darkFormBackgroundColor)
+                              : Color(Constants.lightFormBackgroundColor),
+                          borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
+                          border: Border.all(
+                            color: isDarkMode 
+                                ? Color(Constants.darkFormBorderColor)
+                                : Color(Constants.lightFormBorderColor),
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.warning_amber_rounded,
+                              color: Colors.orange,
+                              size: 48,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              widget.isArabic
+                                  ? 'السمات الحيوية غير متوفرة على هذا الجهاز'
+                                  : 'Biometrics not available on this device',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w500,
+                                color: isDarkMode 
+                                    ? Color(Constants.darkLabelTextColor)
+                                    : Color(Constants.lightLabelTextColor),
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 8),
+                            // Text(
+                            //   widget.isArabic
+                            //       ? 'يرجى تفعيل السمات الحيوية في إعدادات الجهاز'
+                            //       : 'Please enable biometrics in device settings',
+                            //   style: TextStyle(
+                            //     fontSize: 14,
+                            //     color: isDarkMode 
+                            //         ? Color(Constants.darkHintTextColor)
+                            //         : Color(Constants.lightHintTextColor),
+                            //   ),
+                            //   textAlign: TextAlign.center,
+                            // ),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 24),
+                    TextButton(
+                      onPressed: _isLoading ? null : _handleSetup,
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 16,
+                        ),
+                      ),
+                      child: Text(
+                        _isBiometricsEnabled
+                            ? (widget.isArabic ? 'التالي' : 'Next')
+                            : (widget.isArabic ? 'تخطي' : 'Skip'),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: _isLoading 
+                              ? Colors.grey[400] 
+                              : themeColor,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            );
-          },
+            ),
+          ],
         ),
       ),
     );

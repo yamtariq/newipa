@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
+import 'package:provider/provider.dart';
+import '../../providers/theme_provider.dart';
+import '../../utils/constants.dart';
 
 class RegistrationSuccessDialog extends StatelessWidget {
   final bool isArabic;
@@ -17,56 +20,146 @@ class RegistrationSuccessDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Lottie.asset(
-            'assets/animations/marked.json',
-            width: 200,
-            height: 200,
-            repeat: true,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            isArabic 
-                ? (isDeviceReplacement ? 'تم إعداد الجهاز الجديد' : 'تم التسجيل بنجاح')
-                : (isDeviceReplacement ? 'New Device Setup Complete' : 'Registration Successful'),
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 20,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            isArabic
-                ? (isDeviceReplacement 
-                    ? 'تم إعداد جهازك الجديد بنجاح${enableBiometric ? ' مع تفعيل السمات الحيوية' : ''}'
-                    : 'تم إنشاء حسابك بنجاح${enableBiometric ? ' مع تفعيل السمات الحيوية' : ''}')
-                : (isDeviceReplacement
-                    ? 'Your new device has been set up successfully${enableBiometric ? ' with biometric authentication enabled' : ''}'
-                    : 'Your account has been created successfully${enableBiometric ? ' with biometric authentication enabled' : ''}'),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[700],
-            ),
-          ),
-        ],
+    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
+    final themeColor = Color(isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final labelTextColor = Color(isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
+    final hintTextColor = Color(isDarkMode 
+        ? Constants.darkHintTextColor 
+        : Constants.lightHintTextColor);
+    final surfaceColor = Color(isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
+    final successColor = Color(isDarkMode 
+        ? Constants.darkNavbarActiveIcon 
+        : Constants.lightNavbarActiveIcon);
+    final buttonTextColor = Color(isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
+    final borderColor = Color(isDarkMode 
+        ? Constants.darkFormBorderColor 
+        : Constants.lightFormBorderColor);
+
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
       ),
-      actions: [
-        TextButton(
-          onPressed: onContinue,
-          child: Text(
-            isArabic ? 'متابعة' : 'Continue',
-            style: TextStyle(
-              color: Theme.of(context).primaryColor,
-              fontWeight: FontWeight.bold,
+      backgroundColor: surfaceColor,
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  color: surfaceColor,
+                  borderRadius: BorderRadius.circular(100),
+                  border: Border.all(
+                    color: borderColor,
+                    width: 1,
+                  ),
+                ),
+                child: Lottie.asset(
+                  'assets/animations/celebration.json',
+                  repeat: true,
+                  errorBuilder: (context, error, stackTrace) {
+                    print('Error loading celebration animation: $error');
+                    return Icon(
+                      Icons.celebration,
+                      size: 100,
+                      color: successColor,
+                    );
+                  },
+                ),
+              ),
             ),
-          ),
+            const SizedBox(height: 16),
+            Center(
+              child: Text(
+                isArabic ? 'مبروك' : 'Congratulations',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              child: Text(
+                isArabic
+                    ? (isDeviceReplacement ? 'تم إعداد الجهاز الجديد بنجاح' : 'تم التسجيل بنجاح')
+                    : (isDeviceReplacement ? 'New device setup completed successfully' : 'Registration completed successfully'),
+                textAlign: isArabic ? TextAlign.right : TextAlign.left,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: labelTextColor,
+                ),
+              ),
+            ),
+            if (enableBiometric) ...[
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                child: Text(
+                  isArabic
+                      ? 'تم تفعيل السمات الحيوية للدخول السريع'
+                      : 'Biometric login enabled for quick access',
+                  textAlign: isArabic ? TextAlign.right : TextAlign.left,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: labelTextColor,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+            Container(
+              width: double.infinity,
+              child: Text(
+                isArabic 
+                    ? 'يمكنك الآن تسجيل الدخول باستخدام رمز الدخول أو السمات الحيوية'
+                    : 'You can now sign in using MPIN or biometrics',
+                textAlign: isArabic ? TextAlign.right : TextAlign.left,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: hintTextColor,
+                ),
+              ),
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: onContinue,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: themeColor,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
+                  ),
+                ),
+                child: Text(
+                  isArabic ? 'متابعة' : 'Continue',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: buttonTextColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

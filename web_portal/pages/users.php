@@ -2,7 +2,8 @@
 session_start();
 require_once '../db_connect.php';
 
-if (!isset($_SESSION['user_id'])) {
+// Check if user is logged in and is admin
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
     header("Location: ../login.php");
     exit();
 }
@@ -14,7 +15,7 @@ $result = $conn->query($query);
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Nayifat - Portal Employees</title>
+    <title>Nayifat - Employee Management</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root {
@@ -216,61 +217,118 @@ $result = $conn->query($query);
 
         .header-buttons {
             display: flex;
-            gap: 1rem;
-            align-items: center;
+            gap: 10px;
         }
 
         .btn-primary {
-            background: white;
-            color: #0A71A3;
-            border: 2px solid #0A71A3;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
             padding: 10px 20px;
-            border-radius: 6px;
+            border-radius: 5px;
             cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            display: flex;
+            display: inline-flex;
             align-items: center;
             gap: 8px;
-            transition: all 0.3s ease;
+            transition: background-color 0.3s;
         }
 
         .btn-primary:hover {
-            background: #e6f3f8;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-
-        .btn-primary i {
-            font-size: 16px;
-            color: #0A71A3;
+            background-color: var(--secondary-color);
         }
 
         .btn-danger {
-            background: white;
-            color: #dc3545;
-            border: 2px solid #dc3545;
+            background-color: #dc3545;
+            color: white;
+            border: none;
             padding: 10px 20px;
-            border-radius: 6px;
+            border-radius: 5px;
             cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            display: flex;
+            display: inline-flex;
             align-items: center;
             gap: 8px;
-            transition: all 0.3s ease;
-            text-decoration: none;
+            transition: background-color 0.3s;
         }
 
         .btn-danger:hover {
-            background: #fde8ea;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            background-color: #c82333;
         }
 
-        .btn-danger i {
-            font-size: 16px;
-            color: #dc3545;
+        .action-btn {
+            background: none;
+            border: none;
+            color: var(--primary-color);
+            cursor: pointer;
+            padding: 5px;
+            transition: color 0.3s;
+        }
+
+        .action-btn:hover {
+            color: var(--secondary-color);
+        }
+
+        .action-btn.edit {
+            color: var(--primary-color);
+        }
+
+        .action-btn.toggle-status {
+            color: #6c757d;
+        }
+
+        .action-btn.toggle-status:hover {
+            color: #5a6268;
+        }
+
+        .submit-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .submit-btn:hover {
+            background-color: var(--secondary-color);
+        }
+
+        .cancel-btn {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .cancel-btn:hover {
+            background-color: #5a6268;
+        }
+
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+
+        .status-badge.active {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.inactive {
+            background-color: #f8d7da;
+            color: #721c24;
         }
 
         .page-title {
@@ -312,31 +370,72 @@ $result = $conn->query($query);
             background: #f8f9fa;
         }
 
-        .action-btn {
-            padding: 6px 12px;
-            border-radius: 6px;
-            border: none;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s ease;
-            background: #1a4f7a;
+        /* Table Styles */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 25px 0;
+            font-size: 0.9em;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        thead tr {
+            background-color: var(--primary-color);
             color: white;
-            margin-right: 5px;
-            display: inline-flex;
-            align-items: center;
+            text-align: left;
+            font-weight: bold;
         }
 
-        .action-btn.delete {
-            background: #dc3545;
+        th, td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
         }
 
-        .action-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        tbody tr {
+            transition: all 0.2s ease;
         }
 
-        .action-btn i {
-            margin-right: 5px;
+        tbody tr:hover {
+            background-color: var(--hover-bg);
+        }
+
+        tbody tr:last-of-type {
+            border-bottom: 2px solid var(--primary-color);
+        }
+
+        .status {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .status.active {
+            background-color: #e6f4ea;
+            color: #1e8e3e;
+        }
+
+        .status.inactive {
+            background-color: #fce8e6;
+            color: #d93025;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .actions a {
+            color: var(--primary-color);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .actions a:hover {
+            color: var(--secondary-color);
         }
 
         /* Modal Styles */
@@ -516,7 +615,7 @@ $result = $conn->query($query);
 
     <div class="main-content">
         <div class="top-bar">
-            <h1 class="page-title">Portal Employees</h1>
+            <h1 class="page-title">Employee Management</h1>
             <div class="header-buttons">
                 <button class="btn-primary" onclick="openModal()">
                     <i class="fas fa-plus"></i> Add New Employee
@@ -527,27 +626,7 @@ $result = $conn->query($query);
             </div>
         </div>
 
-        <?php if (isset($_SESSION['success'])): ?>
-            <div class="success-message">
-                <i class="fas fa-check-circle message-icon"></i>
-                <?php 
-                echo $_SESSION['success'];
-                unset($_SESSION['success']);
-                ?>
-            </div>
-        <?php endif; ?>
-
-        <?php if (isset($_SESSION['error'])): ?>
-            <div class="error-message">
-                <i class="fas fa-exclamation-circle message-icon"></i>
-                <?php 
-                echo $_SESSION['error'];
-                unset($_SESSION['error']);
-                ?>
-            </div>
-        <?php endif; ?>
-
-        <div class="employees-table">
+        <div class="table-container">
             <table>
                 <thead>
                     <tr>
@@ -555,24 +634,32 @@ $result = $conn->query($query);
                         <th>Name</th>
                         <th>Email</th>
                         <th>Role</th>
+                        <th>Status</th>
                         <th>Created At</th>
+                        <th>Last Login</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php while ($row = $result->fetch_assoc()): ?>
+                    <?php while($row = $result->fetch_assoc()): ?>
                     <tr>
-                        <td><?php echo $row['id']; ?></td>
-                        <td><?php echo $row['name']; ?></td>
-                        <td><?php echo $row['email']; ?></td>
+                        <td><?php echo $row['employee_id']; ?></td>
+                        <td><?php echo htmlspecialchars($row['name']); ?></td>
+                        <td><?php echo htmlspecialchars($row['email']); ?></td>
                         <td><?php echo ucfirst($row['role']); ?></td>
+                        <td><span class="status-badge <?php echo $row['status']; ?>"><?php echo ucfirst($row['status']); ?></span></td>
                         <td><?php echo date('Y-m-d H:i', strtotime($row['created_at'])); ?></td>
+                        <td><?php echo $row['last_login'] ? date('Y-m-d H:i', strtotime($row['last_login'])) : 'Never'; ?></td>
                         <td>
-                            <button class="action-btn" onclick="openModal(<?php echo $row['id']; ?>)">
-                                <i class="fas fa-edit"></i> Edit
+                            <button class="action-btn edit" onclick="editEmployee(<?php echo htmlspecialchars(json_encode($row)); ?>)">
+                                <i class="fas fa-edit"></i>
                             </button>
-                            <button class="action-btn delete" onclick="deleteEmployee(<?php echo $row['id']; ?>)">
-                                <i class="fas fa-trash"></i> Delete
+                            <button class="action-btn toggle-status" onclick="toggleStatus(<?php echo $row['employee_id']; ?>, '<?php echo $row['status']; ?>')">
+                                <?php if($row['status'] === 'active'): ?>
+                                    <i class="fas fa-user-slash" title="Deactivate"></i>
+                                <?php else: ?>
+                                    <i class="fas fa-user-check" title="Activate"></i>
+                                <?php endif; ?>
                             </button>
                         </td>
                     </tr>
@@ -582,31 +669,26 @@ $result = $conn->query($query);
         </div>
     </div>
 
-    <!-- Add/Edit Employee Modal -->
+    <!-- Employee Modal -->
     <div id="employeeModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeModal()">&times;</span>
-            <h2 id="modalTitle" class="page-title">Add New Employee</h2>
-            <form id="employeeForm" method="POST" action="../api/manage-employee.php">
+            <h2 id="modalTitle">Add New Employee</h2>
+            <form id="employeeForm" method="POST" action="../api/manage-employee.php" onsubmit="handleFormSubmit(event)">
                 <input type="hidden" id="employee_id" name="employee_id">
-                <input type="hidden" id="action" name="action" value="add">
-                
                 <div class="form-group">
                     <label for="name">Name</label>
                     <input type="text" id="name" name="name" required>
                 </div>
-
                 <div class="form-group">
                     <label for="email">Email</label>
                     <input type="email" id="email" name="email" required>
                 </div>
-
                 <div class="form-group">
                     <label for="password">Password</label>
                     <input type="password" id="password" name="password">
-                    <small>(Leave empty if not changing)</small>
+                    <small class="password-hint">Leave empty to keep existing password when editing</small>
                 </div>
-
                 <div class="form-group">
                     <label for="role">Role</label>
                     <select id="role" name="role" required>
@@ -616,82 +698,137 @@ $result = $conn->query($query);
                         <option value="credit">Credit</option>
                     </select>
                 </div>
-
-                <button type="submit" class="action-btn">
-                    <i class="fas fa-save"></i> Save Employee
-                </button>
+                <div class="form-group">
+                    <label for="status">Status</label>
+                    <select id="status" name="status">
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="submit-btn">Save Employee</button>
+                    <button type="button" class="cancel-btn" onclick="closeModal()">Cancel</button>
+                </div>
             </form>
         </div>
     </div>
 
     <script>
-        const sidebar = document.getElementById('sidebar');
-        const toggleButton = document.getElementById('toggleSidebar');
+    function openModal() {
+        document.getElementById('employeeModal').style.display = 'block';
+        document.getElementById('modalTitle').textContent = 'Add New Employee';
+        document.getElementById('employeeForm').reset();
+        document.getElementById('employee_id').value = '';
+        document.getElementById('password').required = true;
+        document.querySelector('.password-hint').style.display = 'none';
+    }
 
-        toggleButton.addEventListener('click', () => {
-            sidebar.classList.toggle('collapsed');
+    function closeModal() {
+        document.getElementById('employeeModal').style.display = 'none';
+    }
+
+    function editEmployee(employee) {
+        console.log('Employee data:', employee); // Debug log
+        document.getElementById('employeeModal').style.display = 'block';
+        document.getElementById('modalTitle').textContent = 'Edit Employee';
+        
+        // Set form values
+        const form = document.getElementById('employeeForm');
+        form.employee_id.value = employee.employee_id;
+        form.name.value = employee.name;
+        form.email.value = employee.email;
+        form.role.value = employee.role || 'admin'; // Set default if role is undefined
+        form.status.value = employee.status || 'active'; // Set default if status is undefined
+        
+        // Password field handling
+        form.password.required = false;
+        document.querySelector('.password-hint').style.display = 'block';
+        
+        console.log('Form values after setting:', {
+            employee_id: form.employee_id.value,
+            name: form.name.value,
+            email: form.email.value,
+            role: form.role.value,
+            status: form.status.value
         });
+    }
 
-        // Handle responsive behavior
-        if (window.innerWidth <= 768) {
-            sidebar.classList.add('collapsed');
+    function handleFormSubmit(event) {
+        event.preventDefault();
+        
+        const form = document.getElementById('employeeForm');
+        const formData = new FormData(form);
+        
+        // Validate required fields
+        const requiredFields = ['name', 'email', 'role'];
+        for (const field of requiredFields) {
+            if (!formData.get(field)) {
+                alert(`${field.charAt(0).toUpperCase() + field.slice(1)} is required`);
+                return;
+            }
+        }
+        
+        // Debug log
+        console.log('Form Data:');
+        for (let pair of formData.entries()) {
+            console.log(pair[0] + ': ' + pair[1]);
         }
 
-        window.addEventListener('resize', () => {
-            if (window.innerWidth <= 768) {
-                sidebar.classList.add('collapsed');
+        fetch('../api/manage-employee.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
             }
-        });
-
-        function openModal(employeeId = null) {
-            const modal = document.getElementById('employeeModal');
-            const modalTitle = document.getElementById('modalTitle');
-            const form = document.getElementById('employeeForm');
-            
-            if (employeeId) {
-                modalTitle.textContent = 'Edit Employee';
-                // Populate form with employee data
-                // Add your edit logic here
+            return response.json();
+        })
+        .then(data => {
+            console.log('Response:', data);  // Debug log
+            if (data.success) {
+                location.reload();
             } else {
-                modalTitle.textContent = 'Add New Employee';
-                form.reset();
+                alert('Error: ' + (data.message || 'An error occurred'));
             }
-            
-            modal.style.display = 'block';
-        }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while saving the employee data');
+        });
+    }
 
-        function closeModal() {
-            const modal = document.getElementById('employeeModal');
-            modal.style.display = 'none';
-        }
+    function toggleStatus(employeeId, currentStatus) {
+        const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+        const formData = new FormData();
+        formData.append('employee_id', employeeId);
+        formData.append('status', newStatus);
 
-        window.onclick = function(event) {
-            const modal = document.getElementById('employeeModal');
-            if (event.target == modal) {
-                modal.style.display = 'none';
+        fetch('../api/manage-employee.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error updating status: ' + data.message);
             }
-        }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while updating the status');
+        });
+    }
 
-        function deleteEmployee(id) {
-            if (confirm('Are you sure you want to delete this employee?')) {
-                fetch('../api/manage-employee.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `action=delete&employee_id=${id}`
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        alert('Error deleting employee');
-                    }
-                })
-                .catch(error => console.error('Error:', error));
-            }
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        const modal = document.getElementById('employeeModal');
+        if (event.target === modal) {
+            closeModal();
         }
+    }
     </script>
 </body>
 </html>

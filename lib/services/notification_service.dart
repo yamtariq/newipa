@@ -357,21 +357,84 @@ class NotificationService {
   /// );
 
   @pragma('vm:entry-point')
-  static Future<void> _handleNotificationAction(ReceivedAction receivedAction) async {
+  static Future<void> onActionReceivedMethod(ReceivedAction receivedAction) async {
+    debugPrint('=================== NOTIFICATION CLICKED ===================');
+    debugPrint('Action: ${receivedAction.buttonKeyPressed}');
+    debugPrint('Raw Payload: ${receivedAction.payload}');
+    
     try {
-      if (receivedAction.payload != null) {
-        final payloadJson = jsonDecode(receivedAction.payload!['data'] ?? '{}');
-        final route = payloadJson['route'];
-        final data = payloadJson['data'] as Map<String, dynamic>;
-        final isArabic = data['isArabic'] as bool;
-        
-        if (route != null) {
-          NavigationService().navigateToPage(route, isArabic: isArabic);
-        }
+      // First, dismiss the notification if we have an ID
+      if (receivedAction.id != null) {
+        await AwesomeNotifications().dismiss(receivedAction.id!);
+        debugPrint('Step N1: Dismissed notification with ID: ${receivedAction.id}');
       }
-    } catch (e) {
-      print('Error handling notification action: $e');
+      
+      if (receivedAction.payload != null && receivedAction.payload!['data'] != null) {
+        final String payloadStr = receivedAction.payload!['data']!;
+        debugPrint('Step N2: Payload String: $payloadStr');
+        
+        if (payloadStr.isNotEmpty) {
+          final Map<String, dynamic> payload = jsonDecode(payloadStr);
+          debugPrint('Step N3: Decoded Payload: $payload');
+          
+          String? route = payload['route'] as String?;
+          debugPrint('Step N4: Original Route: $route');
+          
+          // Normalize route
+          if (route != null) {
+            // Remove leading slash if present
+            route = route.startsWith('/') ? route.substring(1) : route;
+            // Convert to lowercase for consistent matching
+            route = route.toLowerCase();
+            debugPrint('Step N5: Normalized Route: $route');
+          }
+          
+          final Map<String, dynamic>? data = payload['data'] as Map<String, dynamic>?;
+          debugPrint('Step N6: Extracted Data: $data');
+          
+          final bool isArabic = data?['isArabic'] as bool? ?? false;
+          debugPrint('Step N7: Is Arabic: $isArabic');
+
+          if (route != null && route.isNotEmpty) {
+            debugPrint('Step N8: Attempting navigation to route: $route');
+            // Wait a bit to ensure the app is properly initialized
+            await Future.delayed(const Duration(milliseconds: 500));
+            
+            if (navigatorKey?.currentState != null) {
+              debugPrint('Step N9: Navigator is available, proceeding with navigation');
+              
+              // Use NavigationService for consistent navigation
+              final navigationService = NavigationService();
+              debugPrint('Step N10: Navigation Service initialized');
+              
+              navigationService.navigateToPage(
+                '/$route', // Add back the leading slash
+                isArabic: isArabic,
+                arguments: {'fromNotification': true},
+              );
+              debugPrint('Step N11: Navigation command sent');
+            } else {
+              debugPrint('Step N12: Navigator not available, storing route for later');
+              // Store the route and language preference for when the app starts
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('pending_notification_route', '/$route'); // Add back the leading slash
+              await prefs.setBool('pending_notification_is_arabic', isArabic);
+              debugPrint('Step N13: Route stored in SharedPreferences');
+            }
+          } else {
+            debugPrint('Step N14: ERROR - No route specified in notification payload');
+          }
+        } else {
+          debugPrint('Step N15: ERROR - Empty payload string');
+        }
+      } else {
+        debugPrint('Step N16: ERROR - No payload data available');
+      }
+    } catch (e, stackTrace) {
+      debugPrint('Step N17: ERROR in notification handling: $e');
+      debugPrint('Stack trace: $stackTrace');
     }
+    debugPrint('=============== END NOTIFICATION HANDLING ===============');
   }
 
   Future<bool> showNotification({
@@ -380,10 +443,40 @@ class NotificationService {
     String? payload,
   }) async {
     try {
-      debugPrint('Creating local notification...');
-      debugPrint('Title: $title');
-      debugPrint('Body: $body');
-      debugPrint('Payload: $payload');
+      debugPrint('Step S1: Creating local notification...');
+      debugPrint('Step S2: Title: $title');
+      debugPrint('Step S3: Body: $body');
+      debugPrint('Step S4: Raw Payload: $payload');
+
+      Map<String, dynamic> payloadData;
+      String? route;
+      
+      // Parse the payload if it exists
+      if (payload != null && payload.isNotEmpty) {
+        try {
+          payloadData = jsonDecode(payload);
+          route = payloadData['route'] as String?;
+          debugPrint('Step S5: Successfully parsed payload, route: $route');
+        } catch (e) {
+          debugPrint('Step S6: Error parsing payload: $e');
+          payloadData = {};
+        }
+      } else {
+        debugPrint('Step S7: No payload provided');
+        payloadData = {};
+      }
+
+      // Create the payload structure that matches what we expect in onActionReceivedMethod
+      final notificationPayload = {
+        'route': route,
+        'data': {
+          'isArabic': _isArabic,
+          // Add any other needed data here
+        }
+      };
+      
+      final encodedPayload = jsonEncode(notificationPayload);
+      debugPrint('Step S8: Final Encoded Payload: $encodedPayload');
 
       // Create local notification with background handling
       await AwesomeNotifications().createNotification(
@@ -392,7 +485,7 @@ class NotificationService {
           channelKey: 'basic_channel',
           title: title,
           body: body,
-          payload: {'data': payload ?? ''},
+          payload: {'data': encodedPayload},
           notificationLayout: NotificationLayout.Default,
           displayOnForeground: true,
           displayOnBackground: true,
@@ -406,10 +499,10 @@ class NotificationService {
         ),
       );
 
-      debugPrint('Local notification creation result: true');
+      debugPrint('Step S9: Local notification created successfully');
       return true;
     } catch (e, stackTrace) {
-      debugPrint('Error showing notification: $e');
+      debugPrint('Step S10: Error showing notification: $e');
       debugPrint('Stack trace: $stackTrace');
       return false;
     }
@@ -458,34 +551,6 @@ class NotificationService {
   static Future<void> onDismissActionReceivedMethod(ReceivedAction receivedAction) async {
     // Called when a notification is dismissed
     debugPrint('Notification dismissed');
-  }
-
-  @pragma('vm:entry-point')
-  static Future<void> onActionReceivedMethod(ReceivedAction receivedAction) async {
-    debugPrint('Notification action received: ${receivedAction.buttonKeyPressed}');
-    debugPrint('Payload: ${receivedAction.payload}');
-    
-    try {
-      if (receivedAction.payload != null) {
-        final payloadStr = receivedAction.payload!['data'];
-        if (payloadStr != null) {
-          final Map<String, dynamic> payload = jsonDecode(payloadStr);
-          final String? route = payload['route'] as String?;
-          final Map<String, dynamic> data = payload['data'] as Map<String, dynamic>;
-          final bool isArabic = data['isArabic'] as bool? ?? false;
-
-          debugPrint('Processing notification action - Route: $route, IsArabic: $isArabic');
-
-          if (route != null && navigatorKey?.currentState != null) {
-            debugPrint('Navigating to route: $route');
-            navigatorKey!.currentState!.pushNamed(route);
-          }
-        }
-      }
-    } catch (e, stackTrace) {
-      debugPrint('Error handling notification action: $e');
-      debugPrint('Stack trace: $stackTrace');
-    }
   }
 
   // Add setter for language

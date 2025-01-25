@@ -2,6 +2,8 @@
 
 This is the Nayifat App.
 
+nayifat.com
+
 ## Getting Started
 
 This project is a starting point for a Flutter application.

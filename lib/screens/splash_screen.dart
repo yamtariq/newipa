@@ -4,8 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../services/content_update_service.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
-import 'main_page.dart' show MainPage;
-import 'main_page_white.dart' show MainPageWhite;
+import 'main_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/theme_service.dart';
 
@@ -23,6 +22,8 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   bool _startAnimations = false;
+  String? _pendingNotificationRoute;
+  bool? _pendingNotificationIsArabic;
 
   @override
   void initState() {
@@ -35,7 +36,25 @@ class _SplashScreenState extends State<SplashScreen> {
         await ThemeService.setDarkMode(widget.isDarkMode); // Save to storage
       }
     });
+    _checkForPendingNotification();
     _initializeApp();
+  }
+
+  Future<void> _checkForPendingNotification() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _pendingNotificationRoute = prefs.getString('pending_notification_route');
+      _pendingNotificationIsArabic = prefs.getBool('pending_notification_is_arabic');
+      
+      // Clear the pending notification data
+      if (_pendingNotificationRoute != null) {
+        await prefs.remove('pending_notification_route');
+        await prefs.remove('pending_notification_is_arabic');
+        debugPrint('Found pending notification route: $_pendingNotificationRoute');
+      }
+    } catch (e) {
+      debugPrint('Error checking pending notification: $e');
+    }
   }
 
   Future<void> _initializeApp() async {
@@ -76,26 +95,25 @@ class _SplashScreenState extends State<SplashScreen> {
 
   void _navigateToMainPage(bool isDarkMode) async {
     final savedIsArabic = await _loadSavedLanguage();
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => isDarkMode
-          ? MainPage(
-              isArabic: savedIsArabic,
-              onLanguageChanged: (bool newIsArabic) async {
-                await _saveLanguagePreference(newIsArabic);
-              },
-              userData: {},
-            )
-          : MainPageWhite(
-              isArabic: savedIsArabic,
-              onLanguageChanged: (bool newIsArabic) async {
-                await _saveLanguagePreference(newIsArabic);
-              },
-              userData: {},
-            ),
-      ),
-    );
+    
+    // If we have a pending notification route, use its language setting
+    final isArabic = _pendingNotificationIsArabic ?? savedIsArabic;
+    
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MainPage(
+            isArabic: isArabic,
+            onLanguageChanged: (bool newValue) {
+              // Handle language change
+            },
+            userData: {},
+            isDarkMode: Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
+          ),
+        ),
+      );
+    }
   }
 
   @override

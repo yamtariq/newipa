@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/content_update_service.dart';
 import 'package:provider/provider.dart';
+import '../providers/theme_provider.dart';
 
 class LoadingScreen extends StatefulWidget {
   final bool isArabic;
@@ -67,15 +68,17 @@ class _LoadingScreenState extends State<LoadingScreen> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: themeProvider.isDarkMode ? Colors.black : Colors.white,
       body: Center(
         child: RotationTransition(
           turns: _animation,
           child: Image.asset(
             'assets/images/nayifatlogocircle-nobg.png',
-            width: 100, // Made logo bigger
-            height: 100, // Made logo bigger
+            width: 100,
+            height: 100,
           ),
         ),
       ),

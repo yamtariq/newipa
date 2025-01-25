@@ -313,240 +313,142 @@ class AuthService {
     }
   }
 
+  // Register device - simplified flow
+  Future<Map<String, dynamic>> registerDevice({
+    required String nationalId,
+  }) async {
+    try {
+      final deviceInfo = await getDeviceInfo();
+      
+      final response = await http.post(
+        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointRegisterDevice}'),
+        headers: await getAuthHeaders(),  // Use auth headers for proper API key
+        body: jsonEncode({
+          'national_id': nationalId,
+          'deviceId': deviceInfo['deviceId'],
+          'platform': deviceInfo['platform'],
+          'model': deviceInfo['model'],
+          'manufacturer': deviceInfo['manufacturer'],
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+      print('Device registration response: $data');
+
+      if (data['status'] == 'success') {
+        // Store device registration data locally
+        await storeDeviceRegistration(nationalId);
+      }
+
+      return data;
+    } catch (e) {
+      print('Error registering device: $e');
+      return {
+        'status': 'error',
+        'message': 'Error registering device: $e',
+        'message_ar': 'حدث خطأ أثناء تسجيل الجهاز'
+      };
+    }
+  }
+
   // Core sign-in method
   Future<Map<String, dynamic>> signIn({
     required String nationalId,
-    required String deviceId,
     String? password,
+    String? deviceId,
   }) async {
     try {
-      final Map<String, dynamic> body = {
-        'national_id': nationalId,
-        'deviceId': deviceId,
-      };
-      
-      if (password != null) {
-        body['password'] = password;
+      // Always register device first
+      final deviceRegistration = await registerDevice(nationalId: nationalId);
+      if (deviceRegistration['status'] != 'success') {
+        return deviceRegistration;
       }
+
+      final deviceInfo = await getDeviceInfo();
       
-      print('Signing in with: ${body.toString()}');
-      
+      final Map<String, dynamic> requestBody = {
+        'national_id': nationalId,
+        'deviceId': deviceId ?? deviceInfo['deviceId'],
+        'device_info': deviceInfo,
+      };
+
+      if (password != null) {
+        requestBody['password'] = password;
+      }
+
       final response = await http.post(
         Uri.parse('${Constants.apiBaseUrl}${Constants.endpointSignIn}'),
         headers: await getAuthHeaders(),
-        body: jsonEncode(body),
+        body: jsonEncode(requestBody),
       );
 
-      print('Sign-in Response Status: ${response.statusCode}');
-      print('Sign-in Response Body: ${response.body}');
+      print('Login API Response:');
+      print(response.body);
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        print('Sign-in response data: $data');
-        
-        if (data['status'] == 'success') {
-          // Store the authentication token
-          if (data['token'] != null) {
-            await storeToken(data['token']);
-            print('Authentication token stored');
-          }
-          
-          // Store user data if available
-          if (data['user'] != null) {
-            // Store user data in SharedPreferences
-            final prefs = await SharedPreferences.getInstance();
-            
-            try {
-              // Get government data during sign-in
-              print('\n=== FETCHING GOVERNMENT DATA DURING SIGN IN ===');
-              final govData = await getGovernmentData(data['user']['national_id']);
-              print('Government data received: $govData');
-              
-              // Merge user data with government data
-              print('\n=== MERGING USER DATA WITH GOVERNMENT DATA ===');
-              print('Original user data: ${data['user']}');
-              final completeUserData = <String, dynamic>{
-                ...Map<String, dynamic>.from(data['user']),
-                'date_of_birth': govData['dob'],
-                'salary': govData['salary'],
-                'employment_status': govData['employment_status'],
-                'employer_name': govData['employer_name'],
-                'employment_date': govData['employment_date'],
-                'national_address': govData['national_address'],
-              };
-              print('Merged complete user data: $completeUserData');
-              
-              // Store in SharedPreferences
-              await prefs.setString('national_id', completeUserData['national_id'] ?? '');
-              await prefs.setString('date_of_birth', completeUserData['date_of_birth'] ?? '');
-              await prefs.setString('name', completeUserData['name'] ?? '');
-              await prefs.setString('email', completeUserData['email'] ?? '');
-              await prefs.setString('phone', completeUserData['phone'] ?? '');
-              
-              // Store complete user data in secure storage
-              await storeUserData(completeUserData);
-              
-              print('Stored complete user data:');
-              print('National ID: ${completeUserData['national_id']}');
-              print('Date of Birth: ${completeUserData['date_of_birth']}');
-              print('Name: ${completeUserData['name']}');
-            } catch (e) {
-              print('Error storing user data: $e');
-            }
-          }
-          
-          // Start the session
-          if (data['user'] != null && data['user']['national_id'] != null) {
-            await startSession(data['user']['national_id'], userId: data['user']['user_id']?.toString());
-            print('Session started for user: ${data['user']['national_id']}');
-          }
-          
-          return data;
-        } else {
-          print('Sign-in failed: ${data['message']}');
-          return data;
+      final data = jsonDecode(response.body);
+      
+      if (data['status'] == 'success') {
+        // Store tokens and start session
+        if (data['token'] != null) {
+          await storeToken(data['token']);
         }
-      } else {
-        throw Exception('Failed to sign in: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Error in sign-in: $e');
-      return {
-        'status': 'error',
-        'code': 'SYSTEM_ERROR',
-        'message': 'An error occurred during sign in',
-      };
-    }
-  }
-
-  // Verify device and get token (for MPIN/Biometric)
-  Future<Map<String, dynamic>> verifyDeviceAndGetToken({
-    required String nationalId,
-  }) async {
-    try {
-      final deviceUserId = await _secureStorage.read(key: 'device_user_id');
-      final deviceRegistered = await _secureStorage.read(key: 'device_registered');
-      
-      print('Device Registration Check:');
-      print('- Registered User ID: $deviceUserId');
-      print('- Device Registered: $deviceRegistered');
-      print('- Checking for ID: $nationalId');
-      
-      if (deviceUserId != nationalId || deviceRegistered != 'true') {
-        throw Exception('Device not registered to this user');
+        if (data['user'] != null) {
+          await storeUserData(data['user']);
+          await startSession(data['user']['national_id']);
+        }
       }
 
-      final deviceInfo = await getDeviceInfo();
-      final deviceId = deviceInfo['deviceId'];
-      
-      if (deviceId == null) {
-        throw Exception('Could not get device ID');
-      }
-      
-      print('Verifying device with ID: $deviceId');
-      
-      return await signIn(
-        nationalId: nationalId,
-        deviceId: deviceId,
-      );
-    } catch (e) {
-      print('Error in device verification: $e');
-      print('Stack trace: ${StackTrace.current}');
-      throw Exception('Authentication failed: $e');
-    }
-  }
-
-  // Check device registration status
-  Future<Map<String, dynamic>> checkDeviceRegistration(String nationalId) async {
-    try {
-      final deviceInfo = await getDeviceInfo();
-      
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointCheckDeviceRegistration}'),
-        headers: Constants.deviceHeaders,
-        body: jsonEncode({
-          'national_id': nationalId,
-          'device_info': deviceInfo,
-        }),
-      );
-
-      print('Device registration check response: ${response.body}');
-
-      if (response.statusCode != 200) {
-        return {
-          'isValid': false,
-          'reason': 'Server validation failed',
-          'requiresAction': 'server_error'
-        };
-      }
-
-      final data = jsonDecode(response.body);
-      
-      // Clear any existing device registration
-      await _secureStorage.delete(key: 'device_registered');
-      await _secureStorage.delete(key: 'device_user_id');
-      
-      // If device belongs to another user
-      if (data['registered_user'] != null) {
-        return {
-          'status': 'error',
-          'message': 'هذا الجهاز مسجل لمستخدم آخر',
-          'registered_user': data['registered_user']
-        };
-      }
-      
-      // If user has another device
-      if (data['existing_device'] != null) {
-        return {
-          'status': 'device_mismatch',
-          'message': data['message'],
-          'existing_device': data['existing_device']
-        };
-      }
-
-      // If device is registered to this user
-      if (data['status'] == 'registered') {
-        await _secureStorage.write(key: 'device_registered', value: 'true');
-        await _secureStorage.write(key: 'device_user_id', value: nationalId);
-      }
-      
       return data;
     } catch (e) {
-      print('Error checking device registration: $e');
-      throw Exception('Error checking device registration: $e');
-    }
-  }
-
-  // Password-based login
-  Future<Map<String, dynamic>> login({
-    required String nationalId,
-    required String password,
-  }) async {
-    try {
-      final deviceInfo = await getDeviceInfo();
-      
-      // Proceed with login
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointSignIn}'),
-        headers: Constants.authHeaders,
-        body: jsonEncode({
-          'national_id': nationalId,
-          'password': password,
-          'deviceId': deviceInfo['deviceId'],
-          'device_info': deviceInfo,
-        }),
-      );
-
-      final data = jsonDecode(response.body);
-      print('Login response: $data');
-      return data;
-    } catch (e) {
-      print('Error during login: $e');
+      print('Error during sign in: $e');
       return {
         'status': 'error',
-        'message': 'Error during login: $e',
+        'message': 'Error during sign in: $e',
         'message_ar': 'حدث خطأ أثناء تسجيل الدخول'
       };
+    }
+  }
+
+  // Store device registration data
+  Future<void> storeDeviceRegistration(String nationalId) async {
+    try {
+      await _secureStorage.write(key: 'device_user_id', value: nationalId);
+      await _secureStorage.write(key: 'device_registered', value: 'true');
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('device_user_id', nationalId);
+      await prefs.setBool('device_registered', true);
+      
+      print('Device registration stored for user: $nationalId');
+    } catch (e) {
+      print('Error storing device registration: $e');
+      throw Exception('Error storing device registration: $e');
+    }
+  }
+
+  // Check if device is registered (for quick sign-in methods)
+  Future<bool> isDeviceRegistered() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final isRegistered = prefs.getBool('device_registered') ?? false;
+      final deviceUserId = prefs.getString('device_user_id');
+      return isRegistered && deviceUserId != null;
+    } catch (e) {
+      print('Error checking device registration: $e');
+      return false;
+    }
+  }
+
+  // Check if device is registered to specific user (for quick sign-in methods)
+  Future<bool> isDeviceRegisteredToUser(String nationalId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final storedUserId = prefs.getString('device_user_id');
+      final isRegistered = prefs.getBool('device_registered') ?? false;
+      return isRegistered && storedUserId == nationalId;
+    } catch (e) {
+      print('Error checking device registration: $e');
+      return false;
     }
   }
 
@@ -571,7 +473,6 @@ class AuthService {
       }
       
       print('Local MPIN verification successful');
-      print('\n=== FETCHING GOVERNMENT DATA DURING MPIN LOGIN ===');
 
       // Get device info
       final deviceInfo = await getDeviceInfo();
@@ -582,25 +483,18 @@ class AuthService {
         throw Exception('Could not get device ID');
       }
       
-      print('MPIN login attempt with device ID: $deviceId');
-      
-      // Get government data before sign-in
-      print('Fetching government data for ID: $nationalId');
-      final govData = await getGovernmentData(nationalId);
-      print('Government data received during MPIN login: $govData');
-      
       // Use the core signIn method
-      final signInResult = await signIn(
+      return await signIn(
         nationalId: nationalId,
         deviceId: deviceId,
       );
-
-      print('Sign-in result after MPIN verification: $signInResult');
-      return signInResult;
     } catch (e) {
       print('Error during MPIN login: $e');
-      print('Stack trace: ${StackTrace.current}');
-      throw Exception('Error during MPIN login: $e');
+      return {
+        'status': 'error',
+        'message': 'Error during MPIN login: $e',
+        'message_ar': 'حدث خطأ أثناء تسجيل الدخول'
+      };
     }
   }
 
@@ -616,88 +510,19 @@ class AuthService {
       }
 
       final deviceInfo = await getDeviceInfo();
+      final deviceId = deviceInfo['deviceId'];
+      
+      if (deviceId == null) {
+        throw Exception('Could not get device ID');
+      }
       
       return await signIn(
         nationalId: nationalId,
-        deviceId: deviceInfo['deviceId'],
+        deviceId: deviceId,
       );
     } catch (e) {
       print('Error during biometric verification: $e');
       throw Exception('Error during biometric verification: $e');
-    }
-  }
-
-  // Store device registration data
-  Future<void> storeDeviceRegistration(String nationalId) async {
-    try {
-      await _secureStorage.write(key: 'device_user_id', value: nationalId);
-      await _secureStorage.write(key: 'device_registered', value: 'true');
-      
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('device_user_id', nationalId);
-      await prefs.setBool('device_registered', true);
-      
-      print('Device registration stored for user: $nationalId');
-    } catch (e) {
-      print('Error storing device registration: $e');
-      throw Exception('Error storing device registration: $e');
-    }
-  }
-
-  Future<bool> isDeviceRegistered() async {
-    try {
-      final deviceRegistered = await _secureStorage.read(key: 'device_registered');
-      final deviceUserId = await _secureStorage.read(key: 'device_user_id');
-      print('Device check - Registered: $deviceRegistered, User ID: $deviceUserId');
-      return deviceRegistered == 'true' && deviceUserId != null;
-    } catch (e) {
-      print('Error checking device registration: $e');
-      return false;
-    }
-  }
-
-  // Check if device is registered to a specific user
-  Future<bool> isDeviceRegisteredToUser(String nationalId) async {
-    try {
-      // First check SharedPreferences for quick access
-      final prefs = await SharedPreferences.getInstance();
-      final prefsUserId = prefs.getString('device_user_id');
-      final prefsRegistered = prefs.getBool('device_registered');
-      
-      print('Device Registration Check (SharedPreferences):');
-      print('- User ID: $prefsUserId');
-      print('- Registered: $prefsRegistered');
-
-      // Then check secure storage for verification
-      final secureUserId = await _secureStorage.read(key: 'device_user_id');
-      final secureRegistered = await _secureStorage.read(key: 'device_registered');
-      
-      print('Device Registration Check (Secure Storage):');
-      print('- User ID: $secureUserId');
-      print('- Registered: $secureRegistered');
-      print('- Checking for ID: $nationalId');
-
-      // If there's a mismatch between SharedPreferences and SecureStorage,
-      // update SharedPreferences with SecureStorage values
-      if (prefsUserId != secureUserId || prefsRegistered != (secureRegistered == 'true')) {
-        print('Fixing inconsistency between SharedPreferences and SecureStorage');
-        if (secureUserId != null && secureRegistered == 'true') {
-          await prefs.setString('device_user_id', secureUserId);
-          await prefs.setBool('device_registered', true);
-        } else {
-          await prefs.remove('device_user_id');
-          await prefs.setBool('device_registered', false);
-        }
-      }
-
-      // Use secure storage values for verification
-      return secureUserId != null && 
-             secureRegistered == 'true' && 
-             secureUserId == nationalId;
-    } catch (e) {
-      print('Error in device verification: $e');
-      print('Stack trace: ${StackTrace.current}');
-      return false;
     }
   }
 
@@ -854,31 +679,6 @@ class AuthService {
     }
     
     throw Exception('Unsupported platform');
-  }
-
-  // Replace device
-  Future<Map<String, dynamic>> replaceDevice({
-    required String nationalId,
-  }) async {
-    try {
-      final deviceInfo = await getDeviceInfo();
-      
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointReplaceDevice}'),
-        headers: Constants.deviceHeaders,
-        body: jsonEncode({
-          'national_id': nationalId,
-          'device_info': deviceInfo,
-        }),
-      );
-
-      final data = jsonDecode(response.body);
-      print('Device replacement response: $data');
-      return data;
-    } catch (e) {
-      print('Error replacing device: $e');
-      throw Exception('Error replacing device: $e');
-    }
   }
 
   // Store auth token in secure storage
@@ -1334,53 +1134,6 @@ class AuthService {
   // Clear all stored data (for logout)
   Future<void> clearStoredData() async {
     await _secureStorage.deleteAll();
-  }
-
-  // Register device for a user
-  Future<Map<String, dynamic>> registerDevice({
-    required String nationalId,
-  }) async {
-    try {
-      final deviceInfo = await getDeviceInfo();
-      
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointRegisterDevice}'),
-        headers: Constants.deviceHeaders,
-        body: jsonEncode({
-          'register_device_only': true,
-          'national_id': nationalId,
-          'deviceId': deviceInfo['deviceId'],
-          'platform': deviceInfo['platform'],
-          'model': deviceInfo['model'],
-          'manufacturer': deviceInfo['manufacturer'],
-        }),
-      );
-
-      print('Device Registration Response Status: ${response.statusCode}');
-      print('Device Registration Response Body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        
-        if (data['status'] == 'success') {  // Only check for 'status' == 'success'
-          // Store device registration data locally
-          await _secureStorage.write(key: 'device_user_id', value: nationalId);
-          await _secureStorage.write(key: 'device_registered', value: 'true');
-          
-          // Also store in SharedPreferences for quick access
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('device_user_id', nationalId);
-          await prefs.setBool('device_registered', true);
-        }
-        
-        return data;
-      } else {
-        throw Exception('Failed to register device: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Error registering device: $e');
-      throw Exception('Error registering device: $e');
-    }
   }
 
   // Store registration data locally

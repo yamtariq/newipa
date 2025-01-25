@@ -10,11 +10,19 @@ if (!isset($_SESSION['user_id'])) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true);
-    $loanId = $data['id'];
-    $status = $data['status'];
 
-    $stmt = $conn->prepare("UPDATE loan_application_details SET status = ?, status_date = NOW() WHERE loan_id = ?");
-    $stmt->bind_param("si", $status, $loanId);
+    $loanId = $data['loan_id'];  // Changed from $data['id']
+    $status = $data['status'];
+    $remarks = $data['remarks']; // If you also want to store remarks
+
+    $stmt = $conn->prepare("
+        UPDATE loan_application_details
+        SET status = ?, 
+            remarks = ?, 
+            status_date = NOW()
+        WHERE loan_id = ?
+    ");
+    $stmt->bind_param("ssi", $status, $remarks, $loanId);
 
     if ($stmt->execute()) {
         echo json_encode(['success' => true]);

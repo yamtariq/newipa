@@ -18,6 +18,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'forget_password_screen.dart';
 import 'forget_mpin_screen.dart';
+import '../../providers/theme_provider.dart';
+import '../../utils/constants.dart';
 
 class SignInScreen extends StatefulWidget {
   final bool isArabic;
@@ -61,21 +63,30 @@ class _SignInScreenState extends State<SignInScreen> {
     IconData? icon,
     Color? iconColor,
   }) {
+    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
+    final themeColor = isDarkMode 
+        ? Color(Constants.darkPrimaryColor) 
+        : Color(Constants.lightPrimaryColor);
+    
     return Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
       ),
       elevation: 0,
       backgroundColor: Colors.transparent,
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDarkMode 
+              ? Color(Constants.darkSurfaceColor) 
+              : Color(Constants.lightSurfaceColor),
           shape: BoxShape.rectangle,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
           boxShadow: [
             BoxShadow(
-              color: Colors.black26,
+              color: isDarkMode 
+                  ? Color(Constants.darkPrimaryShadowColor)
+                  : Color(Constants.lightPrimaryShadowColor),
               blurRadius: 10.0,
               offset: const Offset(0.0, 10.0),
             ),
@@ -84,42 +95,40 @@ class _SignInScreenState extends State<SignInScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Icon at the top
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: (iconColor ?? const Color(0xFF0077B6)).withOpacity(0.1),
+                color: (iconColor ?? themeColor).withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon ?? Icons.info_outline_rounded,
                 size: 40,
-                color: iconColor ?? const Color(0xFF0077B6),
+                color: iconColor ?? themeColor,
               ),
             ),
             const SizedBox(height: 24),
-            // Title
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0077B6),
+                color: themeColor,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            // Message
             Text(
               message,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.grey[700],
+                color: isDarkMode 
+                    ? Color(Constants.darkLabelTextColor)
+                    : Color(Constants.lightLabelTextColor),
               ),
             ),
             const SizedBox(height: 32),
-            // Buttons
             Row(
               children: actions.map((action) {
                 final isLastAction = action == actions.last;
@@ -142,6 +151,11 @@ class _SignInScreenState extends State<SignInScreen> {
 
   void _showErrorBanner(String message) {
     if (!mounted) return;
+    
+    final isDarkMode = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+    final themeColor = isDarkMode 
+        ? Color(Constants.darkPrimaryColor) 
+        : Color(Constants.lightPrimaryColor);
     
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -187,11 +201,13 @@ class _SignInScreenState extends State<SignInScreen> {
             ],
           ),
         ),
-        backgroundColor: Colors.red[700],
+        backgroundColor: isDarkMode 
+            ? Color(Constants.darkSurfaceColor)
+            : Colors.red[700],
         duration: const Duration(seconds: 4),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
         ),
         margin: const EdgeInsets.all(16),
       ),
@@ -312,6 +328,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     // Handle language change if needed
                   },
                   userData: response['user'],
+                  isDarkMode: Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
                 ),
               ),
             );
@@ -319,62 +336,44 @@ class _SignInScreenState extends State<SignInScreen> {
           return;
         }
 
-        // For password sign-in, store device info and continue with MPIN setup
-        final deviceInfo = await _authService.getDeviceInfo();
-        await _authService.storeDeviceRegistration(response['user']['national_id']);
+        // For password sign-in, always register this device
+        print('Registering current device...');
+        final registerResponse = await _authService.registerDevice(
+          nationalId: _nationalIdController.text,
+        );
 
-        if (mounted) {
-          // Show device registration success popup
-          await showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (BuildContext context) {
-              // Auto dismiss after 3 seconds
-              Future.delayed(const Duration(seconds: 5), () {
-                if (mounted) {
-                  Navigator.of(context).pop();
-                }
-              });
+        if (registerResponse['status'] == 'success') {
+          if (mounted) {
+            // Show quick success message
+            // ScaffoldMessenger.of(context).showSnackBar(
+            //   SnackBar(
+            //     content: Text(
+            //       widget.isArabic 
+            //         ? 'تم تسجيل الجهاز بنجاح'
+            //         : 'Device registered successfully',
+            //       style: const TextStyle(color: Colors.white),
+            //     ),
+            //     backgroundColor: Colors.green,
+            //     duration: const Duration(seconds: 2),
+            //   ),
+            // );
 
-              return WillPopScope(
-                onWillPop: () async => false,
-                child: AlertDialog(
-                  title: Text(
-                    widget.isArabic
-                        ? 'تم تسجيل الجهاز بنجاح'
-                        : 'Device Registration Successful',
-                    textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
-                    textDirection: widget.isArabic ? ui.TextDirection.rtl : ui.TextDirection.ltr,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  content: Text(
-                    widget.isArabic
-                        ? 'سيتم الآن إعداد رمز الدخول السريع والسمات الحيوية'
-                        : 'You will now set up MPIN and biometric authentication',
-                    textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
-                    textDirection: widget.isArabic ? ui.TextDirection.rtl : ui.TextDirection.ltr,
-                  ),
+            // Navigate to MPIN setup
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MPINSetupScreen(
+                  isArabic: widget.isArabic,
+                  nationalId: _nationalIdController.text,
+                  password: _passwordController.text,
+                  user: response['user'],
+                  showSteps: false,
                 ),
-              );
-            },
-          );
-
-          // Navigate to MPIN setup
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MPINSetupScreen(
-                isArabic: widget.isArabic,
-                nationalId: _nationalIdController.text,
-                password: _passwordController.text,
-                user: response['user'],
-                showSteps: false,
               ),
-            ),
-          );
+            );
+          }
+        } else {
+          throw Exception(registerResponse['message'] ?? 'Failed to register device');
         }
       } catch (e, stackTrace) {
         print('Error during sign in process: $e\n$stackTrace');
@@ -390,185 +389,6 @@ class _SignInScreenState extends State<SignInScreen> {
       print('Sign in failed with code: ${response['code']}');
 
       switch (response['code']) {
-        case 'DEVICE_REGISTERED_TO_OTHER':
-          print('Device registered to other user');
-          if (response['existing_device'] != null) {
-            await showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (BuildContext context) {
-                return DeviceTransitionDialog(
-                  existingDevice: response['existing_device'],
-                  isArabic: widget.isArabic,
-                  onTransitionDecision: (bool shouldTransition) async {
-                    Navigator.of(context).pop();
-                    if (shouldTransition) {
-                      // Navigate to device replacement MPIN setup
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (context) => DeviceReplacementMPINScreen(
-                            isArabic: widget.isArabic,
-                            userData: {
-                              'nationalId': _nationalIdController.text,
-                              'deviceInfo': response['device_info'],
-                            },
-                          ),
-                        ),
-                      );
-                    }
-                  },
-                );
-              },
-            );
-          } else {
-            _showErrorBanner(
-              widget.isArabic
-                  ? 'خطأ في معلومات الجهاز'
-                  : 'Error in device information'
-            );
-          }
-          break;
-
-        case 'DEVICE_NOT_REGISTERED':
-          print('Device not registered');
-          await showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (BuildContext context) {
-              return _buildCustomDialog(
-                title: widget.isArabic ? 'تنبيه' : 'Alert',
-                message: widget.isArabic
-                    ? 'هذا الجهاز غير مسجل. سيتم تسجيل هذا الجهاز تحت حسابك'
-                    : 'This device is not registered. You will now register this device under your account.',
-                icon: Icons.phonelink_erase_rounded,
-                iconColor: Colors.red[700],
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: Text(
-                      widget.isArabic ? 'إلغاء' : 'Cancel',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  ElevatedButton(
-                    onPressed: () async {
-                      Navigator.of(context).pop();
-                      // Register device
-                      final registerResponse = await _authService.registerDevice(
-                        nationalId: _nationalIdController.text,
-                      );
-                      if (registerResponse['status'] == 'success') {
-                        // Try sign in again
-                        final signInResponse = await _authService.login(
-                          nationalId: _nationalIdController.text,
-                          password: _passwordController.text,
-                        );
-                        await _handleSignInResponse(signInResponse);
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0077B6),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: Text(
-                      widget.isArabic ? 'متابعة' : 'Continue',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          );
-          break;
-
-        case 'REQUIRES_DEVICE_REPLACEMENT':
-          print('Device replacement required');
-          await showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (BuildContext context) {
-              return _buildCustomDialog(
-                title: widget.isArabic ? 'تنبيه' : 'Alert',
-                message: widget.isArabic
-                    ? 'يجب استبدال الجهاز الحالي. سيتم تسجيل هذا الجهاز تحت حسابك.'
-                    : 'Device replacement required. You will now register this device under your account.',
-                icon: Icons.devices_rounded,
-                iconColor: Colors.red[700],
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: Text(
-                      widget.isArabic ? 'إلغاء' : 'Cancel',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  ElevatedButton(
-                    onPressed: () async {
-                      Navigator.of(context).pop();
-                      // Replace device
-                      final replaceResponse = await _authService.replaceDevice(
-                        nationalId: _nationalIdController.text,
-                      );
-                      if (replaceResponse['status'] == 'success') {
-                        // Try sign in again
-                        final signInResponse = await _authService.login(
-                          nationalId: _nationalIdController.text,
-                          password: _passwordController.text,
-                        );
-                        await _handleSignInResponse(signInResponse);
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0077B6),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: Text(
-                      widget.isArabic ? 'متابعة' : 'Continue',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          );
-          break;
-
         case 'USER_NOT_FOUND':
           await showDialog(
             context: context,
@@ -690,60 +510,6 @@ class _SignInScreenState extends State<SignInScreen> {
     print('=== HANDLE SIGN IN RESPONSE END ===\n');
   }
 
-  Future<void> _handleDeviceNotRegistered(String message) async {
-    print('Device is no longer registered/has been replaced, showing message...');
-    // Clear local authentication data
-    await _authService.clearStoredData();
-
-    if (mounted) {
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return _buildCustomDialog(
-            title: widget.isArabic ? 'تنبيه' : 'Alert',
-            message: widget.isArabic
-                ? 'هذا الجهاز لم يعد مسجلاً. يرجى تسجيل الدخول باستخدام كلمة المرور'
-                : 'This device is no longer registered. Please sign in with password',
-            icon: Icons.phonelink_erase_rounded,
-            iconColor: Colors.red[700],
-            actions: [
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => SignInScreen(
-                        isArabic: widget.isArabic,
-                        startWithPassword: true,
-                      ),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0077B6),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: Text(
-                  widget.isArabic ? 'موافق' : 'OK',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      );
-    }
-  }
-
   Future<void> _authenticateWithBiometrics() async {
     print('=== BIOMETRIC AUTHENTICATION START ===');
     if (_nationalIdController.text.isEmpty) {
@@ -781,13 +547,6 @@ class _SignInScreenState extends State<SignInScreen> {
           nationalId: _nationalIdController.text,
         );
         print('Backend verification result: ${json.encode(result)}');
-
-        // Handle cases where device is no longer registered or has been replaced
-        if (result['message'] == 'Device is not registered for this user' ||
-            result['message'] == 'Device has been replaced') {
-          await _handleDeviceNotRegistered(result['message']);
-          return;
-        }
 
         await _handleSignInResponse(result);
       }
@@ -842,23 +601,12 @@ class _SignInScreenState extends State<SignInScreen> {
       }
 
       print('Verifying device and getting token...');
-      final result = await _authService.verifyDeviceAndGetToken(
+      final result = await _authService.signIn(
         nationalId: _nationalIdController.text,
       );
       print('Device verification result: ${json.encode(result)}');
 
-      // Handle cases where device is no longer registered or has been replaced
-      if (result['message'] == 'Device is not registered for this user' ||
-          result['message'] == 'Device has been replaced') {
-        await _handleDeviceNotRegistered(result['message']);
-        return;
-      }
-
-      if (mounted) {
-        await _handleSignInResponse(result);
-      } else {
-        print('Widget not mounted after MPIN verification');
-      }
+      await _handleSignInResponse(result);
     } catch (e, stackTrace) {
       print('Error during MPIN authentication:');
       print('Error: $e');
@@ -896,21 +644,13 @@ class _SignInScreenState extends State<SignInScreen> {
       print('Attempting login with:');
       print('- National ID: ${_nationalIdController.text}');
 
-      final result = await _authService.login(
+      final result = await _authService.signIn(
         nationalId: _nationalIdController.text,
         password: _passwordController.text,
       );
 
       print('Login API Response:');
       print(json.encode(result));
-
-      // Check for device replacement requirement
-      if (result['status'] == 'error' &&
-          result['code'] == 'REQUIRES_DEVICE_REPLACEMENT') {
-        print('Device replacement required, handling device replacement...');
-        await _handleDeviceMismatch(result);
-        return;
-      }
 
       await _handleSignInResponse(result);
     } catch (e, stackTrace) {
@@ -929,365 +669,6 @@ class _SignInScreenState extends State<SignInScreen> {
         setState(() => _isLoading = false);
       }
       print('=== PASSWORD AUTHENTICATION END ===\n');
-    }
-  }
-
-  Future<void> _handleDeviceMismatch(Map<String, dynamic> response) async {
-    if (response['existing_device'] != null) {
-      // Show device replacement dialog
-      final result = await _showDeviceReplacementDialog(
-          context, response['existing_device']);
-
-      if (result ?? false) {
-        setState(() => _isLoading = true);
-        try {
-          // Call replaceDevice directly
-          final response = await _authService.replaceDevice(
-            nationalId: _nationalIdController.text,
-          );
-
-          if (response['status'] == 'success') {
-            // After device replacement, go straight to MPIN setup
-            if (mounted) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => DeviceReplacementMPINScreen(
-                    isArabic: widget.isArabic,
-                    userData: {
-                      'nationalId': _nationalIdController.text,
-                      'password': _passwordController.text,
-                    },
-                  ),
-                ),
-              );
-            }
-          } else {
-            throw Exception(response['message'] ?? 'Device replacement failed');
-          }
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(e.toString()),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        } finally {
-          if (mounted) {
-            setState(() => _isLoading = false);
-          }
-        }
-      }
-    }
-  }
-
-  Future<bool?> _showDeviceReplacementDialog(
-      BuildContext context, Map<String, dynamic> existingDevice) async {
-    final primaryColor = Theme.of(context).primaryColor;
-    
-    return await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return Directionality(
-          textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
-          child: AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            contentPadding: EdgeInsets.zero,
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Header with icon
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 24),
-                    decoration: BoxDecoration(
-                      color: primaryColor.withOpacity(0.1),
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                    ),
-                    child: Center(
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Icon(
-                            Icons.phonelink_setup,
-                            size: 48,
-                            color: primaryColor,
-                          ),
-                          Positioned(
-                            right: widget.isArabic ? null : 0,
-                            left: widget.isArabic ? 0 : null,
-                            bottom: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: primaryColor, width: 2),
-                              ),
-                              child: Icon(
-                                Icons.swap_horiz,
-                                size: 16,
-                                color: primaryColor,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Content
-                  Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          widget.isArabic
-                              ? 'الدخول من جهاز جديد'
-                              : 'Singing in from a new device',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          widget.isArabic
-                              ? 'أنت تحاول تسجيل الدخول من جهاز جديد'
-                              : 'You are trying to sign in from a new device.',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[700],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        // Device Info Card
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey[300]!),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Text(
-                                widget.isArabic
-                                    ? 'الجهاز المسجل حالياً:'
-                                    : 'Current registered device:',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Icon(Icons.phone_android, 
-                                    size: 20, 
-                                    color: Colors.grey[600]
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      '${existingDevice['manufacturer']} ${existingDevice['model']}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.red[50],
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.red[100]!),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(top: 2),
-                                child: Icon(
-                                  Icons.warning_amber_rounded,
-                                  color: Colors.red[700],
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  widget.isArabic
-                                      ? 'هل تريد استبدال جهازك الحالي بهذا الجهاز؟ سيؤدي هذا إلى ايقاف معلومات الدخول من جهازك القديم.'
-                                      : 'Would you like to replace your existing device with this one? This will disable authenticated information on your old device.',
-                                  style: TextStyle(
-                                    color: Colors.red[700],
-                                    fontSize: 13,
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                ),
-                child: Text(
-                  widget.isArabic ? 'إلغاء' : 'Cancel',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  widget.isArabic ? 'استبدال الجهاز' : 'Replace Device',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _showDeviceRegistrationDialog(BuildContext context) async {
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(
-            widget.isArabic ? 'تسجيل الجهاز' : 'Device Registration',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: Text(widget.isArabic
-              ? 'هذا الجهاز غير مسجل. هل تريد تسجيل هذا الجهاز لحسابك؟'
-              : 'This device is not registered. Would you like to register this device to your account?'),
-          actions: <Widget>[
-            TextButton(
-              child: Text(widget.isArabic ? 'إلغاء' : 'Cancel'),
-              onPressed: () => Navigator.of(context).pop(false),
-            ),
-            ElevatedButton(
-              child: Text(widget.isArabic ? 'تسجيل الجهاز' : 'Register Device'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).primaryColor,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () => Navigator.of(context).pop(true),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (result == true) {
-      try {
-        setState(() {
-          _isLoading = true;
-        });
-
-        print('Registering device for user: ${_nationalIdController.text}');
-        final response = await _authService.registerDevice(
-          nationalId: _nationalIdController.text,
-        );
-        print('Device registration response: ${json.encode(response)}');
-
-        if (response['status'] == 'success') {
-          print('Device registered successfully, proceeding to MPIN setup');
-          if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => MPINSetupScreen(
-                  isArabic: widget.isArabic,
-                  nationalId: _nationalIdController.text,
-                  password: _passwordController.text,
-                  user: response['user'],
-                ),
-              ),
-            );
-          }
-        } else {
-          print('Device registration failed: ${response['message']}');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  widget.isArabic
-                      ? 'فشل في تسجيل الجهاز'
-                      : response['message'] ?? 'Failed to register device',
-                ),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        }
-      } catch (e) {
-        print('Error during device registration: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                widget.isArabic
-                    ? 'حدث خطأ أثناء تسجيل الجهاز'
-                    : 'Error during device registration',
-              ),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
-      }
     }
   }
 
@@ -1424,17 +805,22 @@ class _SignInScreenState extends State<SignInScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = const Color(0xFF0077B6);
+    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
+    final themeColor = isDarkMode 
+        ? Color(Constants.darkPrimaryColor) 
+        : Color(Constants.lightPrimaryColor);
+    final primaryColor = themeColor;
 
     return WillPopScope(
       onWillPop: () async {
-        // Only allow back navigation in password mode
         return _isPasswordMode;
       },
       child: Directionality(
         textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
         child: Scaffold(
-          backgroundColor: const Color(0xFFF5F6FA),
+          backgroundColor: isDarkMode 
+              ? Color(Constants.darkBackgroundColor) 
+              : Color(Constants.lightBackgroundColor),
           body: SafeArea(
             child: Stack(
               children: [
@@ -1443,14 +829,20 @@ class _SignInScreenState extends State<SignInScreen> {
                   top: -100,
                   right: widget.isArabic ? null : -100,
                   left: widget.isArabic ? -100 : null,
-                  child: Opacity(
-                    opacity: 0.2,
-                    child: Image.asset(
-                      'assets/images/nayifatlogocircle-nobg.png',
-                      width: 240,
-                      height: 240,
-                    ),
-                  ),
+                  child: isDarkMode
+                    ? Image.asset(
+                        'assets/images/nayifat-circle-grey.png',
+                        width: 240,
+                        height: 240,
+                      )
+                    : Opacity(
+                        opacity: 0.2,
+                        child: Image.asset(
+                          'assets/images/nayifatlogocircle-nobg.png',
+                          width: 240,
+                          height: 240,
+                        ),
+                      ),
                 ),
 
                 // Main Content
@@ -1617,11 +1009,13 @@ class _SignInScreenState extends State<SignInScreen> {
                                   _onNextPressed();
                                 },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
+                            backgroundColor: themeColor,
+                            foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
                             ),
+                            elevation: 0,
                           ),
                           child: _isLoading
                               ? const SizedBox(
@@ -1656,6 +1050,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                     // Handle language change if needed
                                   },
                                   userData: {},  // Pass empty map for unauthenticated user
+                                  isDarkMode: Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
                                 ),
                               ),
                             );
@@ -1666,7 +1061,11 @@ class _SignInScreenState extends State<SignInScreen> {
                           child: Text(
                             widget.isArabic ? 'إلغاء' : 'Cancel',
                             style: TextStyle(
-                              color: _isTimerActive ? Colors.grey[400] : Colors.grey[600],
+                              color: _isTimerActive 
+                                ? Colors.grey[400] 
+                                : (isDarkMode 
+                                    ? Color(Constants.darkLabelTextColor)
+                                    : Color(Constants.lightLabelTextColor)),
                               fontSize: 16,
                             ),
                           ),
@@ -1689,22 +1088,33 @@ class _SignInScreenState extends State<SignInScreen> {
     required String subtitle,
     required VoidCallback onTap,
   }) {
+    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
+    final themeColor = isDarkMode 
+        ? Color(Constants.darkPrimaryColor) 
+        : Color(Constants.lightPrimaryColor);
+    
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
+        side: BorderSide(
+          color: isDarkMode 
+              ? Color(Constants.darkFormBorderColor)
+              : Color(Constants.lightFormBorderColor),
+        ),
       ),
+      color: isDarkMode 
+          ? Color(Constants.darkFormBackgroundColor)
+          : Color(Constants.lightFormBackgroundColor),
       child: InkWell(
         onTap: _isLoading ? null : onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
-            textDirection:
-                widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
+            textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
             children: [
-              Icon(icon, size: 32, color: const Color(0xFF0077B6)),
+              Icon(icon, size: 32, color: themeColor),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -1712,16 +1122,21 @@ class _SignInScreenState extends State<SignInScreen> {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
+                        color: isDarkMode 
+                            ? Color(Constants.darkLabelTextColor)
+                            : Color(Constants.lightLabelTextColor),
                       ),
                     ),
                     Text(
                       subtitle,
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey[600],
+                        color: isDarkMode 
+                            ? Color(Constants.darkHintTextColor)
+                            : Color(Constants.lightHintTextColor),
                       ),
                     ),
                   ],
@@ -1730,7 +1145,9 @@ class _SignInScreenState extends State<SignInScreen> {
               Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
-                color: Colors.grey[400],
+                color: isDarkMode 
+                    ? Color(Constants.darkIconColor)
+                    : Color(Constants.lightIconColor),
               ),
             ],
           ),
@@ -1740,12 +1157,16 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   Widget _buildMPINInput() {
+    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
+    final themeColor = isDarkMode 
+        ? Color(Constants.darkPrimaryColor) 
+        : Color(Constants.lightPrimaryColor);
+    
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // PIN Display
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(6, (index) {
@@ -1757,14 +1178,18 @@ class _SignInScreenState extends State<SignInScreen> {
                 margin: const EdgeInsets.symmetric(horizontal: 10),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isFilled ? const Color(0xFF0077B6) : Colors.transparent,
+                  color: isFilled ? themeColor : Colors.transparent,
                   border: Border.all(
-                    color: isFilled ? const Color(0xFF0077B6) : Colors.grey[300]!,
+                    color: isFilled 
+                        ? themeColor 
+                        : (isDarkMode 
+                            ? Color(Constants.darkFormBorderColor)
+                            : Color(Constants.lightFormBorderColor)),
                     width: 2,
                   ),
                   boxShadow: isFilled ? [
                     BoxShadow(
-                      color: const Color(0xFF0077B6).withOpacity(0.3),
+                      color: themeColor.withOpacity(0.3),
                       blurRadius: 8,
                       spreadRadius: 1,
                     )
@@ -1775,7 +1200,6 @@ class _SignInScreenState extends State<SignInScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Numpad
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
             child: Column(
@@ -1819,9 +1243,12 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   Widget _buildNumpadButton(String value, {bool isSpecial = false}) {
+    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
+    final themeColor = isDarkMode 
+        ? Color(Constants.darkPrimaryColor) 
+        : Color(Constants.lightPrimaryColor);
     final bool isBackspace = value == '⌫';
     final bool isClear = value == 'C';
-    final primaryColor = const Color(0xFF0077B6);
     
     return GestureDetector(
       onTapDown: (_) => setState(() {}),
@@ -1832,24 +1259,33 @@ class _SignInScreenState extends State<SignInScreen> {
         height: 75,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.white,
+          color: isDarkMode 
+              ? Color(Constants.darkFormBackgroundColor)
+              : (isSpecial ? themeColor : Colors.white),
           gradient: !isSpecial ? LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
+            colors: isDarkMode ? [
+              Color(Constants.darkGradientStartColor),
+              Color(Constants.darkGradientEndColor),
+            ] : [
               Colors.white,
-              Colors.grey.shade50,
+              Colors.white,
             ],
           ) : null,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: isDarkMode 
+                  ? Color(Constants.darkPrimaryShadowColor)
+                  : Color(Constants.lightPrimaryShadowColor),
               blurRadius: 10,
               spreadRadius: 1,
               offset: const Offset(0, 2),
             ),
             BoxShadow(
-              color: Colors.white.withOpacity(0.8),
+              color: isDarkMode 
+                  ? Color(Constants.darkSecondaryShadowColor)
+                  : Color(Constants.lightSecondaryShadowColor),
               blurRadius: 10,
               spreadRadius: 1,
               offset: const Offset(0, -2),
@@ -1869,13 +1305,15 @@ class _SignInScreenState extends State<SignInScreen> {
                   _handleMPINKeyPress(value);
                 }
               },
-              splashColor: primaryColor.withOpacity(0.1),
-              highlightColor: primaryColor.withOpacity(0.05),
+              splashColor: themeColor.withOpacity(0.1),
+              highlightColor: themeColor.withOpacity(0.05),
               child: Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: Colors.grey.withOpacity(0.1),
+                    color: isDarkMode 
+                        ? Color(Constants.darkFormBorderColor)
+                        : (isSpecial ? Colors.transparent : Color(Constants.lightFormBorderColor)),
                     width: 1,
                   ),
                 ),
@@ -1883,7 +1321,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   child: isBackspace
                       ? Icon(
                           Icons.backspace_rounded,
-                          color: primaryColor,
+                          color: isDarkMode ? themeColor : Colors.white,
                           size: 28,
                         )
                       : isClear
@@ -1892,7 +1330,7 @@ class _SignInScreenState extends State<SignInScreen> {
                               style: TextStyle(
                                 fontSize: 28,
                                 fontWeight: FontWeight.w100,
-                                color: primaryColor,
+                                color: isDarkMode ? themeColor : Colors.white,
                                 letterSpacing: 1,
                               ),
                             )
@@ -1901,7 +1339,9 @@ class _SignInScreenState extends State<SignInScreen> {
                               style: TextStyle(
                                 fontSize: 32,
                                 fontWeight: FontWeight.w500,
-                                color: Colors.black87,
+                                color: isDarkMode 
+                                    ? Color(Constants.darkLabelTextColor)
+                                    : Color(Constants.lightLabelTextColor),
                                 letterSpacing: 1,
                               ),
                             ),
@@ -1945,25 +1385,72 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   Widget _buildNationalIdInput() {
+    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
+    final themeColor = isDarkMode 
+        ? Color(Constants.darkPrimaryColor) 
+        : Color(Constants.lightPrimaryColor);
+    
     return TextFormField(
       controller: _nationalIdController,
       enabled: !_isTimerActive,
       decoration: InputDecoration(
         labelText: widget.isArabic ? 'رقم الهوية أو الإقامة' : 'National or Iqama ID',
-        hintText:
-            widget.isArabic ? 'أدخل رقم الهوية أو الإقامة' : 'Enter your National or Iqama ID',
-        prefixIcon: const Icon(Icons.person_outline),
+        hintText: widget.isArabic ? 'أدخل رقم الهوية أو الإقامة' : 'Enter your National or Iqama ID',
+        prefixIcon: Icon(Icons.person_outline, color: themeColor),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+          borderSide: BorderSide(
+            color: isDarkMode 
+                ? Color(Constants.darkFormBorderColor)
+                : Color(Constants.lightFormBorderColor),
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+          borderSide: BorderSide(
+            color: isDarkMode 
+                ? Color(Constants.darkFormBorderColor)
+                : Color(Constants.lightFormBorderColor),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+          borderSide: BorderSide(
+            color: isDarkMode 
+                ? Color(Constants.darkFormFocusedBorderColor)
+                : Color(Constants.lightFormFocusedBorderColor),
+          ),
         ),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: isDarkMode 
+            ? Color(Constants.darkFormBackgroundColor)
+            : Color(Constants.lightFormBackgroundColor),
+        labelStyle: TextStyle(
+          color: isDarkMode 
+              ? Color(Constants.darkLabelTextColor)
+              : Color(Constants.lightLabelTextColor),
+        ),
+        hintStyle: TextStyle(
+          color: isDarkMode 
+              ? Color(Constants.darkHintTextColor)
+              : Color(Constants.lightHintTextColor),
+        ),
       ),
       keyboardType: TextInputType.number,
+      style: TextStyle(
+        color: isDarkMode 
+            ? Color(Constants.darkLabelTextColor)
+            : Color(Constants.lightLabelTextColor),
+      ),
     );
   }
 
   Widget _buildPasswordInput() {
+    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
+    final themeColor = isDarkMode 
+        ? Color(Constants.darkPrimaryColor) 
+        : Color(Constants.lightPrimaryColor);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1973,14 +1460,52 @@ class _SignInScreenState extends State<SignInScreen> {
           decoration: InputDecoration(
             labelText: widget.isArabic ? 'كلمة المرور' : 'Password',
             hintText: widget.isArabic ? 'أدخل كلمة المرور' : 'Enter your password',
-            prefixIcon: const Icon(Icons.lock_outline),
+            prefixIcon: Icon(Icons.lock_outline, color: themeColor),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+              borderSide: BorderSide(
+                color: isDarkMode 
+                    ? Color(Constants.darkFormBorderColor)
+                    : Color(Constants.lightFormBorderColor),
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+              borderSide: BorderSide(
+                color: isDarkMode 
+                    ? Color(Constants.darkFormBorderColor)
+                    : Color(Constants.lightFormBorderColor),
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+              borderSide: BorderSide(
+                color: isDarkMode 
+                    ? Color(Constants.darkFormFocusedBorderColor)
+                    : Color(Constants.lightFormFocusedBorderColor),
+              ),
             ),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: isDarkMode 
+                ? Color(Constants.darkFormBackgroundColor)
+                : Color(Constants.lightFormBackgroundColor),
+            labelStyle: TextStyle(
+              color: isDarkMode 
+                  ? Color(Constants.darkLabelTextColor)
+                  : Color(Constants.lightLabelTextColor),
+            ),
+            hintStyle: TextStyle(
+              color: isDarkMode 
+                  ? Color(Constants.darkHintTextColor)
+                  : Color(Constants.lightHintTextColor),
+            ),
           ),
           obscureText: true,
+          style: TextStyle(
+            color: isDarkMode 
+                ? Color(Constants.darkLabelTextColor)
+                : Color(Constants.lightLabelTextColor),
+          ),
         ),
         const SizedBox(height: 8),
         Align(
@@ -2002,7 +1527,9 @@ class _SignInScreenState extends State<SignInScreen> {
             child: Text(
               widget.isArabic ? 'نسيت كلمة المرور؟' : 'Forgot Password?',
               style: TextStyle(
-                color: _isTimerActive ? Colors.grey : const Color(0xFF0077B6),
+                color: _isTimerActive 
+                    ? Colors.grey 
+                    : themeColor,
                 fontSize: 14,
               ),
             ),

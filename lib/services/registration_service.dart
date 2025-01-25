@@ -136,7 +136,7 @@ class RegistrationService {
         headers: Constants.userHeaders,
         body: json.encode({
           'national_id': nationalId,
-          'check_only': 'true'
+          'check_only': true
         }),
       );
 
@@ -185,6 +185,7 @@ class RegistrationService {
     required String phone,
     required Map<String, dynamic> userData,
     String? password,
+    Map<String, dynamic>? nafathData,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final secureStorage = const FlutterSecureStorage();
@@ -201,6 +202,7 @@ class RegistrationService {
       'employment_date': userData['employment_date'],
       'national_address': userData['national_address'],
       'updated_at': userData['updated_at'],
+      if (nafathData != null) 'nafath_data': nafathData,
     };
     
     print('Initial Registration - Storing in Secure Storage: ${json.encode(secureData)}');
@@ -212,6 +214,7 @@ class RegistrationService {
       'phone': phone,
       'userData': userData,
       if (password != null) 'password': password,
+      if (nafathData != null) 'nafath_data': nafathData,
       'registration_timestamp': DateTime.now().toIso8601String(),
     };
     print('Initial Registration - Storing in SharedPreferences: ${json.encode(registrationData)}');
@@ -279,6 +282,12 @@ class RegistrationService {
         'employment_date': userData['employment_date'],
         'national_address': userData['national_address'],
         'device_info': deviceInfo,
+        // Add Nafath data if available
+        if (storedData['nafath_data'] != null) ...{
+          'nafath_status': 'COMPLETED',
+          'nafath_trans_id': storedData['nafath_data']['transId'],
+          'nafath_random': storedData['nafath_data']['random'],
+        },
       };
 
       print('Request body: ${json.encode(requestBody)}');

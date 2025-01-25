@@ -8,6 +8,8 @@ import '../../services/loan_service.dart';
 import '../../screens/main_page.dart';
 import '../../screens/loans_page.dart';
 import '../../screens/loans_page_ar.dart';
+import '../../providers/theme_provider.dart';
+import 'package:provider/provider.dart';
 
 class LoanOfferScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -511,12 +513,15 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
                       MaterialPageRoute(
                         builder: (context) => MainPage(
                           isArabic: isArabic,
+                          onLanguageChanged: (bool value) {},
                           userData: {
                             ...?userData,
                             'isSessionActive': true,
                             'isSignedIn': true,
                             'deviceRegistered': isDeviceRegistered,
                           },
+                          initialRoute: '',
+                          isDarkMode: Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
                         ),
                       ),
                       (route) => false,
@@ -678,12 +683,15 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
         MaterialPageRoute(
           builder: (context) => MainPage(
             isArabic: isArabic,
+            onLanguageChanged: (bool value) {},
             userData: {
               ...?userData,
               'isSessionActive': true,
               'isSignedIn': true,
               'deviceRegistered': isDeviceRegistered,
             },
+            initialRoute: '',
+            isDarkMode: Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
           ),
         ),
         (route) => false,

@@ -7,8 +7,17 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-// Fetch loan applications
-$query = "SELECT * FROM loan_application_details ORDER BY status_date DESC";
+// Fetch loan applications based on user role
+$user_role = $_SESSION['role'];
+$status_conditions = '';
+
+if ($user_role === 'sales') {
+    $status_conditions = "WHERE status IN ('pending', 'rejected', 'declined', 'missing', 'followup', 'fulfilled', 'accepted')";
+} elseif ($user_role === 'credit') {
+    $status_conditions = "WHERE status IN ('pending', 'fulfilled')";
+}
+
+$query = "SELECT * FROM loan_application_details $status_conditions ORDER BY status_date DESC";
 $result = $conn->query($query);
 ?>
 
@@ -158,7 +167,8 @@ $result = $conn->query($query);
             display: none;
         }
 
-        .nav-link:hover, .nav-link.active {
+        .nav-link:hover,
+        .nav-link.active {
             color: var(--primary-color);
             background: var(--hover-bg);
         }
@@ -280,6 +290,23 @@ $result = $conn->query($query);
         .status-rejected {
             background: #f8d7da;
             color: #721c24;
+        }
+
+        .status-fulfilled,
+        .status-accepted {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-declined {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-missing,
+        .status-followup {
+            background: #fff3cd;
+            color: #856404;
         }
 
         .action-btn {
@@ -426,6 +453,7 @@ $result = $conn->query($query);
             justify-content: center;
             border-radius: 50%;
             background: #f8f9fa;
+            margin-left: 20px;
         }
 
         .close:hover {
@@ -592,7 +620,6 @@ $result = $conn->query($query);
                 <i class="fas fa-bell"></i>
                 <span>Push Notifications</span>
             </a>
-            
         </nav>
     </div>
     <button class="toggle-sidebar" id="toggleSidebar">
@@ -627,7 +654,7 @@ $result = $conn->query($query);
                 </thead>
                 <tbody>
                     <?php while($row = $result->fetch_assoc()): ?>
-                        <tr>
+                        <tr data-loan-id="<?php echo $row['loan_id']; ?>">
                             <td><?php echo $row['loan_id']; ?></td>
                             <td><?php echo $row['application_no']; ?></td>
                             <td><?php echo $row['national_id']; ?></td>
@@ -645,14 +672,6 @@ $result = $conn->query($query);
                                 <button class="action-btn" onclick="viewLoanDetails(<?php echo $row['loan_id']; ?>)">
                                     <i class="fas fa-eye"></i> View
                                 </button>
-                                <?php if ($row['status'] === 'pending'): ?>
-                                <button class="action-btn" onclick="handleStatusUpdate(<?php echo $row['loan_id']; ?>, 'approved', 'loan')">
-                                    <i class="fas fa-check"></i> Approve
-                                </button>
-                                <button class="action-btn" onclick="handleStatusUpdate(<?php echo $row['loan_id']; ?>, 'rejected', 'loan')">
-                                    <i class="fas fa-times"></i> Reject
-                                </button>
-                                <?php endif; ?>
                             </td>
                         </tr>
                     <?php endwhile; ?>
@@ -664,9 +683,28 @@ $result = $conn->query($query);
     <!-- Application Details Modal -->
     <div id="applicationModal" class="modal">
         <div class="modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-right: 50px;">
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <h2 id="modalTitle" class="page-title">Application Details</h2>
+                    <div class="status-buttons" style="display: flex; gap: 10px;">
+                        <?php if ($_SESSION['role'] === 'credit'): ?>
+                            <button class="action-btn" onclick="updateLoanStatus('approved')">Approved</button>
+                            <button class="action-btn" onclick="updateLoanStatus('missing')">Missing</button>
+                            <button class="action-btn" onclick="updateLoanStatus('rejected')">Rejected</button>
+                        <?php elseif ($_SESSION['role'] === 'sales'): ?>
+                            <button class="action-btn" onclick="updateLoanStatus('accepted')">Accepted</button>
+                            <button class="action-btn" onclick="updateLoanStatus('fulfilled')">Fulfilled</button>
+                            <button class="action-btn" onclick="updateLoanStatus('followup')">Follow Up</button>
+                            <button class="action-btn" onclick="updateLoanStatus('declined')">Declined</button>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div style="font-size: 14px; color: #666; text-align: right;">
+                    <strong><?php echo $_SESSION['name']; ?></strong> (<?php echo ucfirst($_SESSION['role']); ?>)
+                </div>
+            </div>
             <span class="close" onclick="closeModal()">&times;</span>
-            <h2 id="modalTitle" class="page-title">Application Details</h2>
-            
+
             <ul class="tabs">
                 <li class="tab-item active" onclick="switchTab('applicant-info', this)">Applicant Information</li>
                 <li class="tab-item" onclick="switchTab('employment-info', this)">Employment Information</li>
@@ -691,179 +729,195 @@ $result = $conn->query($query);
                     <input type="text" id="phone" readonly placeholder="Phone number">
                 </div>
                 <div class="form-group">
-                    <label>Email</label>
-                    <input type="email" id="email" readonly placeholder="Email address">
-                </div>
+                    <label>Email Address</label> 
+                    <input type="email" id="email" readonly placeholder="Email address"> 
+                </div> 
             </div>
-
             <div id="employment-info" class="tab-content">
-                <div class="form-group">
-                    <label>Employer</label>
-                    <input type="text" id="employer" readonly placeholder="Employer name">
-                </div>
-                <div class="form-group">
-                    <label>Job Title</label>
-                    <input type="text" id="job_title" readonly placeholder="Job title">
-                </div>
-                <div class="form-group">
-                    <label>Monthly Salary</label>
-                    <input type="text" id="salary" readonly placeholder="Monthly salary">
-                </div>
-                <div class="form-group">
-                    <label>Employment Duration</label>
-                    <input type="text" id="employment_duration" readonly placeholder="Duration of employment">
-                </div>
+            <div class="form-group">
+                <label>Employer</label>
+                <input type="text" id="employer" readonly placeholder="Employer name">
             </div>
+            <div class="form-group">
+                <label>Job Title</label>
+                <input type="text" id="job_title" readonly placeholder="Job title">
+            </div>
+            <div class="form-group">
+                <label>Monthly Salary</label>
+                <input type="text" id="salary" readonly placeholder="Monthly salary">
+            </div>
+            <div class="form-group">
+                <label>Employment Duration</label>
+                <input type="text" id="employment_duration" readonly placeholder="Duration of employment">
+            </div>
+        </div>
 
-            <div id="loan-info" class="tab-content">
-                <div class="form-group">
-                    <label>Loan ID</label>
-                    <input type="text" id="loan_id" readonly>
-                </div>
-                <div class="form-group">
-                    <label>National ID</label>
-                    <input type="text" id="loan_national_id" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Loan Amount</label>
-                    <input type="text" id="loan_amount" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Loan Purpose</label>
-                    <input type="text" id="loan_purpose" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Loan Tenure (Months)</label>
-                    <input type="text" id="loan_tenure" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Interest Rate (%)</label>
-                    <input type="text" id="interest_rate" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Status</label>
-                    <select id="status" onchange="updateStatus(this.value)">
-                        <option value="pending">Pending</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Status Date</label>
-                    <input type="text" id="status_date" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Remarks</label>
-                    <textarea id="remarks" rows="3"></textarea>
-                </div>
+        <div id="loan-info" class="tab-content">
+            <div class="form-group">
+                <label>Loan ID</label>
+                <input type="text" id="loan_id" readonly>
+            </div>
+            <div class="form-group">
+                <label>National ID</label>
+                <input type="text" id="loan_national_id" readonly>
+            </div>
+            <div class="form-group">
+                <label>Loan Amount</label>
+                <input type="text" id="loan_amount" readonly>
+            </div>
+            <div class="form-group">
+                <label>Loan Purpose</label>
+                <input type="text" id="loan_purpose" readonly>
+            </div>
+            <div class="form-group">
+                <label>Loan Tenure (Months)</label>
+                <input type="text" id="loan_tenure" readonly>
+            </div>
+            <div class="form-group">
+                <label>Interest Rate (%)</label>
+                <input type="text" id="interest_rate" readonly>
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <input type="text" id="status" readonly>
+            </div>
+            <div class="form-group">
+                <label>Status Date</label>
+                <input type="text" id="status_date" readonly>
+            </div>
+            <div class="form-group">
+                <label>Remarks</label>
+                <textarea id="remarks" rows="3"></textarea>
             </div>
         </div>
     </div>
+</div>
 
-    <script>
-        // Sidebar toggle functionality
-        const sidebar = document.getElementById('sidebar');
-        const toggleButton = document.getElementById('toggleSidebar');
+<script>
+    // Sidebar toggle functionality
+    const sidebar = document.getElementById('sidebar');
+    const toggleButton = document.getElementById('toggleSidebar');
 
-        toggleButton.addEventListener('click', () => {
-            sidebar.classList.toggle('collapsed');
-        });
+    toggleButton.addEventListener('click', () => {
+        sidebar.classList.toggle('collapsed');
+    });
 
-        // Handle responsive behavior
+    // Handle responsive behavior
+    if (window.innerWidth <= 768) {
+        sidebar.classList.add('collapsed');
+    }
+
+    window.addEventListener('resize', () => {
         if (window.innerWidth <= 768) {
             sidebar.classList.add('collapsed');
         }
+    });
 
-        window.addEventListener('resize', () => {
-            if (window.innerWidth <= 768) {
-                sidebar.classList.add('collapsed');
+    function switchTab(tabId, element) {
+        document.querySelectorAll('.tab-item').forEach(tab => tab.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        
+        element.classList.add('active');
+        document.getElementById(tabId).classList.add('active');
+    }
+
+    function closeModal() {
+        document.getElementById('applicationModal').style.display = 'none';
+    }
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        const modal = document.getElementById('applicationModal');
+        if (event.target === modal) {
+            modal.style.display = 'none';
+        }
+    }
+
+    function viewLoanDetails(loanId) {
+        fetch(`../api/get-loan-details.php?id=${loanId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.details) {
+                    const details = data.details;
+                    
+                    document.getElementById('name').value = details.name || '';
+                    document.getElementById('national_id').value = details.national_id || '';
+                    document.getElementById('dob').value = details.dob || '';
+                    document.getElementById('phone').value = details.phone || '';
+                    document.getElementById('email').value = details.email || '';
+
+                    document.getElementById('employer').value = details.employer || '';
+                    document.getElementById('job_title').value = details.job_title || '';
+                    document.getElementById('salary').value = details.salary 
+                        ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'SAR' }).format(details.salary) 
+                        : '';
+                    document.getElementById('employment_duration').value = details.employment_duration || '';
+
+                    document.getElementById('loan_id').value = details.loan_id || '';
+                    document.getElementById('loan_national_id').value = details.national_id || '';
+                    document.getElementById('loan_amount').value = details.loan_amount 
+                        ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'SAR' }).format(details.loan_amount) 
+                        : '';
+                    document.getElementById('loan_purpose').value = details.loan_purpose || '';
+                    document.getElementById('loan_tenure').value = details.loan_tenure || '';
+                    document.getElementById('interest_rate').value = details.interest_rate 
+                        ? details.interest_rate + '%' 
+                        : '';
+                    document.getElementById('status').value = details.status || 'pending';
+                    document.getElementById('status_date').value = details.status_date 
+                        ? new Date(details.status_date).toLocaleString() 
+                        : '';
+                    document.getElementById('remarks').value = details.remarks || '';
+
+                    document.querySelectorAll('.tab-item').forEach(tab => tab.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                    document.querySelector('.tab-item').classList.add('active');
+                    document.getElementById('applicant-info').classList.add('active');
+
+                    document.getElementById('applicationModal').style.display = 'block';
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+    function updateLoanStatus(status) {
+        const loanId = document.getElementById('loan_id').value;
+        const remarks = document.getElementById('remarks').value;
+        
+        fetch('../api/update-loan-status.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                loan_id: loanId,
+                status: status,
+                remarks: remarks
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const statusCell = document.querySelector(`tr[data-loan-id="${loanId}"] .status-badge`);
+                if (statusCell) {
+                    statusCell.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+                    statusCell.className = `status-badge status-${status.toLowerCase()}`;
+                }
+                
+                document.getElementById('status').value = status.charAt(0).toUpperCase() + status.slice(1);
+                document.getElementById('status_date').value = new Date().toLocaleString();
+                
+                alert('Status updated successfully');
+            } else {
+                alert('Failed to update status: ' + (data.message || 'Unknown error'));
             }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to update status. Please try again.');
         });
-
-        function switchTab(tabId, element) {
-            // Remove active class from all tabs and contents
-            document.querySelectorAll('.tab-item').forEach(tab => tab.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-            
-            // Add active class to selected tab and content
-            element.classList.add('active');
-            document.getElementById(tabId).classList.add('active');
-        }
-
-        function closeModal() {
-            document.getElementById('applicationModal').style.display = 'none';
-        }
-
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('applicationModal');
-            if (event.target === modal) {
-                modal.style.display = 'none';
-            }
-        }
-
-        function viewLoanDetails(loanId) {
-            fetch(`../api/get-loan-details.php?id=${loanId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.details) {
-                        const details = data.details;
-                        
-                        // Populate applicant info
-                        document.getElementById('name').value = details.name || '';
-                        document.getElementById('national_id').value = details.national_id || '';
-                        document.getElementById('dob').value = details.dob || '';
-                        document.getElementById('phone').value = details.phone || '';
-                        document.getElementById('email').value = details.email || '';
-
-                        // Populate employment info
-                        document.getElementById('employer').value = details.employer || '';
-                        document.getElementById('job_title').value = details.job_title || '';
-                        document.getElementById('salary').value = details.salary ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'SAR' }).format(details.salary) : '';
-                        document.getElementById('employment_duration').value = details.employment_duration || '';
-
-                        // Populate loan info
-                        document.getElementById('loan_id').value = details.loan_id || '';
-                        document.getElementById('loan_national_id').value = details.national_id || '';
-                        document.getElementById('loan_amount').value = details.loan_amount ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'SAR' }).format(details.loan_amount) : '';
-                        document.getElementById('loan_purpose').value = details.loan_purpose || '';
-                        document.getElementById('loan_tenure').value = details.loan_tenure || '';
-                        document.getElementById('interest_rate').value = details.interest_rate ? details.interest_rate + '%' : '';
-                        document.getElementById('status').value = details.status || 'pending';
-                        document.getElementById('status_date').value = details.status_date ? new Date(details.status_date).toLocaleString() : '';
-                        document.getElementById('remarks').value = details.remarks || '';
-
-                        // Show first tab by default
-                        document.querySelectorAll('.tab-item').forEach(tab => tab.classList.remove('active'));
-                        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-                        document.querySelector('.tab-item').classList.add('active');
-                        document.getElementById('applicant-info').classList.add('active');
-
-                        // Display modal
-                        document.getElementById('applicationModal').style.display = 'block';
-                    }
-                })
-                .catch(error => console.error('Error:', error));
-        }
-
-        function handleStatusUpdate(loanId, status, type) {
-            fetch(`../api/update-status.php?id=${loanId}&status=${status}&type=${type}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        alert('Error updating status');
-                    }
-                })
-                .catch(error => console.error('Error:', error));
-        }
-
-        function updateStatus(status) {
-            const loanId = document.getElementById('loan_id').value;
-            handleStatusUpdate(loanId, status, 'loan');
-        }
-    </script>
-    <script src="../assets/js/main.js?v=<?php echo time(); ?>"></script>
-</body>
-</html>
+    }
+</script>
+<script src="../assets/js/main.js?v=<?php echo time(); ?>"></script>
+</body> 
+</html> 

@@ -61,26 +61,10 @@ try {
             'message' => 'Configuration updated successfully'
         ]);
     } else {
-        // If no rows were updated, try to insert
-        $insertSql = "INSERT INTO master_config (page, key_name, value) VALUES (?, ?, ?)";
-        $insertStmt = $conn->prepare($insertSql);
-        
-        if (!$insertStmt) {
-            throw new Exception('Failed to prepare insert statement: ' . $conn->error);
-        }
-
-        $insertStmt->bind_param("sss", $page, $key_name, $value);
-        
-        if (!$insertStmt->execute()) {
-            throw new Exception('Failed to execute insert statement: ' . $insertStmt->error);
-        }
-
         echo json_encode([
             'success' => true,
-            'message' => 'Configuration created successfully'
+            'message' => 'No configuration found to update'
         ]);
-        
-        $insertStmt->close();
     }
 
     $stmt->close();

@@ -1,71 +1,55 @@
 <?php
+require_once 'db_connect.php';
+
 function authenticate($email, $password) {
     global $conn;
     
     try {
+        // MySQLi prepared statement
         $stmt = $conn->prepare("
-            SELECT * FROM portal_employees 
-            WHERE email = :email AND status = 'active' 
+            SELECT employee_id, name, email, password, role
+            FROM portal_employees
+            WHERE email = ?
+              AND status = 'active'
             LIMIT 1
         ");
-        $stmt->bindParam(':email', $email);
+        $stmt->bind_param("s", $email);
         $stmt->execute();
         
-        if ($stmt->rowCount() > 0) {
-            $employee = $stmt->fetch(PDO::FETCH_ASSOC);
-            if (password_verify($password, $employee['password'])) {
-                // Update last login
-                $updateStmt = $conn->prepare("
-                    UPDATE portal_employees 
-                    SET last_login = NOW() 
-                    WHERE employee_id = :employee_id
+        $result = $stmt->get_result();
+        if ($result->num_rows > 0) {
+            $user = $result->fetch_assoc();
+            
+            // Plain text password check
+            if ($password === $user['password']) {
+                
+                // Update last login timestamp
+                $update = $conn->prepare("
+                    UPDATE portal_employees
+                    SET last_login = NOW()
+                    WHERE employee_id = ?
                 ");
-                $updateStmt->execute(['employee_id' => $employee['employee_id']]);
+                $update->bind_param("i", $user['employee_id']);
+                $update->execute();
                 
-                // Set session variables
-                $_SESSION['employee_id'] = $employee['employee_id'];
-                $_SESSION['name'] = $employee['name'];
-                $_SESSION['email'] = $employee['email'];
+                // Optional: log the login event
+                logActivity($user['employee_id'], 'login', 'User logged in');
                 
-                // Log activity
-                logActivity($employee['employee_id'], 'login', 'User logged in successfully');
-                
-                return true;
+                return $user;
             }
         }
         return false;
-    } catch(PDOException $e) {
-        error_log("Authentication Error: " . $e->getMessage());
-        return false;
-    }
-}
-
-function checkPermission($requiredRole) {
-    if (!isset($_SESSION['employee_id'])) {
-        return false;
-    }
-    
-    global $conn;
-    try {
-        $stmt = $conn->prepare("
-            SELECT role FROM portal_roles 
-            WHERE employee_id = :employee_id AND role = :role
-        ");
-        $stmt->execute([
-            'employee_id' => $_SESSION['employee_id'],
-            'role' => $requiredRole
-        ]);
-        
-        return $stmt->rowCount() > 0;
-    } catch(PDOException $e) {
-        error_log("Permission Check Error: " . $e->getMessage());
+    } catch (mysqli_sql_exception $e) {
+        error_log("Database Error: " . $e->getMessage());
         return false;
     }
 }
 
 function logout() {
-    if (isset($_SESSION['employee_id'])) {
-        logActivity($_SESSION['employee_id'], 'logout', 'User logged out');
+    if (isset($_SESSION['user_id'])) {
+        $userId = $_SESSION['user_id'];
+        $logType = ($_SESSION['role'] === 'admin') ? 'admin' : 'user';
+        logActivity($userId, 'logout', "$logType logged out");
     }
     
     session_destroy();
@@ -73,22 +57,17 @@ function logout() {
     exit();
 }
 
-function logActivity($employeeId, $action, $details = '') {
+function logActivity($userId, $action, $details = '') {
     global $conn;
     try {
         $stmt = $conn->prepare("
-            INSERT INTO portal_activity_log 
-            (employee_id, action, details, ip_address) 
-            VALUES (:employee_id, :action, :details, :ip_address)
+            INSERT INTO portal_activity_log (employee_id, action, details, ip_address)
+            VALUES (?, ?, ?, ?)
         ");
-        
-        $stmt->execute([
-            'employee_id' => $employeeId,
-            'action' => $action,
-            'details' => $details,
-            'ip_address' => $_SERVER['REMOTE_ADDR'] ?? null
-        ]);
-    } catch(PDOException $e) {
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'Unknown IP';
+        $stmt->bind_param("isss", $userId, $action, $details, $ip);
+        $stmt->execute();
+    } catch (mysqli_sql_exception $e) {
         error_log("Activity Log Error: " . $e->getMessage());
     }
 }

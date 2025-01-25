@@ -3,7 +3,12 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../services/auth_service.dart';
 import '../../widgets/otp_dialog.dart';
+import '../../utils/constants.dart';
 import 'sign_in_screen.dart';
+import 'mpin_setup_screen.dart';
+import 'package:provider/provider.dart';
+import '../../providers/session_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ForgetPasswordScreen extends StatefulWidget {
   final bool isArabic;
@@ -134,7 +139,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
     try {
       // Generate OTP
       final response = await http.post(
-        Uri.parse('${AuthService.baseUrl}/otp_generate.php'),
+        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPGenerate}'),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'api-key': AuthService.apiKey,
@@ -157,7 +162,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
               isArabic: widget.isArabic,
               onResendOTP: () async {
                 final response = await http.post(
-                  Uri.parse('${AuthService.baseUrl}/otp_generate.php'),
+                  Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPGenerate}'),
                   headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                     'api-key': AuthService.apiKey,
@@ -171,7 +176,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
               },
               onVerifyOTP: (otp) async {
                 final response = await http.post(
-                  Uri.parse('${AuthService.baseUrl}/otp_verification.php'),
+                  Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPVerification}'),
                   headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                     'api-key': AuthService.apiKey,
@@ -245,7 +250,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
     try {
       // Send request
       final response = await http.post(
-        Uri.parse('${AuthService.baseUrl}/password_change.php'),
+        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointPasswordChange}'),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'api-key': AuthService.apiKey,
@@ -269,21 +274,110 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
               : data['message']
         );
         
-        // Navigate back to sign in screen after 2 seconds
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => SignInScreen(
-                  isArabic: widget.isArabic,
-                  nationalId: _nationalIdController.text,
-                  startWithPassword: true,
-                ),
-              ),
-            );
+        // Sign in with the new password to get user data
+        print('Attempting sign in with new password...');
+        final signInResponse = await AuthService().signIn(
+          nationalId: _nationalIdController.text,
+          password: _newPasswordController.text,
+        );
+
+        print('Sign in response: ${json.encode(signInResponse)}');
+
+        if (signInResponse['status'] == 'success') {
+          // Register the device first
+          print('Registering current device...');
+          final registerResponse = await AuthService().registerDevice(
+            nationalId: _nationalIdController.text,
+          );
+
+          print('Device registration response: ${json.encode(registerResponse)}');
+
+          if (registerResponse['status'] == 'success') {
+            // Reset manual sign off flag in session provider
+            if (mounted) {
+              Provider.of<SessionProvider>(context, listen: false).resetManualSignOff();
+            }
+
+            // Store user data in local storage
+            await AuthService().storeUserData(signInResponse['user']);
+
+            // Set session as active
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setBool('isSessionActive', true);
+
+            // Navigate to MPIN setup after 1 second
+            Future.delayed(const Duration(seconds: 1), () {
+              if (mounted) {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => MPINSetupScreen(
+                      nationalId: _nationalIdController.text,
+                      password: _newPasswordController.text,
+                      user: signInResponse['user'],
+                      isArabic: widget.isArabic,
+                      showSteps: false,
+                    ),
+                  ),
+                );
+              }
+            });
+          } else {
+            print('Device registration failed with code: ${registerResponse['code']}');
+            String errorMessage;
+            
+            switch (registerResponse['code']) {
+              case 'DEVICE_ALREADY_REGISTERED':
+                errorMessage = widget.isArabic
+                    ? 'هذا الجهاز مسجل بالفعل لمستخدم آخر'
+                    : 'This device is already registered to another user';
+                break;
+              case 'MAX_DEVICES_REACHED':
+                errorMessage = widget.isArabic
+                    ? 'لقد وصلت إلى الحد الأقصى من الأجهزة المسجلة'
+                    : 'You have reached the maximum number of registered devices';
+                break;
+              default:
+                errorMessage = widget.isArabic
+                    ? (registerResponse['message_ar'] ?? 'فشل في تسجيل الجهاز')
+                    : (registerResponse['message'] ?? 'Failed to register device');
+            }
+            
+            _showErrorBanner(errorMessage);
           }
-        });
+        } else {
+          print('Sign in failed with code: ${signInResponse['code']}');
+          String errorMessage;
+          
+          switch (signInResponse['code']) {
+            case 'INVALID_CREDENTIALS':
+              errorMessage = widget.isArabic
+                  ? 'بيانات الدخول غير صحيحة'
+                  : 'Invalid credentials';
+              break;
+            case 'USER_NOT_FOUND':
+              errorMessage = widget.isArabic
+                  ? 'رقم الهوية غير مسجل في النظام'
+                  : 'National ID is not registered in the system';
+              break;
+            case 'ACCOUNT_LOCKED':
+              errorMessage = widget.isArabic
+                  ? 'تم قفل الحساب مؤقتاً. يرجى المحاولة لاحقاً'
+                  : 'Account temporarily locked. Please try again later';
+              break;
+            case 'DEVICE_NOT_REGISTERED':
+              errorMessage = widget.isArabic
+                  ? 'الجهاز غير مسجل'
+                  : 'Device not registered';
+              break;
+            default:
+              errorMessage = widget.isArabic
+                  ? (signInResponse['message_ar'] ?? 'حدث خطأ أثناء تسجيل الدخول')
+                  : (signInResponse['message'] ?? 'Error during sign in process');
+          }
+          
+          _showErrorBanner(errorMessage);
+        }
       } else {
         _showErrorBanner(
           widget.isArabic
@@ -307,10 +401,12 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return Directionality(
       textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF5F6FA),
+        backgroundColor: Color(isDarkMode ? Constants.darkBackgroundColor : Constants.lightBackgroundColor),
         body: SafeArea(
           child: Stack(
             children: [
@@ -319,14 +415,20 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                 top: -100,
                 right: widget.isArabic ? null : -100,
                 left: widget.isArabic ? -100 : null,
-                child: Opacity(
-                  opacity: 0.2,
-                  child: Image.asset(
-                    'assets/images/nayifatlogocircle-nobg.png',
-                    width: 240,
-                    height: 240,
-                  ),
-                ),
+                child: isDarkMode
+                  ? Image.asset(
+                      'assets/images/nayifat-circle-grey.png',
+                      width: 240,
+                      height: 240,
+                    )
+                  : Opacity(
+                      opacity: 0.2,
+                      child: Image.asset(
+                        'assets/images/nayifatlogocircle-nobg.png',
+                        width: 240,
+                        height: 240,
+                      ),
+                    ),
               ),
 
               SingleChildScrollView(
@@ -343,7 +445,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                         widget.isArabic ? 'نسيت كلمة المرور' : 'Forgot Password',
                         style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: const Color(0xFF0077B6),
+                              color: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.primaryColorValue),
                             ),
                         textAlign: TextAlign.center,
                       ),
@@ -353,7 +455,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                           width: 60,
                           height: 4,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0077B6),
+                            color: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.primaryColorValue),
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
@@ -367,7 +469,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                             : 'Enter your National ID or Iqama number to reset your password',
                         style: TextStyle(
                           fontSize: 16,
-                          color: Colors.grey[600],
+                          color: Color(isDarkMode ? Constants.darkLabelTextColor : Constants.lightLabelTextColor),
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -380,12 +482,36 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                         decoration: InputDecoration(
                           labelText: widget.isArabic ? 'رقم الهوية أو الإقامة' : 'National or Iqama ID',
                           hintText: widget.isArabic ? 'أدخل رقم الهوية أو الإقامة' : 'Enter your National or Iqama ID',
-                          prefixIcon: const Icon(Icons.person_outline),
+                          prefixIcon: Icon(
+                            Icons.person_outline,
+                            color: Color(isDarkMode ? Constants.darkIconColor : Constants.lightIconColor),
+                          ),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                            borderSide: BorderSide(
+                              color: Color(isDarkMode ? Constants.darkFormBorderColor : Constants.lightFormBorderColor),
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                            borderSide: BorderSide(
+                              color: Color(isDarkMode ? Constants.darkFormBorderColor : Constants.lightFormBorderColor),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                            borderSide: BorderSide(
+                              color: Color(isDarkMode ? Constants.darkFormFocusedBorderColor : Constants.lightFormFocusedBorderColor),
+                            ),
                           ),
                           filled: true,
-                          fillColor: Colors.white,
+                          fillColor: Color(isDarkMode ? Constants.darkFormBackgroundColor : Constants.lightFormBackgroundColor),
+                          labelStyle: TextStyle(
+                            color: Color(isDarkMode ? Constants.darkLabelTextColor : Constants.lightLabelTextColor),
+                          ),
+                          hintStyle: TextStyle(
+                            color: Color(isDarkMode ? Constants.darkHintTextColor : Constants.lightHintTextColor),
+                          ),
                         ),
                         keyboardType: TextInputType.number,
                         validator: (value) {
@@ -403,11 +529,11 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                         ElevatedButton(
                           onPressed: _isLoading ? null : _verifyNationalId,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0077B6),
+                            backgroundColor: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.primaryColorValue),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
                             ),
                           ),
                           child: _isLoading
@@ -437,7 +563,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                           child: Text(
                             widget.isArabic ? 'إلغاء' : 'Cancel',
                             style: TextStyle(
-                              color: Colors.grey[600],
+                              color: Color(isDarkMode ? Constants.darkLabelTextColor : Constants.lightLabelTextColor),
                               fontSize: 16,
                             ),
                           ),
@@ -451,12 +577,36 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                           decoration: InputDecoration(
                             labelText: widget.isArabic ? 'كلمة المرور الجديدة' : 'New Password',
                             hintText: widget.isArabic ? 'أدخل كلمة المرور الجديدة' : 'Enter new password',
-                            prefixIcon: const Icon(Icons.lock_outline),
+                            prefixIcon: Icon(
+                              Icons.lock_outline,
+                              color: Color(isDarkMode ? Constants.darkIconColor : Constants.lightIconColor),
+                            ),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                              borderSide: BorderSide(
+                                color: Color(isDarkMode ? Constants.darkFormBorderColor : Constants.lightFormBorderColor),
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                              borderSide: BorderSide(
+                                color: Color(isDarkMode ? Constants.darkFormBorderColor : Constants.lightFormBorderColor),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                              borderSide: BorderSide(
+                                color: Color(isDarkMode ? Constants.darkFormFocusedBorderColor : Constants.lightFormFocusedBorderColor),
+                              ),
                             ),
                             filled: true,
-                            fillColor: Colors.white,
+                            fillColor: Color(isDarkMode ? Constants.darkFormBackgroundColor : Constants.lightFormBackgroundColor),
+                            labelStyle: TextStyle(
+                              color: Color(isDarkMode ? Constants.darkLabelTextColor : Constants.lightLabelTextColor),
+                            ),
+                            hintStyle: TextStyle(
+                              color: Color(isDarkMode ? Constants.darkHintTextColor : Constants.lightHintTextColor),
+                            ),
                           ),
                           obscureText: true,
                           validator: (value) {
@@ -475,18 +625,42 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                         ),
                         const SizedBox(height: 24),
 
-                        // Confirm Password Input
+                        // Confirm Password Input with same theme as New Password Input
                         TextFormField(
                           controller: _confirmPasswordController,
                           decoration: InputDecoration(
                             labelText: widget.isArabic ? 'تأكيد كلمة المرور' : 'Confirm Password',
                             hintText: widget.isArabic ? 'أدخل كلمة المرور مرة أخرى' : 'Enter password again',
-                            prefixIcon: const Icon(Icons.lock_outline),
+                            prefixIcon: Icon(
+                              Icons.lock_outline,
+                              color: Color(isDarkMode ? Constants.darkIconColor : Constants.lightIconColor),
+                            ),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                              borderSide: BorderSide(
+                                color: Color(isDarkMode ? Constants.darkFormBorderColor : Constants.lightFormBorderColor),
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                              borderSide: BorderSide(
+                                color: Color(isDarkMode ? Constants.darkFormBorderColor : Constants.lightFormBorderColor),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                              borderSide: BorderSide(
+                                color: Color(isDarkMode ? Constants.darkFormFocusedBorderColor : Constants.lightFormFocusedBorderColor),
+                              ),
                             ),
                             filled: true,
-                            fillColor: Colors.white,
+                            fillColor: Color(isDarkMode ? Constants.darkFormBackgroundColor : Constants.lightFormBackgroundColor),
+                            labelStyle: TextStyle(
+                              color: Color(isDarkMode ? Constants.darkLabelTextColor : Constants.lightLabelTextColor),
+                            ),
+                            hintStyle: TextStyle(
+                              color: Color(isDarkMode ? Constants.darkHintTextColor : Constants.lightHintTextColor),
+                            ),
                           ),
                           obscureText: true,
                           validator: (value) {
@@ -508,10 +682,10 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                         ElevatedButton(
                           onPressed: _isLoading ? null : _resetPassword,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0077B6),
+                            backgroundColor: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.primaryColorValue),
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
                             ),
                           ),
                           child: _isLoading
@@ -531,20 +705,6 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: Text(
-                            widget.isArabic ? 'إلغاء' : 'Cancel',
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 16,
-                            ),
-                          ),
                         ),
                       ],
                     ],

@@ -4,6 +4,9 @@ import '../../services/auth_service.dart';
 import 'biometric_setup_screen.dart';
 import '../main_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
+import '../../providers/theme_provider.dart';
+import '../../utils/constants.dart';
 
 class MPINSetupScreen extends StatefulWidget {
   final String nationalId;
@@ -36,8 +39,6 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
   bool _isEnteringCurrentPin = false;
   bool _isLoading = false;
   String? _errorMessage;
-  final Color primaryColor = const Color(0xFF0077B6);
-  final Color backgroundColor = const Color(0xFFF5F6FA);
 
   @override
   void initState() {
@@ -45,6 +46,12 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
     if (widget.isChangingMPIN) {
       _isEnteringCurrentPin = true;
     }
+    // Ensure theme is initialized immediately
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
   }
 
   void _handleDigit(String value) {
@@ -110,6 +117,11 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
   }
 
   Widget _buildPINDisplay(List<String> digits) {
+    final isDarkMode = Provider.of<ThemeProvider>(context, listen: true).isDarkMode;
+    final themeColor = isDarkMode 
+        ? Color(Constants.darkPrimaryColor) 
+        : Color(Constants.lightPrimaryColor);
+    
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(6, (index) {
@@ -121,14 +133,18 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
           margin: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: isFilled ? primaryColor : Colors.transparent,
+            color: isFilled ? themeColor : Colors.transparent,
             border: Border.all(
-              color: isFilled ? primaryColor : Colors.grey[300]!,
+              color: isFilled 
+                  ? themeColor 
+                  : (isDarkMode 
+                      ? Color(Constants.darkFormBorderColor)
+                      : Color(Constants.lightFormBorderColor)),
               width: 2,
             ),
             boxShadow: isFilled ? [
               BoxShadow(
-                color: primaryColor.withOpacity(0.3),
+                color: themeColor.withOpacity(0.3),
                 blurRadius: 8,
                 spreadRadius: 1,
               )
@@ -140,6 +156,10 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
   }
 
   Widget _buildNumpadButton(String value, {bool isSpecial = false}) {
+    final isDarkMode = Provider.of<ThemeProvider>(context, listen: true).isDarkMode;
+    final themeColor = isDarkMode 
+        ? Color(Constants.darkPrimaryColor) 
+        : Color(Constants.lightPrimaryColor);
     final bool isBackspace = value == '⌫';
     final bool isClear = value == 'C';
     
@@ -152,24 +172,33 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
         height: 75,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.white,
+          color: isDarkMode 
+              ? Color(Constants.darkFormBackgroundColor)
+              : (isSpecial ? themeColor : Colors.white),
           gradient: !isSpecial ? LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
+            colors: isDarkMode ? [
+              Color(Constants.darkGradientStartColor),
+              Color(Constants.darkGradientEndColor),
+            ] : [
               Colors.white,
-              Colors.grey.shade50,
+              Colors.white,
             ],
           ) : null,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: isDarkMode 
+                  ? Color(Constants.darkPrimaryShadowColor)
+                  : Color(Constants.lightPrimaryShadowColor),
               blurRadius: 10,
               spreadRadius: 1,
               offset: const Offset(0, 2),
             ),
             BoxShadow(
-              color: Colors.white.withOpacity(0.8),
+              color: isDarkMode 
+                  ? Color(Constants.darkSecondaryShadowColor)
+                  : Color(Constants.lightSecondaryShadowColor),
               blurRadius: 10,
               spreadRadius: 1,
               offset: const Offset(0, -2),
@@ -191,13 +220,15 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
                         _handleDigit(value);
                       }
                     },
-              splashColor: primaryColor.withOpacity(0.1),
-              highlightColor: primaryColor.withOpacity(0.05),
+              splashColor: themeColor.withOpacity(0.1),
+              highlightColor: themeColor.withOpacity(0.05),
               child: Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: Colors.grey.withOpacity(0.1),
+                    color: isDarkMode 
+                        ? Color(Constants.darkFormBorderColor)
+                        : Color(Constants.lightFormBorderColor),
                     width: 1,
                   ),
                 ),
@@ -205,7 +236,7 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
                   child: isBackspace
                       ? Icon(
                           Icons.backspace_rounded,
-                          color: primaryColor,
+                          color: isDarkMode ? themeColor : (isSpecial ? Colors.white : themeColor),
                           size: 28,
                         )
                       : isClear
@@ -214,7 +245,7 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
                               style: TextStyle(
                                 fontSize: 28,
                                 fontWeight: FontWeight.w100,
-                                color: primaryColor,
+                                color: isDarkMode ? themeColor : (isSpecial ? Colors.white : themeColor),
                                 letterSpacing: 1,
                               ),
                             )
@@ -223,7 +254,9 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
                               style: TextStyle(
                                 fontSize: 32,
                                 fontWeight: FontWeight.w500,
-                                color: Colors.black87,
+                                color: isDarkMode 
+                                    ? Color(Constants.darkLabelTextColor)
+                                    : Color(Constants.lightLabelTextColor),
                                 letterSpacing: 1,
                               ),
                             ),
@@ -348,11 +381,14 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
                       MaterialPageRoute(
                         builder: (context) => MainPage(
                           isArabic: widget.isArabic,
+                          onLanguageChanged: (bool value) {},
                           userData: {
                             ...widget.user ?? {},
                             'firstName': firstName,
                             'isSessionActive': isSessionActive,
                           },
+                          initialRoute: '',
+                          isDarkMode: Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
                         ),
                       ),
                     );
@@ -394,169 +430,145 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Provider.of<ThemeProvider>(context, listen: true).isDarkMode;
+    final themeColor = isDarkMode 
+        ? Color(Constants.darkPrimaryColor) 
+        : Color(Constants.lightPrimaryColor);
+    
     return Scaffold(
-      backgroundColor: backgroundColor,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              physics: constraints.maxHeight < 600 
-                  ? const AlwaysScrollableScrollPhysics() 
-                  : const NeverScrollableScrollPhysics(),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: constraints.maxHeight,
-                  minWidth: constraints.maxWidth,
-                ),
-                child: IntrinsicHeight(
-                  child: Stack(
-                    children: [
-                      // Background Logo
-                      Positioned(
-                        top: -75,
-                        right: widget.isArabic ? null : -75,
-                        left: widget.isArabic ? -75 : null,
-                        child: Opacity(
-                          opacity: 0.2,
-                          child: Image.asset(
-                            'assets/images/nayifatlogocircle-nobg.png',
-                            width: 200,
-                            height: 200,
-                          ),
-                        ),
-                      ),
-
-                      // Main Content
-                      Column(
-                        children: [
-                          const SizedBox(height: 100),
-                          // Title with decoration
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                            child: Column(
-                              children: [
-                                Text(
-                                  _getTitle(),
-                                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: primaryColor,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 8),
-                                Container(
-                                  width: 60,
-                                  height: 4,
-                                  decoration: BoxDecoration(
-                                    color: primaryColor,
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          if (widget.showSteps && !widget.isChangingMPIN) ...[
-                            // Progress Indicator (only for initial setup)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                              child: Column(
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: List.generate(3 * 2 - 1, (index) {
-                                      if (index % 2 == 0) {
-                                        final stepIndex = index ~/ 2;
-                                        final isActive = stepIndex == 2;
-                                        final isPast = stepIndex < 2;
-                                        return Container(
-                                          width: 40,
-                                          height: 40,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: isActive || isPast
-                                                ? primaryColor
-                                                : Colors.grey[300],
-                                          ),
-                                          child: Center(
-                                            child: Text(
-                                              '${stepIndex + 1}',
-                                              style: TextStyle(
-                                                color: isActive || isPast
-                                                    ? Colors.white
-                                                    : Colors.grey[600],
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                        );
-                                      } else {
-                                        return Container(
-                                          width: 40,
-                                          height: 2,
-                                          color: Colors.grey[300],
-                                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                                        );
-                                      }
-                                    }),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const Divider(height: 1),
-                          ],
-
-                          Expanded(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const SizedBox(height: 40),
-                                Text(
-                                  _getInstructions(),
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                                const SizedBox(height: 40),
-                                _buildPINDisplay(_getCurrentPinList()),
-                                if (_errorMessage != null) ...[
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    _errorMessage!,
-                                    style: const TextStyle(
-                                      color: Colors.red,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ],
-                                const SizedBox(height: 40),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: primaryColor.withOpacity(0.05),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, -5),
-                                ),
-                              ],
-                            ),
-                            child: _buildNumpad(),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
+      backgroundColor: isDarkMode 
+          ? Color(Constants.darkBackgroundColor)
+          : Color(Constants.lightBackgroundColor),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: widget.showSteps ? null : IconButton(
+          icon: Icon(
+            Icons.arrow_back_ios,
+            color: themeColor,
+          ),
+          onPressed: () => Navigator.of(context).pop(),
         ),
       ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            if (widget.showSteps) ...[
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildStepCircle(1, true),
+                  _buildStepLine(true),
+                  _buildStepCircle(2, true),
+                  _buildStepLine(false),
+                  _buildStepCircle(3, false),
+                ],
+              ),
+              const SizedBox(height: 40),
+            ],
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _getTitle(),
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: themeColor,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _getSubtitle(),
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: isDarkMode 
+                            ? Color(Constants.darkHintTextColor)
+                            : Color(Constants.lightHintTextColor),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    if (_errorMessage != null) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        _errorMessage!,
+                        style: TextStyle(
+                          color: Colors.red[700],
+                          fontSize: 14,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                    const SizedBox(height: 40),
+                    _buildPINDisplay(_getCurrentPinDisplay()),
+                    const SizedBox(height: 40),
+                    _buildNumpad(),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStepCircle(int number, bool isActive) {
+    final isDarkMode = Provider.of<ThemeProvider>(context, listen: true).isDarkMode;
+    final themeColor = isDarkMode 
+        ? Color(Constants.darkPrimaryColor) 
+        : Color(Constants.lightPrimaryColor);
+    
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: isActive ? themeColor : Colors.transparent,
+        border: Border.all(
+          color: isActive 
+              ? themeColor 
+              : (isDarkMode 
+                  ? Color(Constants.darkFormBorderColor)
+                  : Color(Constants.lightFormBorderColor)),
+          width: 2,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          number.toString(),
+          style: TextStyle(
+            color: isActive 
+                ? Colors.white 
+                : (isDarkMode 
+                    ? Color(Constants.darkLabelTextColor)
+                    : Color(Constants.lightLabelTextColor)),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStepLine(bool isActive) {
+    final isDarkMode = Provider.of<ThemeProvider>(context, listen: true).isDarkMode;
+    final themeColor = isDarkMode 
+        ? Color(Constants.darkPrimaryColor) 
+        : Color(Constants.lightPrimaryColor);
+    
+    return Container(
+      width: 60,
+      height: 2,
+      color: isActive 
+          ? themeColor 
+          : (isDarkMode 
+              ? Color(Constants.darkFormBorderColor)
+              : Color(Constants.lightFormBorderColor)),
     );
   }
 
@@ -574,7 +586,7 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
         : (widget.isArabic ? 'إنشاء رمز دخول سريع' : 'Create MPIN');
   }
 
-  String _getInstructions() {
+  String _getSubtitle() {
     if (widget.isChangingMPIN && _isEnteringCurrentPin) {
       return widget.isArabic 
           ? 'أدخل رمز الدخول الحالي المكون من 6 أرقام'
@@ -585,7 +597,7 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
         : (widget.isArabic ? 'أدخل رمز دخول مكون من 6 أرقام' : 'Enter a 6-digit MPIN');
   }
 
-  List<String> _getCurrentPinList() {
+  List<String> _getCurrentPinDisplay() {
     if (widget.isChangingMPIN && _isEnteringCurrentPin) {
       return _currentPin;
     }

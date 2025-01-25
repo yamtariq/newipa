@@ -91,19 +91,26 @@ try {
             $employer_name = isset($data['employer_name']) ? $data['employer_name'] : null;
             $employment_date = isset($data['employment_date']) ? $data['employment_date'] : null;
             $national_address = isset($data['national_address']) ? $data['national_address'] : null;
+            
+            // Add Nafath data
+            $nafath_status = isset($data['nafath_status']) ? $data['nafath_status'] : null;
+            $nafath_trans_id = isset($data['nafath_trans_id']) ? $data['nafath_trans_id'] : null;
+            $nafath_random = isset($data['nafath_random']) ? $data['nafath_random'] : null;
 
-            // Prepare and insert user with government data
+            // Prepare and insert user with government data and Nafath info
             $stmt = $con->prepare("INSERT INTO Users (
                 national_id, name, arabic_name, email, password, phone, 
                 dob, salary, employment_status, employer_name, 
-                employment_date, national_address, created_at
+                employment_date, national_address, created_at,
+                nafath_status, nafath_trans_id, nafath_random, nafath_timestamp
             ) VALUES (
                 ?, ?, ?, ?, ?, ?, 
                 ?, ?, ?, ?, 
-                ?, ?, DATE_ADD(NOW(), INTERVAL 8 HOUR)
+                ?, ?, date('Y-m-d H:i:s'),
+                ?, ?, ?, date('Y-m-d H:i:s')
             )");
             
-            $stmt->bind_param("ssssssssssss", 
+            $stmt->bind_param("sssssssssssssss", 
                 $national_id,
                 $full_name,
                 $arabic_name,
@@ -115,7 +122,10 @@ try {
                 $employment_status,
                 $employer_name,
                 $employment_date,
-                $national_address
+                $national_address,
+                $nafath_status,
+                $nafath_trans_id,
+                $nafath_random
             );
             
             if (!$stmt->execute()) {

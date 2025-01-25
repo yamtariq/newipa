@@ -4,6 +4,9 @@ import 'dart:ui' as ui;
 import '../../services/auth_service.dart';
 import '../../services/registration_service.dart';
 import 'mpin_setup_screen.dart';
+import 'package:provider/provider.dart';
+import '../../providers/theme_provider.dart';
+import '../../utils/constants.dart';
 
 class PasswordSetupScreen extends StatefulWidget {
   final String nationalId;
@@ -82,7 +85,20 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
   Widget _buildStepIndicator() {
     final steps = widget.isArabic ? _stepsAr : _stepsEn;
     final currentStep = 1; // Password step
-    final primaryColor = Color(0xFF0077B6);
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final activeColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final inactiveColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor
+        : Constants.lightSurfaceColor);
+    final inactiveBorderColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkFormBorderColor 
+        : Constants.lightFormBorderColor);
+    final activeTextColor = themeProvider.isDarkMode ? Colors.black : Colors.white;
+    final inactiveTextColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
 
     return Column(
       children: [
@@ -102,27 +118,48 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
                       height: 40,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isActive || isPast
-                            ? primaryColor
-                            : Colors.grey[300],
+                        color: isActive || isPast ? activeColor : inactiveColor,
+                        border: Border.all(
+                          color: isActive || isPast ? activeColor : inactiveBorderColor,
+                          width: 1,
+                        ),
+                        boxShadow: isActive ? [
+                          BoxShadow(
+                            color: activeColor.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ] : null,
                       ),
                       child: Center(
                         child: Text(
                           '${stepIndex + 1}',
                           style: TextStyle(
                             color: isActive || isPast
-                                ? Colors.white
-                                : Colors.grey[600],
+                                ? activeTextColor
+                                : inactiveTextColor,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
                     );
                   } else {
+                    final stepIndex = index ~/ 2;
+                    final isPastLine = stepIndex < currentStep;
                     return Container(
                       width: 60,
                       height: 2,
-                      color: Colors.grey[300],
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: isPastLine ? [
+                            activeColor,
+                            activeColor,
+                          ] : [
+                            activeColor.withOpacity(0.5),
+                            inactiveBorderColor,
+                          ],
+                        ),
+                      ),
                       margin: const EdgeInsets.symmetric(horizontal: 4),
                     );
                   }
@@ -135,33 +172,41 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
                   if (index % 2 == 0) {
                     final stepIndex = index ~/ 2;
                     final isActive = stepIndex == currentStep;
+                    final isPast = stepIndex < currentStep;
                     return SizedBox(
                       width: 80,
                       child: Text(
                         steps[stepIndex],
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: isActive ? primaryColor : (stepIndex < currentStep ? primaryColor : Colors.grey[600]),
-                          fontWeight:
-                              isActive ? FontWeight.bold : (stepIndex < currentStep ? FontWeight.bold : FontWeight.normal),
+                          color: isActive || isPast
+                              ? activeColor
+                              : inactiveTextColor,
+                          fontWeight: isActive || isPast
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                           fontSize: 14,
                         ),
                       ),
                     );
                   } else {
-                    return SizedBox(width: 40);
+                    return const SizedBox(width: 40);
                   }
                 }),
               ),
             ],
           ),
         ),
-        const Divider(height: 1),
+        Divider(
+          height: 1,
+          color: inactiveBorderColor,
+        ),
       ],
     );
   }
 
   Widget _buildPasswordStrengthIndicator() {
+    final themeProvider = Provider.of<ThemeProvider>(context);
     final Color indicatorColor;
     final String strengthText;
 
@@ -183,7 +228,9 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
             value: _passwordStrength,
-            backgroundColor: Colors.grey[200],
+            backgroundColor: Color(themeProvider.isDarkMode 
+                ? Constants.darkFormBackgroundColor 
+                : Constants.lightFormBackgroundColor),
             valueColor: AlwaysStoppedAnimation<Color>(indicatorColor),
             minHeight: 8,
           ),
@@ -202,6 +249,7 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
   }
 
   Widget _buildRequirementsList() {
+    final themeProvider = Provider.of<ThemeProvider>(context);
     final password = _passwordController.text;
     final requirements = [
       {
@@ -253,7 +301,9 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
               Text(
                 requirement['text'] as String,
                 style: TextStyle(
-                  color: Colors.grey[700],
+                  color: Color(themeProvider.isDarkMode 
+                      ? Constants.darkLabelTextColor 
+                      : Constants.lightLabelTextColor),
                   fontSize: 12,
                 ),
               ),
@@ -317,34 +367,74 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Color(0xFF0077B6);
-    final backgroundColor = Color(0xFFF5F6FA);
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final backgroundColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkBackgroundColor 
+        : Constants.lightBackgroundColor);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final surfaceColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
     final inputDecorationTheme = InputDecorationTheme(
       filled: true,
-      fillColor: Colors.white,
+      fillColor: Color(themeProvider.isDarkMode 
+          ? Constants.darkFormBackgroundColor 
+          : Constants.lightFormBackgroundColor),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+        borderSide: BorderSide(
+          color: Color(themeProvider.isDarkMode 
+              ? Constants.darkFormBorderColor 
+              : Constants.lightFormBorderColor),
+        ),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+        borderSide: BorderSide(
+          color: Color(themeProvider.isDarkMode 
+              ? Constants.darkFormBorderColor 
+              : Constants.lightFormBorderColor),
+        ),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: primaryColor, width: 2),
+        borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+        borderSide: BorderSide(
+          color: Color(themeProvider.isDarkMode 
+              ? Constants.darkPrimaryColor 
+              : Constants.lightPrimaryColor),
+          width: 2,
+        ),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.red[300]!, width: 1),
+        borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+        borderSide: BorderSide(
+          color: Colors.red[300]!,
+          width: 1,
+        ),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.red[300]!, width: 2),
+        borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+        borderSide: BorderSide(
+          color: Colors.red[300]!,
+          width: 2,
+        ),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      labelStyle: TextStyle(color: Colors.grey[700]),
-      hintStyle: TextStyle(color: Colors.grey[400]),
+      labelStyle: TextStyle(
+        color: Color(themeProvider.isDarkMode 
+            ? Constants.darkLabelTextColor 
+            : Constants.lightLabelTextColor),
+      ),
+      hintStyle: TextStyle(
+        color: Color(themeProvider.isDarkMode 
+            ? Constants.darkHintTextColor 
+            : Constants.lightHintTextColor),
+      ),
+      prefixIconColor: Color(themeProvider.isDarkMode 
+          ? Constants.darkIconColor 
+          : Constants.lightIconColor),
     );
 
     return WillPopScope(
@@ -352,23 +442,31 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
       child: Directionality(
         textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
         child: Scaffold(
-          backgroundColor: backgroundColor,
+          backgroundColor: Color(themeProvider.isDarkMode 
+              ? Constants.darkBackgroundColor 
+              : Constants.lightBackgroundColor),
           body: SafeArea(
             child: Stack(
               children: [
                 // Background Logo
                 Positioned(
-                  top: -75,
-                  right: widget.isArabic ? null : -75,
-                  left: widget.isArabic ? -75 : null,
-                  child: Opacity(
-                    opacity: 0.2,
-                    child: Image.asset(
-                      'assets/images/nayifatlogocircle-nobg.png',
-                      width: 200,
-                      height: 200,
-                    ),
-                  ),
+                  top: -100,
+                  right: widget.isArabic ? null : -100,
+                  left: widget.isArabic ? -100 : null,
+                  child: themeProvider.isDarkMode
+                    ? Image.asset(
+                        'assets/images/nayifat-circle-grey.png',
+                        width: 240,
+                        height: 240,
+                      )
+                    : Opacity(
+                        opacity: 0.2,
+                        child: Image.asset(
+                          'assets/images/nayifatlogocircle-nobg.png',
+                          width: 240,
+                          height: 240,
+                        ),
+                      ),
                 ),
 
                 // Main Content
@@ -377,21 +475,17 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
                     const SizedBox(height: 40),
                     // Title with decoration
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                       child: Column(
                         children: [
                           Text(
-                            widget.isArabic
-                                ? 'إنشاء كلمة المرور'
-                                : 'Create Password',
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: primaryColor,
-                                ),
+                            widget.isArabic ? 'إنشاء كلمة المرور' : 'Create Password',
+                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Color(themeProvider.isDarkMode 
+                                  ? Constants.darkPrimaryColor 
+                                  : Constants.lightPrimaryColor),
+                            ),
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 8),
@@ -399,7 +493,9 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
                             width: 60,
                             height: 4,
                             decoration: BoxDecoration(
-                              color: primaryColor,
+                              color: Color(themeProvider.isDarkMode 
+                                  ? Constants.darkPrimaryColor 
+                                  : Constants.lightPrimaryColor),
                               borderRadius: BorderRadius.circular(2),
                             ),
                           ),
@@ -544,12 +640,25 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
                     Container(
                       padding: const EdgeInsets.all(24.0),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Color(themeProvider.isDarkMode 
+                            ? Constants.darkSurfaceColor 
+                            : Constants.lightSurfaceColor),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, -5),
+                            color: Color(themeProvider.isDarkMode 
+                                ? Constants.darkNavbarShadowPrimary
+                                : Constants.lightNavbarShadowPrimary),
+                            offset: const Offset(0, -2),
+                            blurRadius: 6,
+                            spreadRadius: 2,
+                          ),
+                          BoxShadow(
+                            color: Color(themeProvider.isDarkMode 
+                                ? Constants.darkNavbarShadowSecondary
+                                : Constants.lightNavbarShadowSecondary),
+                            offset: const Offset(0, -1),
+                            blurRadius: 4,
+                            spreadRadius: 0,
                           ),
                         ],
                       ),
@@ -559,19 +668,31 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
                             child: ElevatedButton(
                               onPressed: () => Navigator.of(context).pop(),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.grey[100],
-                                foregroundColor: Colors.black87,
+                                backgroundColor: Color(themeProvider.isDarkMode 
+                                    ? Constants.darkFormBackgroundColor
+                                    : Constants.lightFormBackgroundColor),
+                                foregroundColor: Color(themeProvider.isDarkMode 
+                                    ? Constants.darkLabelTextColor 
+                                    : Constants.lightLabelTextColor),
                                 elevation: 0,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 16),
+                                padding: const EdgeInsets.symmetric(vertical: 16),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
+                                  side: BorderSide(
+                                    color: Color(themeProvider.isDarkMode 
+                                        ? Constants.darkFormBorderColor 
+                                        : Constants.lightFormBorderColor),
+                                  ),
                                 ),
                               ),
                               child: Text(
-                                widget.isArabic ? 'إلغاء' : 'Cancel',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold),
+                                widget.isArabic ? 'رجوع' : 'Back',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(themeProvider.isDarkMode 
+                                      ? Constants.darkLabelTextColor 
+                                      : Constants.lightLabelTextColor),
+                                ),
                               ),
                             ),
                           ),
@@ -580,31 +701,32 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
                             child: ElevatedButton(
                               onPressed: _isLoading ? null : _handleNext,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: primaryColor,
+                                backgroundColor: Color(themeProvider.isDarkMode 
+                                    ? Constants.darkPrimaryColor 
+                                    : Constants.lightPrimaryColor),
+                                foregroundColor: Colors.white,
                                 elevation: 0,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 16),
+                                padding: const EdgeInsets.symmetric(vertical: 16),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
                                 ),
                               ),
                               child: _isLoading
-                                  ? const SizedBox(
+                                  ? SizedBox(
                                       height: 20,
                                       width: 20,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                                Colors.white),
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                            themeProvider.isDarkMode ? Colors.black : Colors.white),
                                       ),
                                     )
                                   : Text(
                                       widget.isArabic ? 'التالي' : 'Next',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 16,
-                                        color: Colors.white,
+                                        color: themeProvider.isDarkMode ? Colors.black : Colors.white,
                                       ),
                                     ),
                             ),

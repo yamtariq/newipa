@@ -9,6 +9,6 @@ $conn = new mysqli($SETTINGS["hostname"], $SETTINGS["mysql_user"], $SETTINGS["my
 
 date_default_timezone_set('Asia/Riyadh');
 
-
+ 
  
 ?>

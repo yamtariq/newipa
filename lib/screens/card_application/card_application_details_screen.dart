@@ -6,6 +6,8 @@ import 'card_offer_screen.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../utils/constants.dart';
 import 'dart:math' as math;
+import 'package:provider/provider.dart';
+import '../../providers/theme_provider.dart';
 
 class CardApplicationDetailsScreen extends StatefulWidget {
   final bool isArabic;
@@ -36,22 +38,27 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
         final userData = json.decode(userDataStr);
         setState(() {
           _userData = userData;
-          // Set default values for required fields if they're null
           _userData['salary'] ??= '0';
           double salary = double.parse(_userData['salary'].toString());
           _userData['food_expense'] = (salary * 0.08).round().toString();
           _userData['transportation_expense'] = (salary * 0.05).round().toString();
-          _userData['other_liabilities'] ??= '';  // Changed from '0' to empty string
+          _userData['other_liabilities'] ??= '';
           _isLoading = false;
         });
       } else {
         if (mounted) {
+          final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(isArabic 
-                ? 'لم يتم العثور على بيانات المستخدم' 
-                : 'User data not found'),
-              backgroundColor: Colors.red,
+              content: Text(
+                isArabic ? 'لم يتم العثور على بيانات المستخدم' : 'User data not found',
+                style: TextStyle(
+                  color: themeProvider.isDarkMode ? Colors.black : Colors.white,
+                ),
+              ),
+              backgroundColor: Color(themeProvider.isDarkMode 
+                  ? Constants.darkPrimaryColor 
+                  : Constants.lightPrimaryColor),
             ),
           );
         }
@@ -59,12 +66,18 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
     } catch (e) {
       print('Error loading user data: $e');
       if (mounted) {
+        final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isArabic 
-              ? 'خطأ في تحميل بيانات المستخدم' 
-              : 'Error loading user data'),
-            backgroundColor: Colors.red,
+            content: Text(
+              isArabic ? 'خطأ في تحميل بيانات المستخدم' : 'Error loading user data',
+              style: TextStyle(
+                color: themeProvider.isDarkMode ? Colors.black : Colors.white,
+              ),
+            ),
+            backgroundColor: Color(themeProvider.isDarkMode 
+                ? Constants.darkPrimaryColor 
+                : Constants.lightPrimaryColor),
           ),
         );
       }
@@ -74,8 +87,19 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
   }
 
   void _showError(String message) {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(
+          message,
+          style: TextStyle(
+            color: themeProvider.isDarkMode ? Colors.black : Colors.white,
+          ),
+        ),
+        backgroundColor: Color(themeProvider.isDarkMode 
+            ? Constants.darkPrimaryColor 
+            : Constants.lightPrimaryColor),
+      ),
     );
   }
 
@@ -209,10 +233,39 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
       textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
       child: StatefulBuilder(
         builder: (BuildContext context, StateSetter setDialogState) {
+          final themeProvider = Provider.of<ThemeProvider>(context);
+          final primaryColor = Color(themeProvider.isDarkMode 
+              ? Constants.darkPrimaryColor 
+              : Constants.lightPrimaryColor);
+          final backgroundColor = Color(themeProvider.isDarkMode 
+              ? Constants.darkBackgroundColor 
+              : Constants.lightBackgroundColor);
+          final surfaceColor = Color(themeProvider.isDarkMode 
+              ? Constants.darkSurfaceColor 
+              : Constants.lightSurfaceColor);
+          final textColor = Color(themeProvider.isDarkMode 
+              ? Constants.darkLabelTextColor 
+              : Constants.lightLabelTextColor);
+          final borderColor = Color(themeProvider.isDarkMode 
+              ? Constants.darkFormBorderColor 
+              : Constants.lightFormBorderColor);
+          final hintColor = Color(themeProvider.isDarkMode 
+              ? Constants.darkHintTextColor 
+              : Constants.lightHintTextColor);
+
           return AlertDialog(
+            backgroundColor: surfaceColor,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+              side: BorderSide(color: borderColor),
+            ),
             title: Text(
               isArabic ? _getArabicFieldTitle(field) : _getEnglishFieldTitle(field),
               textAlign: isArabic ? TextAlign.right : TextAlign.left,
+              style: TextStyle(
+                color: primaryColor,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -222,14 +275,32 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                   controller: controller,
                   textAlign: isArabic ? TextAlign.right : TextAlign.left,
                   textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
+                  style: TextStyle(color: textColor),
                   decoration: InputDecoration(
                     labelText: isArabic ? _getArabicInputLabel(field) : field.replaceAll('_', ' ').toUpperCase(),
+                    labelStyle: TextStyle(color: hintColor),
                     errorText: validationError,
                     errorMaxLines: 3,
-                    errorStyle: const TextStyle(
+                    errorStyle: TextStyle(
+                      color: Colors.red,
                       height: 1.2,
                     ),
-                    border: const OutlineInputBorder(),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: borderColor),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: borderColor),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: primaryColor),
+                    ),
+                    filled: true,
+                    fillColor: themeProvider.isDarkMode 
+                        ? surfaceColor.withOpacity(0.1)
+                        : surfaceColor.withOpacity(0.5),
                     alignLabelWithHint: true,
                   ),
                   keyboardType: _getKeyboardType(field),
@@ -259,13 +330,11 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                           validationError = null;
                         }
                       } else if (field == 'food_expense' || field == 'transportation_expense') {
-                        // Get the minimum allowed value (current calculated value)
                         double salary = double.parse(_userData['salary']?.toString() ?? '0');
                         double minValue = field == 'food_expense' 
                           ? salary * 0.08 
                           : salary * 0.05;
                           
-                        // Get the other expense value
                         double otherExpense = field == 'food_expense'
                           ? double.parse(_userData['transportation_expense']?.toString() ?? '0')
                           : double.parse(_userData['food_expense']?.toString() ?? '0');
@@ -310,6 +379,14 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                         _uploadedFiles[field] = result.files.single.name;
                       }
                     },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: themeProvider.isDarkMode ? backgroundColor : surfaceColor,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
                     child: Text(fileName ?? (field == 'salary' 
                       ? (isArabic ? 'تحميل خطاب الراتب (مطلوب للتحديث)' : 'Upload Salary Letter (Required for Update)')
                       : '')),
@@ -319,7 +396,7 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
                         fileName ?? '',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: Colors.green,
                           fontWeight: FontWeight.bold,
                         ),
@@ -332,6 +409,9 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
+                style: TextButton.styleFrom(
+                  foregroundColor: hintColor,
+                ),
                 child: Text(isArabic ? 'إلغاء' : 'Cancel'),
               ),
               TextButton(
@@ -351,7 +431,14 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                         }
                         Navigator.pop(context, finalValue);
                       },
-                child: Text(isArabic ? 'تحديث' : 'Update'),
+                style: TextButton.styleFrom(
+                  foregroundColor: primaryColor,
+                  disabledForegroundColor: hintColor,
+                ),
+                child: Text(
+                  isArabic ? 'تحديث' : 'Update',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           );
@@ -411,7 +498,17 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
     String? fieldName,
     bool isRequired = true,
   }) {
-    // Get Arabic label based on field name
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final textColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
+    final hintColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkHintTextColor 
+        : Constants.lightHintTextColor);
+
     String arabicLabel = _getArabicLabel(label);
     
     return Padding(
@@ -421,9 +518,9 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
         children: [
           Text(
             '${isArabic ? arabicLabel : label} ${isRequired ? '*' : ''}',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
-              color: Colors.grey,
+              color: hintColor,
             ),
           ),
           const SizedBox(height: 4),
@@ -432,15 +529,16 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
               Expanded(
                 child: Text(
                   value ?? '',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
+                    color: textColor,
                   ),
                 ),
               ),
               if (editable)
                 IconButton(
-                  icon: Icon(Icons.edit, color: Color(Constants.primaryColorValue)),
+                  icon: Icon(Icons.edit, color: primaryColor),
                   onPressed: () => _updateField(
                     fieldName ?? label.toLowerCase().replaceAll(' ', '_'), 
                     value ?? ''
@@ -448,7 +546,7 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                 ),
             ],
           ),
-          const Divider(),
+          Divider(color: hintColor.withOpacity(0.5)),
         ],
       ),
     );
@@ -493,30 +591,32 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
   }
 
   Widget _buildDocumentsSection() {
-    print('Building documents section. Current uploaded files: $_uploadedFiles');
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final textColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           isArabic ? 'المستندات المطلوبة' : 'Required Documents',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: Color(Constants.primaryColorValue),
+            color: primaryColor,
           ),
         ),
         const SizedBox(height: 16),
-        // National ID
         _buildDocumentUpload(
           'National ID',
           _uploadedFiles['national_id'],
-          () {
-            print('National ID upload clicked');
-            _pickFile('national_id');
-          },
+          () => _pickFile('national_id'),
           required: true,
         ),
-        // Salary Document (only if salary was changed)
         if (_salaryChanged || _uploadedFiles.containsKey('salary'))
           _buildDocumentUpload(
             'Salary Letter',
@@ -535,7 +635,20 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
     bool required = false,
     String? placeholder,
   }) {
-    // Get Arabic label for documents
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final textColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
+    final surfaceColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
+    final borderColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkFormBorderColor 
+        : Constants.lightFormBorderColor);
+
     String arabicLabel = _getArabicDocumentLabel(label);
     
     return Padding(
@@ -545,7 +658,10 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
         children: [
           Text(
             '${isArabic ? arabicLabel : label} ${required ? '*' : ''}',
-            style: const TextStyle(fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
           ),
           const SizedBox(height: 8),
           GestureDetector(
@@ -553,25 +669,25 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey),
+                border: Border.all(color: borderColor),
                 borderRadius: BorderRadius.circular(8),
-                color: onTap == null ? Colors.grey[100] : null,
+                color: onTap == null ? surfaceColor.withOpacity(0.5) : null,
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.upload_file),
+                  Icon(Icons.upload_file, color: textColor),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       fileName ?? placeholder ?? (isArabic ? 'اختر ملف' : 'Choose File'),
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: onTap == null ? Colors.grey[600] : null,
+                        color: onTap == null ? textColor.withOpacity(0.6) : textColor,
                       ),
                     ),
                   ),
                   if (onTap != null)
-                    const Icon(Icons.arrow_forward_ios, size: 16),
+                    Icon(Icons.arrow_forward_ios, size: 16, color: textColor),
                 ],
               ),
             ),
@@ -594,9 +710,24 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final backgroundColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkBackgroundColor 
+        : Constants.lightBackgroundColor);
+    final surfaceColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
+    final textColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
+
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        backgroundColor: backgroundColor,
+        body: Center(child: CircularProgressIndicator(color: primaryColor)),
       );
     }
 
@@ -608,7 +739,7 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
     return Directionality(
       textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: backgroundColor,
         body: Stack(
           children: [
             // Gradient Background
@@ -618,8 +749,8 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    const Color(0xFF1B3E6C).withOpacity(0.1),
-                    Colors.white,
+                    primaryColor.withOpacity(0.1),
+                    backgroundColor,
                   ],
                 ),
               ),
@@ -644,7 +775,7 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                               },
                               icon: Icon(
                                 isArabic ? Icons.arrow_back_ios : Icons.arrow_back_ios,
-                                color: Color(Constants.primaryColorValue),
+                                color: primaryColor,
                               ),
                             ),
                           ],
@@ -655,7 +786,7 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
-                            color: Color(Constants.primaryColorValue),
+                            color: primaryColor,
                           ),
                         ),
                       ],
@@ -673,11 +804,13 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                             Container(
                               padding: const EdgeInsets.all(24),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: surfaceColor,
                                 borderRadius: BorderRadius.circular(20),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
+                                    color: Color(themeProvider.isDarkMode 
+                                        ? Constants.darkPrimaryShadowColor 
+                                        : Constants.lightPrimaryShadowColor),
                                     blurRadius: 20,
                                     offset: const Offset(0, 5),
                                   ),
@@ -703,11 +836,13 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                             Container(
                               padding: const EdgeInsets.all(24),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: surfaceColor,
                                 borderRadius: BorderRadius.circular(20),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
+                                    color: Color(themeProvider.isDarkMode 
+                                        ? Constants.darkPrimaryShadowColor 
+                                        : Constants.lightPrimaryShadowColor),
                                     blurRadius: 20,
                                     offset: const Offset(0, 5),
                                   ),
@@ -718,10 +853,10 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                                 children: [
                                   Text(
                                     isArabic ? 'المصروفات الشهرية' : 'Monthly Expenses',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.bold,
-                                      color: Color(Constants.primaryColorValue),
+                                      color: primaryColor,
                                     ),
                                   ),
                                   const SizedBox(height: 16),
@@ -751,11 +886,13 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                             Container(
                               padding: const EdgeInsets.all(24),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: surfaceColor,
                                 borderRadius: BorderRadius.circular(20),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
+                                    color: Color(themeProvider.isDarkMode 
+                                        ? Constants.darkPrimaryShadowColor 
+                                        : Constants.lightPrimaryShadowColor),
                                     blurRadius: 20,
                                     offset: const Offset(0, 5),
                                   ),
@@ -772,9 +909,8 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                               child: ElevatedButton(
                                 onPressed: canProceed ? () {
                                   double salary = double.parse(_userData['salary']?.toString() ?? '0');
-                                  // Calculate credit limits based on new formula
-                                  double minCreditLimit = 2000;  // Fixed minimum
-                                  double maxCreditLimit = math.min(50000, (salary * 0.15 * 20));  // Lower of 50k or (15% of salary * 20)
+                                  double minCreditLimit = 2000;
+                                  double maxCreditLimit = math.min(50000, (salary * 0.15 * 20));
 
                                   Navigator.push(
                                     context,
@@ -789,19 +925,20 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                                   );
                                 } : null,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Color(Constants.primaryColorValue),
+                                  backgroundColor: primaryColor,
+                                  disabledBackgroundColor: primaryColor.withOpacity(0.5),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(15),
                                   ),
                                   elevation: 5,
-                                  shadowColor: Color(Constants.primaryColorValue).withOpacity(0.5),
+                                  shadowColor: primaryColor.withOpacity(0.5),
                                 ),
                                 child: Text(
                                   isArabic ? 'التالي' : 'Next',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                    color: themeProvider.isDarkMode ? backgroundColor : surfaceColor,
                                   ),
                                 ),
                               ),

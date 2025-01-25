@@ -1,0 +1,23 @@
+- **Cross-Platform Consistency**  
+  Verify every feature on both Android and iOS.  
+  Ensure parity in functionality and user experience.
+
+- **Code Modification Practices**  
+  Focus edits only on parts relevant to the issue.  
+  Preserve all unrelated sections untouched.
+
+- **Simplicity and Efficiency**  
+  Choose clear, direct solutions.  
+  Avoid unnecessary complexity.
+
+- **Testing and Validation**  
+  Confirm code compiles without errors.  
+  Provide functional examples or test cases.
+
+- **Comprehensive Issue Analysis**  
+  Consider architecture and user experience.  
+  Solve problems with a broad, holistic view.
+
+- **Response Protocol**  
+  Start replies with a robot emoji (🤖).  
+  Demonstrate you followed these guidelines.

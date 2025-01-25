@@ -5,6 +5,8 @@ import '../../widgets/custom_button.dart';
 import 'loan_offer_screen.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../utils/constants.dart';
+import 'package:provider/provider.dart';
+import '../../providers/theme_provider.dart';
 
 class LoanApplicationDetailsScreen extends StatefulWidget {
   final bool isArabic;
@@ -74,8 +76,22 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
   }
 
   void _showError(String message) {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final surfaceColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
+    final textColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
+
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(
+          message,
+          style: TextStyle(color: surfaceColor),
+        ),
+        backgroundColor: textColor,
+      ),
     );
   }
 
@@ -209,10 +225,42 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
       textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
       child: StatefulBuilder(
         builder: (BuildContext context, StateSetter setDialogState) {
+          final themeProvider = Provider.of<ThemeProvider>(context);
+          final primaryColor = Color(themeProvider.isDarkMode 
+              ? Constants.darkPrimaryColor 
+              : Constants.lightPrimaryColor);
+          final surfaceColor = Color(themeProvider.isDarkMode 
+              ? Constants.darkSurfaceColor 
+              : Constants.lightSurfaceColor);
+          final textColor = Color(themeProvider.isDarkMode 
+              ? Constants.darkLabelTextColor 
+              : Constants.lightLabelTextColor);
+          final hintColor = Color(themeProvider.isDarkMode 
+              ? Constants.darkHintTextColor 
+              : Constants.lightHintTextColor);
+          final borderColor = Color(themeProvider.isDarkMode 
+              ? Constants.darkFormBorderColor 
+              : Constants.lightFormBorderColor);
+          final errorColor = Color(themeProvider.isDarkMode 
+              ? Constants.darkErrorColor 
+              : Constants.lightErrorColor);
+          final disabledColor = Color(themeProvider.isDarkMode 
+              ? Constants.darkFormBackgroundColor 
+              : Constants.lightFormBackgroundColor);
+
           return AlertDialog(
+            backgroundColor: surfaceColor,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+              side: BorderSide(color: borderColor),
+            ),
             title: Text(
               isArabic ? _getArabicFieldTitle(field) : _getEnglishFieldTitle(field),
               textAlign: isArabic ? TextAlign.right : TextAlign.left,
+              style: TextStyle(
+                color: textColor,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -221,7 +269,7 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                 if (field == 'ibanNo')
                   Container(
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey),
+                      border: Border.all(color: borderColor),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Row(
@@ -230,17 +278,18 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           decoration: BoxDecoration(
-                            color: Colors.grey[200],
+                            color: disabledColor,
                             borderRadius: const BorderRadius.only(
                               topLeft: Radius.circular(4),
                               bottomLeft: Radius.circular(4),
                             ),
                           ),
-                          child: const Text(
+                          child: Text(
                             'SA',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
+                              color: textColor,
                             ),
                           ),
                         ),
@@ -249,11 +298,13 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                             controller: controller,
                             textAlign: TextAlign.left,
                             textDirection: TextDirection.ltr,
+                            style: TextStyle(color: textColor),
                             decoration: InputDecoration(
                               hintText: isArabic ? 'أدخل ٢٢ رقم' : 'Enter 22 digits',
+                              hintStyle: TextStyle(color: hintColor),
                               errorText: validationError,
-                              errorMaxLines: 3,
-                              errorStyle: const TextStyle(
+                              errorStyle: TextStyle(
+                                color: errorColor,
                                 height: 1.2,
                               ),
                               border: InputBorder.none,
@@ -293,14 +344,37 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                     controller: controller,
                     textAlign: isArabic ? TextAlign.right : TextAlign.left,
                     textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
+                    style: TextStyle(color: textColor),
                     decoration: InputDecoration(
                       labelText: isArabic ? _getArabicInputLabel(field) : field.replaceAll('_', ' ').toUpperCase(),
+                      labelStyle: TextStyle(color: hintColor),
                       errorText: validationError,
-                      errorMaxLines: 3,
-                      errorStyle: const TextStyle(
+                      errorStyle: TextStyle(
+                        color: errorColor,
                         height: 1.2,
                       ),
-                      border: const OutlineInputBorder(),
+                      border: OutlineInputBorder(
+                        borderSide: BorderSide(color: borderColor),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: borderColor),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: primaryColor),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      errorBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: errorColor),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      focusedErrorBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: errorColor),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      filled: true,
+                      fillColor: surfaceColor,
                       alignLabelWithHint: true,
                     ),
                     keyboardType: _getKeyboardType(field),
@@ -381,6 +455,14 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                         _uploadedFiles[field] = result.files.single.name;
                       }
                     },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: surfaceColor,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
                     child: Text(fileName ?? (field == 'salary' 
                       ? (isArabic ? 'تحميل خطاب الراتب (مطلوب للتحديث)' : 'Upload Salary Letter (Required for Update)')
                       : (isArabic ? 'تحميل شهادة الآيبان (مطلوب)' : 'Upload IBAN Certificate (Required)'))),
@@ -390,8 +472,8 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
                         fileName ?? '',
-                        style: const TextStyle(
-                          color: Colors.green,
+                        style: TextStyle(
+                          color: primaryColor,
                           fontWeight: FontWeight.bold,
                         ),
                         textAlign: isArabic ? TextAlign.right : TextAlign.left,
@@ -410,6 +492,9 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                   }
                   Navigator.pop(context);
                 },
+                style: TextButton.styleFrom(
+                  foregroundColor: hintColor,
+                ),
                 child: Text(isArabic ? 'إلغاء' : 'Cancel'),
               ),
               TextButton(
@@ -436,7 +521,14 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                         }
                         Navigator.pop(context, finalValue);
                       },
-                child: Text(isArabic ? 'تحديث' : 'Update'),
+                style: TextButton.styleFrom(
+                  foregroundColor: primaryColor,
+                  disabledForegroundColor: hintColor,
+                ),
+                child: Text(
+                  isArabic ? 'تحديث' : 'Update',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           );
@@ -507,6 +599,17 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
     String? fieldName,
     bool isRequired = true,
   }) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final textColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
+    final hintColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkHintTextColor 
+        : Constants.lightHintTextColor);
+
     // Get Arabic label based on field name
     String arabicLabel = _getArabicLabel(label);
     
@@ -517,9 +620,9 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
         children: [
           Text(
             '${isArabic ? arabicLabel : label}${isRequired ? ' *' : ''}',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
-              color: Colors.grey,
+              color: hintColor,
             ),
           ),
           const SizedBox(height: 4),
@@ -528,15 +631,16 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
               Expanded(
                 child: Text(
                   value ?? '',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
+                    color: textColor,
                   ),
                 ),
               ),
               if (editable)
                 IconButton(
-                  icon: Icon(Icons.edit, color: Color(Constants.primaryColorValue)),
+                  icon: Icon(Icons.edit, color: primaryColor),
                   onPressed: () => _updateField(
                     fieldName ?? label.toLowerCase().replaceAll(' ', '_'), 
                     value ?? ''
@@ -544,7 +648,7 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                 ),
             ],
           ),
-          const Divider(),
+          Divider(color: hintColor.withOpacity(0.5)),
         ],
       ),
     );
@@ -597,16 +701,21 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
   }
 
   Widget _buildDocumentsSection() {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+
     print('Building documents section. Current uploaded files: $_uploadedFiles');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           isArabic ? 'المستندات المطلوبة' : 'Required Documents',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: Color(Constants.primaryColorValue),
+            color: primaryColor,
           ),
         ),
         const SizedBox(height: 16),
@@ -649,6 +758,23 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
     bool required = false,
     String? placeholder,
   }) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final textColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
+    final hintColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkHintTextColor 
+        : Constants.lightHintTextColor);
+    final borderColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkFormBorderColor 
+        : Constants.lightFormBorderColor);
+    final disabledColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkFormBackgroundColor 
+        : Constants.lightFormBackgroundColor);
+
     // Get Arabic label for documents
     String arabicLabel = _getArabicDocumentLabel(label);
     
@@ -659,7 +785,10 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
         children: [
           Text(
             '${isArabic ? arabicLabel : label} ${required ? '*' : ''}',
-            style: const TextStyle(fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
           ),
           const SizedBox(height: 8),
           GestureDetector(
@@ -667,25 +796,25 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey),
+                border: Border.all(color: borderColor),
                 borderRadius: BorderRadius.circular(8),
-                color: onTap == null ? Colors.grey[100] : null,
+                color: onTap == null ? disabledColor : null,
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.upload_file),
+                  Icon(Icons.upload_file, color: onTap == null ? hintColor : primaryColor),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       fileName ?? placeholder ?? (isArabic ? 'اختر ملف' : 'Choose File'),
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: onTap == null ? Colors.grey[600] : null,
+                        color: onTap == null ? hintColor : textColor,
                       ),
                     ),
                   ),
                   if (onTap != null)
-                    const Icon(Icons.arrow_forward_ios, size: 16),
+                    Icon(Icons.arrow_forward_ios, size: 16, color: primaryColor),
                 ],
               ),
             ),
@@ -710,9 +839,24 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final backgroundColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkBackgroundColor 
+        : Constants.lightBackgroundColor);
+    final surfaceColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
+    final textColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
+
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        backgroundColor: backgroundColor,
+        body: Center(child: CircularProgressIndicator(color: primaryColor)),
       );
     }
 
@@ -726,7 +870,7 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
     return Directionality(
       textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: backgroundColor,
         body: Stack(
           children: [
             // Gradient Background
@@ -736,8 +880,8 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    const Color(0xFF1B3E6C).withOpacity(0.1),
-                    Colors.white,
+                    primaryColor.withOpacity(0.1),
+                    backgroundColor,
                   ],
                 ),
               ),
@@ -762,7 +906,7 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                               },
                               icon: Icon(
                                 isArabic ? Icons.arrow_back_ios : Icons.arrow_back_ios,
-                                color: Color(Constants.primaryColorValue),
+                                color: primaryColor,
                               ),
                             ),
                           ],
@@ -773,7 +917,7 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
-                            color: Color(Constants.primaryColorValue),
+                            color: primaryColor,
                           ),
                         ),
                       ],
@@ -791,11 +935,11 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                             Container(
                               padding: const EdgeInsets.all(24),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: surfaceColor,
                                 borderRadius: BorderRadius.circular(20),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
+                                    color: primaryColor.withOpacity(0.05),
                                     blurRadius: 20,
                                     offset: const Offset(0, 5),
                                   ),
@@ -828,11 +972,11 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                             Container(
                               padding: const EdgeInsets.all(24),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: surfaceColor,
                                 borderRadius: BorderRadius.circular(20),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
+                                    color: primaryColor.withOpacity(0.05),
                                     blurRadius: 20,
                                     offset: const Offset(0, 5),
                                   ),
@@ -843,10 +987,10 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                                 children: [
                                   Text(
                                     isArabic ? 'المصروفات الشهرية' : 'Monthly Expenses',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.bold,
-                                      color: Color(Constants.primaryColorValue),
+                                      color: primaryColor,
                                     ),
                                   ),
                                   const SizedBox(height: 16),
@@ -876,11 +1020,11 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                             Container(
                               padding: const EdgeInsets.all(24),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: surfaceColor,
                                 borderRadius: BorderRadius.circular(20),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
+                                    color: primaryColor.withOpacity(0.05),
                                     blurRadius: 20,
                                     offset: const Offset(0, 5),
                                   ),
@@ -907,19 +1051,20 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                                   );
                                 } : null,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Color(Constants.primaryColorValue),
+                                  backgroundColor: primaryColor,
+                                  disabledBackgroundColor: primaryColor.withOpacity(0.3),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(15),
                                   ),
                                   elevation: 5,
-                                  shadowColor: Color(Constants.primaryColorValue).withOpacity(0.5),
+                                  shadowColor: primaryColor.withOpacity(0.5),
                                 ),
                                 child: Text(
                                   isArabic ? 'التالي' : 'Next',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                    color: surfaceColor,
                                   ),
                                 ),
                               ),

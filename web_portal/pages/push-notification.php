@@ -849,8 +849,8 @@ while($row = $notification_templates_result->fetch_assoc()) {
                         <label>Target Method *</label>
                         <select id="targetType" onchange="toggleTargetInputs()">
                             <option value="filtered">Filtered Users</option>
-                            <option value="single">Single User</option>
-                            <option value="multiple">Multiple Users</option>
+                            <!-- <option value="single">Single User</option>
+                            <option value="multiple">Multiple Users</option> -->
                         </select>
                     </div>
 
@@ -926,7 +926,7 @@ while($row = $notification_templates_result->fetch_assoc()) {
                     </div>
 
                     <div class="language-tabs">
-                        <div class="language-tab" onclick="switchLanguageMode('single')">Single Language</div>
+                        <!-- <div class="language-tab" onclick="switchLanguageMode('single')">Single Language</div> -->
                         <div class="language-tab active" onclick="switchLanguageMode('multi')">Multi Language</div>
                     </div>
 
@@ -1022,8 +1022,10 @@ while($row = $notification_templates_result->fetch_assoc()) {
             // Update tabs
             document.querySelectorAll('.language-tab').forEach(tab => {
                 tab.classList.remove('active');
+                if (tab.textContent.toLowerCase().includes(mode)) {
+                    tab.classList.add('active');
+                }
             });
-            event.target.classList.add('active');
 
             // Update content visibility
             if (mode === 'single') {

@@ -518,6 +518,33 @@ require_once '../db_connect.php';
         .save-changes:hover {
             background-color: #0056b3;
         }
+
+        .image-upload-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .upload-btn {
+            padding: 5px 10px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .upload-btn:hover {
+            background-color: var(--secondary-color);
+        }
+        .upload-status {
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .upload-progress {
+            display: none;
+            margin-left: 10px;
+        }
     </style>
 </head>
 <body>
@@ -601,7 +628,7 @@ require_once '../db_connect.php';
                                             echo '<div class="slide-number">Slide ' . ($index + 1) . '</div>';
                                             echo '<div class="form-group">';
                                             echo '<label>Image URL:</label>';
-                                            echo '<input type="text" name="image_url[]" value="' . htmlspecialchars($slide['image_url']) . '" required>';
+                                            echo '<input type="text" id="image_url_' . $index . '" name="image_url[]" value="' . htmlspecialchars($slide['image_url']) . '" required>';
                                             echo '</div>';
                                             echo '<div class="form-group">';
                                             echo '<label>Link:</label>';
@@ -653,7 +680,7 @@ require_once '../db_connect.php';
                                             echo '<div class="slide-number">Slide ' . ($index + 1) . '</div>';
                                             echo '<div class="form-group">';
                                             echo '<label>Image URL:</label>';
-                                            echo '<input type="text" name="image_url_ar[]" value="' . htmlspecialchars($slide['image_url']) . '" required>';
+                                            echo '<input type="text" id="image_url_ar_' . $index . '" name="image_url_ar[]" value="' . htmlspecialchars($slide['image_url']) . '" required>';
                                             echo '</div>';
                                             echo '<div class="form-group">';
                                             echo '<label>Link:</label>';
@@ -699,60 +726,92 @@ require_once '../db_connect.php';
                             html: `
                                 <div class="form-group">
                                     <label>Image URL:</label>
-                                    <input type="text" id="image_url" class="swal2-input" required>
+                                    <input type="text" id="new_image_url" class="swal2-input" placeholder="Enter image URL">
+                                    <div class="image-upload-container">
+                                        <input type="file" id="new_image_file" accept="image/*" style="display: none;">
+                                        <button type="button" class="upload-btn" onclick="document.getElementById('new_image_file').click()">
+                                            <i class="fas fa-upload"></i> Upload
+                                        </button>
+                                        <span class="upload-status"></span>
+                                    </div>
                                 </div>
                                 <div class="form-group">
                                     <label>Link:</label>
-                                    <input type="text" id="link" class="swal2-input" required>
+                                    <input type="text" id="new_link" class="swal2-input" placeholder="Enter link">
                                 </div>
                                 <div class="form-group">
                                     <label>Left Title:</label>
-                                    <input type="text" id="leftTitle" class="swal2-input" required>
+                                    <input type="text" id="new_left_title" class="swal2-input" placeholder="Enter left title">
                                 </div>
                                 <div class="form-group">
                                     <label>Right Title:</label>
-                                    <input type="text" id="rightTitle" class="swal2-input" required>
+                                    <input type="text" id="new_right_title" class="swal2-input" placeholder="Enter right title">
                                 </div>
                             `,
-                            showCancelButton: true,
-                            confirmButtonText: 'Add Slide',
-                            cancelButtonText: 'Cancel',
+                            focusConfirm: false,
+                            didOpen: () => {
+                                const fileInput = document.getElementById('new_image_file');
+                                const urlInput = document.getElementById('new_image_url');
+                                const statusSpan = document.querySelector('.upload-status');
+                                const uploadBtn = document.querySelector('.upload-btn');
+
+                                fileInput.addEventListener('change', async (e) => {
+                                    if (!e.target.files.length) return;
+                                    
+                                    const file = e.target.files[0];
+                                    const formData = new FormData();
+                                    formData.append('image', file);
+                                    
+                                    statusSpan.textContent = 'Uploading...';
+                                    uploadBtn.disabled = true;
+                                    
+                                    try {
+                                        const response = await fetch('../upload_handler.php', {
+                                            method: 'POST',
+                                            body: formData
+                                        });
+                                        
+                                        const result = await response.json();
+                                        
+                                        if (result.success) {
+                                            urlInput.value = result.url;
+                                            statusSpan.textContent = 'Upload successful!';
+                                            statusSpan.style.color = 'green';
+                                        } else {
+                                            throw new Error(result.message);
+                                        }
+                                    } catch (error) {
+                                        statusSpan.textContent = `Error: ${error.message}`;
+                                        statusSpan.style.color = 'red';
+                                        console.error('Upload error:', error);
+                                    } finally {
+                                        uploadBtn.disabled = false;
+                                        fileInput.value = '';
+                                    }
+                                });
+                            },
                             preConfirm: () => {
-                                const imageUrl = document.getElementById('image_url').value;
-                                const link = document.getElementById('link').value;
-                                const leftTitle = document.getElementById('leftTitle').value;
-                                const rightTitle = document.getElementById('rightTitle').value;
-
-                                if (!imageUrl || !link || !leftTitle || !rightTitle) {
-                                    Swal.showValidationMessage('Please fill in all fields');
-                                    return false;
-                                }
-
                                 return {
-                                    slide_id: slideCount + 1,
-                                    image_url: imageUrl,
-                                    link: link,
-                                    leftTitle: leftTitle,
-                                    rightTitle: rightTitle
-                                };
+                                    image_url: document.getElementById('new_image_url').value,
+                                    link: document.getElementById('new_link').value,
+                                    leftTitle: document.getElementById('new_left_title').value,
+                                    rightTitle: document.getElementById('new_right_title').value
+                                }
                             }
                         }).then((result) => {
                             if (result.isConfirmed) {
-                                const container = document.getElementById('slides-container');
                                 const newSlideIndex = slideCount++;
-                                
-                                const slideDiv = document.createElement('div');
-                                slideDiv.className = 'slide';
-                                slideDiv.id = `slide-${newSlideIndex}`;
-                                
-                                slideDiv.innerHTML = `
+                                const newSlide = document.createElement('div');
+                                newSlide.className = 'slide';
+                                newSlide.id = `slide-${newSlideIndex}`;
+                                newSlide.innerHTML = `
                                     <div class="slide-number">Slide ${newSlideIndex + 1}</div>
                                     <button type="button" class="delete-slide" onclick="deleteSlide(${newSlideIndex})">
-                                        <i class="fas fa-trash"></i> Delete Slide
+                                        <i class="fas fa-trash"></i>
                                     </button>
                                     <div class="form-group">
                                         <label>Image URL:</label>
-                                        <input type="text" name="image_url[]" value="${result.value.image_url}" required>
+                                        <input type="text" id="image_url_${newSlideIndex}" name="image_url[]" value="${result.value.image_url}" required>
                                     </div>
                                     <div class="form-group">
                                         <label>Link:</label>
@@ -767,8 +826,8 @@ require_once '../db_connect.php';
                                         <input type="text" name="rightTitle[]" value="${result.value.rightTitle}" required>
                                     </div>
                                 `;
-                                
-                                container.appendChild(slideDiv);
+                                document.getElementById('slides-container').appendChild(newSlide);
+                                createImageUploader(`image_url_${newSlideIndex}`);
                             }
                         });
                     }
@@ -779,60 +838,92 @@ require_once '../db_connect.php';
                             html: `
                                 <div class="form-group">
                                     <label>Image URL:</label>
-                                    <input type="text" id="image_url_ar" class="swal2-input" required>
+                                    <input type="text" id="new_image_url_ar" class="swal2-input" placeholder="Enter image URL">
+                                    <div class="image-upload-container">
+                                        <input type="file" id="new_image_file_ar" accept="image/*" style="display: none;">
+                                        <button type="button" class="upload-btn" onclick="document.getElementById('new_image_file_ar').click()">
+                                            <i class="fas fa-upload"></i> Upload
+                                        </button>
+                                        <span class="upload-status"></span>
+                                    </div>
                                 </div>
                                 <div class="form-group">
                                     <label>Link:</label>
-                                    <input type="text" id="link_ar" class="swal2-input" required>
+                                    <input type="text" id="new_link_ar" class="swal2-input" placeholder="Enter link">
                                 </div>
                                 <div class="form-group">
                                     <label>Left Title:</label>
-                                    <input type="text" id="leftTitle_ar" class="swal2-input" required dir="rtl">
+                                    <input type="text" id="new_left_title_ar" class="swal2-input" placeholder="Enter left title">
                                 </div>
                                 <div class="form-group">
                                     <label>Right Title:</label>
-                                    <input type="text" id="rightTitle_ar" class="swal2-input" required dir="rtl">
+                                    <input type="text" id="new_right_title_ar" class="swal2-input" placeholder="Enter right title">
                                 </div>
                             `,
-                            showCancelButton: true,
-                            confirmButtonText: 'Add Slide',
-                            cancelButtonText: 'Cancel',
+                            focusConfirm: false,
+                            didOpen: () => {
+                                const fileInput = document.getElementById('new_image_file_ar');
+                                const urlInput = document.getElementById('new_image_url_ar');
+                                const statusSpan = document.querySelector('.upload-status');
+                                const uploadBtn = document.querySelector('.upload-btn');
+
+                                fileInput.addEventListener('change', async (e) => {
+                                    if (!e.target.files.length) return;
+                                    
+                                    const file = e.target.files[0];
+                                    const formData = new FormData();
+                                    formData.append('image', file);
+                                    
+                                    statusSpan.textContent = 'Uploading...';
+                                    uploadBtn.disabled = true;
+                                    
+                                    try {
+                                        const response = await fetch('../upload_handler.php', {
+                                            method: 'POST',
+                                            body: formData
+                                        });
+                                        
+                                        const result = await response.json();
+                                        
+                                        if (result.success) {
+                                            urlInput.value = result.url;
+                                            statusSpan.textContent = 'Upload successful!';
+                                            statusSpan.style.color = 'green';
+                                        } else {
+                                            throw new Error(result.message);
+                                        }
+                                    } catch (error) {
+                                        statusSpan.textContent = `Error: ${error.message}`;
+                                        statusSpan.style.color = 'red';
+                                        console.error('Upload error:', error);
+                                    } finally {
+                                        uploadBtn.disabled = false;
+                                        fileInput.value = '';
+                                    }
+                                });
+                            },
                             preConfirm: () => {
-                                const imageUrl = document.getElementById('image_url_ar').value;
-                                const link = document.getElementById('link_ar').value;
-                                const leftTitle = document.getElementById('leftTitle_ar').value;
-                                const rightTitle = document.getElementById('rightTitle_ar').value;
-
-                                if (!imageUrl || !link || !leftTitle || !rightTitle) {
-                                    Swal.showValidationMessage('Please fill in all fields');
-                                    return false;
-                                }
-
                                 return {
-                                    slide_id: slideCountAr + 1,
-                                    image_url: imageUrl,
-                                    link: link,
-                                    leftTitle: leftTitle,
-                                    rightTitle: rightTitle
-                                };
+                                    image_url: document.getElementById('new_image_url_ar').value,
+                                    link: document.getElementById('new_link_ar').value,
+                                    leftTitle: document.getElementById('new_left_title_ar').value,
+                                    rightTitle: document.getElementById('new_right_title_ar').value
+                                }
                             }
                         }).then((result) => {
                             if (result.isConfirmed) {
-                                const container = document.getElementById('slides-container-ar');
                                 const newSlideIndex = slideCountAr++;
-                                
-                                const slideDiv = document.createElement('div');
-                                slideDiv.className = 'slide';
-                                slideDiv.id = `slide-ar-${newSlideIndex}`;
-                                
-                                slideDiv.innerHTML = `
+                                const newSlide = document.createElement('div');
+                                newSlide.className = 'slide';
+                                newSlide.id = `slide-ar-${newSlideIndex}`;
+                                newSlide.innerHTML = `
                                     <div class="slide-number">Slide ${newSlideIndex + 1}</div>
                                     <button type="button" class="delete-slide" onclick="deleteSlideAr(${newSlideIndex})">
-                                        <i class="fas fa-trash"></i> Delete Slide
+                                        <i class="fas fa-trash"></i>
                                     </button>
                                     <div class="form-group">
                                         <label>Image URL:</label>
-                                        <input type="text" name="image_url_ar[]" value="${result.value.image_url}" required>
+                                        <input type="text" id="image_url_ar_${newSlideIndex}" name="image_url_ar[]" value="${result.value.image_url}" required>
                                     </div>
                                     <div class="form-group">
                                         <label>Link:</label>
@@ -840,15 +931,15 @@ require_once '../db_connect.php';
                                     </div>
                                     <div class="form-group">
                                         <label>Left Title:</label>
-                                        <input type="text" name="leftTitle_ar[]" value="${result.value.leftTitle}" required dir="rtl">
+                                        <input type="text" name="leftTitle_ar[]" value="${result.value.leftTitle}" required>
                                     </div>
                                     <div class="form-group">
                                         <label>Right Title:</label>
-                                        <input type="text" name="rightTitle_ar[]" value="${result.value.rightTitle}" required dir="rtl">
+                                        <input type="text" name="rightTitle_ar[]" value="${result.value.rightTitle}" required>
                                     </div>
                                 `;
-                                
-                                container.appendChild(slideDiv);
+                                document.getElementById('slides-container-ar').appendChild(newSlide);
+                                createImageUploader(`image_url_ar_${newSlideIndex}`);
                             }
                         });
                     }
@@ -1610,6 +1701,97 @@ require_once '../db_connect.php';
             icon.classList.toggle('fa-chevron-down');
             icon.classList.toggle('fa-chevron-up');
         }
+    </script>
+
+    <script>
+        function createImageUploader(inputId) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            
+            // Check if uploader already exists
+            const existingUploader = input.nextElementSibling;
+            if (existingUploader && existingUploader.className === 'image-upload-container') {
+                return; // Uploader already exists, don't create another one
+            }
+            
+            // Create upload button and container
+            const uploadContainer = document.createElement('div');
+            uploadContainer.className = 'image-upload-container';
+            
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'image/*';
+            fileInput.style.display = 'none';
+            
+            const uploadBtn = document.createElement('button');
+            uploadBtn.type = 'button';
+            uploadBtn.className = 'upload-btn';
+            uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Upload';
+            
+            const statusSpan = document.createElement('span');
+            statusSpan.className = 'upload-status';
+            
+            uploadContainer.appendChild(fileInput);
+            uploadContainer.appendChild(uploadBtn);
+            uploadContainer.appendChild(statusSpan);
+            
+            // Insert the upload container after the input
+            input.parentNode.insertBefore(uploadContainer, input.nextSibling);
+            
+            // Handle click on upload button
+            uploadBtn.addEventListener('click', () => {
+                fileInput.click();
+            });
+            
+            // Handle file selection
+            fileInput.addEventListener('change', async (e) => {
+                if (!e.target.files.length) return;
+                
+                const file = e.target.files[0];
+                const formData = new FormData();
+                formData.append('image', file);
+                
+                statusSpan.textContent = 'Uploading...';
+                uploadBtn.disabled = true;
+                
+                try {
+                    const response = await fetch('../upload_handler.php', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        input.value = result.url;
+                        statusSpan.textContent = 'Upload successful!';
+                        statusSpan.style.color = 'green';
+                    } else {
+                        throw new Error(result.message);
+                    }
+                } catch (error) {
+                    statusSpan.textContent = `Error: ${error.message}`;
+                    statusSpan.style.color = 'red';
+                    console.error('Upload error:', error);
+                } finally {
+                    uploadBtn.disabled = false;
+                    fileInput.value = '';
+                }
+            });
+        }
+
+        // Initialize image uploaders for all image URL fields
+        document.addEventListener('DOMContentLoaded', function() {
+            // For English slides
+            document.querySelectorAll('[id^="image_url_"]').forEach(input => {
+                createImageUploader(input.id);
+            });
+            
+            // For Arabic slides
+            document.querySelectorAll('[id^="image_url_ar_"]').forEach(input => {
+                createImageUploader(input.id);
+            });
+        });
     </script>
 </body>
 </html>

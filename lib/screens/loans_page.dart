@@ -20,6 +20,7 @@ import 'package:provider/provider.dart' as provider;
 import 'auth/sign_in_screen.dart';
 import '../services/content_update_service.dart';
 import '../providers/theme_provider.dart';
+import '../services/theme_service.dart';
 
 class LoansPage extends StatefulWidget {
   const LoansPage({Key? key}) : super(key: key);
@@ -140,45 +141,71 @@ class _LoansPageState extends State<LoansPage> {
     }
   }
 
-  Widget _buildHeader() {
-    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
-    final themeColor = isDarkMode ? Colors.black : const Color(0xFF0077B6);
+  @override
+  Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final backgroundColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkBackgroundColor 
+        : Constants.lightBackgroundColor);
+    final surfaceColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
+    
+    return Scaffold(
+      backgroundColor: backgroundColor,
+      body: SafeArea(
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                onRefresh: _loadData,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildHeader(primaryColor),
+                      _buildAdvertBanner(),
+                      if (Provider.of<SessionProvider>(context).isSignedIn) ...[
+                        _buildApplyNowButton(),
+                        _buildApplicationStatus(primaryColor),
+                        _buildLoansList(primaryColor),
+                      ] else
+                        _buildSignInPrompt(primaryColor),
+                    ],
+                  ),
+                ),
+              ),
+      ),
+      bottomNavigationBar: _buildBottomNavBar(),
+    );
+  }
 
+  Widget _buildHeader(Color textColor) {
     return Container(
       height: 100,
       padding: const EdgeInsets.all(16.0),
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Center title
           Center(
             child: Text(
               'Loans',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: themeColor,
+                color: textColor,
               ),
             ),
           ),
-          // Logo positioned at right
           Positioned(
             right: 0,
-            child: isDarkMode 
-              ? ColorFiltered(
-                  colorFilter: const ColorFilter.mode(
-                    Colors.black,
-                    BlendMode.srcIn,
-                  ),
-                  child: Image.asset(
-                    'assets/images/nayifat-logo-no-bg.png',
-                    height: screenHeight * 0.06,
-                  ),
-                )
-              : Image.asset(
-                  'assets/images/nayifat-logo-no-bg.png',
-                  height: screenHeight * 0.06,
-                ),
+            child: Image.asset(
+              'assets/images/nayifat-logo-no-bg.png',
+              height: screenHeight * 0.06,
+            ),
           ),
         ],
       ),
@@ -186,7 +213,6 @@ class _LoansPageState extends State<LoansPage> {
   }
 
   Widget _buildAdvertBanner() {
-    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
     final contentUpdateService = ContentUpdateService();
     final adData = contentUpdateService.getLoanAd(isArabic: false);
     
@@ -194,17 +220,10 @@ class _LoansPageState extends State<LoansPage> {
       height: 180,
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12.0),
-        boxShadow: [
-          BoxShadow(
-            color: isDarkMode ? Colors.grey[400]! : Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12.0),
+        borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
         child: adData != null && adData['image_bytes'] != null
             ? Image.memory(
                 adData['image_bytes'],
@@ -221,8 +240,14 @@ class _LoansPageState extends State<LoansPage> {
   }
 
   Widget _buildApplyNowButton() {
-    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
+    final themeProvider = Provider.of<ThemeProvider>(context);
     final sessionProvider = Provider.of<SessionProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final surfaceColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -237,36 +262,44 @@ class _LoansPageState extends State<LoansPage> {
           );
         } : null,
         style: ElevatedButton.styleFrom(
-          backgroundColor: isDarkMode ? Colors.black : const Color(0xFF0077B6),
-          padding: const EdgeInsets.symmetric(vertical: 16.0),
+          backgroundColor: primaryColor,
+          padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8.0),
+            borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
+          ),
+          elevation: themeProvider.isDarkMode ? 0 : 2,
+          side: BorderSide(
+            color: primaryColor,
           ),
         ),
         child: Text(
           sessionProvider.isSignedIn ? 'Apply for Loan' : 'Sign in to Apply',
-          style: const TextStyle(
-            fontSize: 18,
+          style: TextStyle(
+            fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: surfaceColor,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildApplicationStatus() {
-    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
-    final themeColor = isDarkMode ? Colors.black : const Color(0xFF0077B6);
+  Widget _buildApplicationStatus(Color textColor) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final surfaceColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
       decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey[100] : Colors.grey[100],
-        borderRadius: BorderRadius.circular(8.0),
+        color: surfaceColor,
+        borderRadius: BorderRadius.circular(Constants.formBorderRadius),
         border: Border.all(
-          color: themeColor.withOpacity(0.3),
+          color: Color(themeProvider.isDarkMode 
+              ? Constants.darkFormBorderColor 
+              : Constants.lightFormBorderColor),
         ),
       ),
       child: Row(
@@ -276,7 +309,7 @@ class _LoansPageState extends State<LoansPage> {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: themeColor,
+              color: textColor,
             ),
           ),
           Expanded(
@@ -284,7 +317,7 @@ class _LoansPageState extends State<LoansPage> {
               _applicationStatus ?? 'No active applications',
               style: TextStyle(
                 fontSize: 16,
-                color: isDarkMode ? Colors.black87 : Colors.black87,
+                color: textColor,
               ),
             ),
           ),
@@ -293,9 +326,11 @@ class _LoansPageState extends State<LoansPage> {
     );
   }
 
-  Widget _buildLoansList() {
-    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
-    final themeColor = isDarkMode ? Colors.black : const Color(0xFF0077B6);
+  Widget _buildLoansList(Color textColor) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final surfaceColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
 
     if (_loans.isEmpty) {
       return Center(
@@ -304,7 +339,7 @@ class _LoansPageState extends State<LoansPage> {
           child: Text(
             'No active loans',
             style: TextStyle(
-              color: isDarkMode ? Colors.black54 : Colors.grey[600],
+              color: textColor,
               fontSize: 16,
             ),
           ),
@@ -322,7 +357,7 @@ class _LoansPageState extends State<LoansPage> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: themeColor,
+              color: textColor,
             ),
           ),
         ),
@@ -339,18 +374,22 @@ class _LoansPageState extends State<LoansPage> {
     );
   }
 
-  Widget _buildSignInPrompt() {
-    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
-    final themeColor = isDarkMode ? Colors.black : const Color(0xFF0077B6);
+  Widget _buildSignInPrompt(Color textColor) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final surfaceColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
 
     return Container(
       margin: const EdgeInsets.all(16.0),
       padding: const EdgeInsets.all(20.0),
       decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey[100] : Colors.grey[100],
-        borderRadius: BorderRadius.circular(12.0),
+        color: surfaceColor,
+        borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
         border: Border.all(
-          color: themeColor.withOpacity(0.2),
+          color: Color(themeProvider.isDarkMode 
+              ? Constants.darkFormBorderColor 
+              : Constants.lightFormBorderColor),
         ),
       ),
       child: Column(
@@ -361,7 +400,7 @@ class _LoansPageState extends State<LoansPage> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: themeColor,
+              color: textColor,
             ),
           ),
           const SizedBox(height: 8),
@@ -370,20 +409,17 @@ class _LoansPageState extends State<LoansPage> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
-              color: isDarkMode ? Colors.black87 : Colors.black87,
+              color: textColor,
             ),
           ),
           const SizedBox(height: 20),
           ElevatedButton(
             onPressed: _navigateToSignIn,
             style: ElevatedButton.styleFrom(
-              backgroundColor: isDarkMode ? Colors.black.withOpacity(0.1) : Colors.red[50],
+              backgroundColor: textColor,
               padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8.0),
-              ),
-              side: BorderSide(
-                color: isDarkMode ? Colors.black : Colors.red,
+                borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
               ),
             ),
             child: Text(
@@ -391,7 +427,7 @@ class _LoansPageState extends State<LoansPage> {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: isDarkMode ? Colors.black : Colors.red,
+                color: surfaceColor,
               ),
             ),
           ),
@@ -400,129 +436,151 @@ class _LoansPageState extends State<LoansPage> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final isSignedIn = Provider.of<SessionProvider>(context).isSignedIn;
-    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
-    
-    return Scaffold(
-      backgroundColor: isDarkMode ? Colors.grey[100] : Colors.white,
-      body: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : RefreshIndicator(
-                onRefresh: _loadData,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeader(),
-                      _buildAdvertBanner(),
-                      if (isSignedIn) ...[
-                        _buildApplyNowButton(),
-                        _buildApplicationStatus(),
-                        _buildLoansList(),
-                      ] else
-                        _buildSignInPrompt(),
-                    ],
+  Widget _buildBottomNavBar() {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final navBackgroundColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkNavbarBackground 
+        : Constants.lightNavbarBackground);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: navBackgroundColor,
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(themeProvider.isDarkMode 
+                ? Constants.darkNavbarGradientStart
+                : Constants.lightNavbarGradientStart),
+            Color(themeProvider.isDarkMode 
+                ? Constants.darkNavbarGradientEnd
+                : Constants.lightNavbarGradientEnd),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Color(themeProvider.isDarkMode 
+                ? Constants.darkNavbarShadowPrimary
+                : Constants.lightNavbarShadowPrimary),
+            offset: const Offset(0, -2),
+            blurRadius: 6,
+            spreadRadius: 2,
+          ),
+          BoxShadow(
+            color: Color(themeProvider.isDarkMode 
+                ? Constants.darkNavbarShadowSecondary
+                : Constants.lightNavbarShadowSecondary),
+            offset: const Offset(0, -1),
+            blurRadius: 4,
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: CircleNavBar(
+        activeIcons: [
+          Icon(Icons.headset_mic, color: Color(themeProvider.isDarkMode 
+              ? Constants.darkNavbarActiveIcon 
+              : Constants.lightNavbarActiveIcon)),
+          Icon(Icons.credit_card, color: Color(themeProvider.isDarkMode 
+              ? Constants.darkNavbarActiveIcon 
+              : Constants.lightNavbarActiveIcon)),
+          Icon(Icons.home, color: Color(themeProvider.isDarkMode 
+              ? Constants.darkNavbarActiveIcon 
+              : Constants.lightNavbarActiveIcon)),
+          Icon(Icons.account_balance, color: Color(themeProvider.isDarkMode 
+              ? Constants.darkNavbarActiveIcon 
+              : Constants.lightNavbarActiveIcon)),
+          Icon(Icons.settings, color: Color(themeProvider.isDarkMode 
+              ? Constants.darkNavbarActiveIcon 
+              : Constants.lightNavbarActiveIcon)),
+        ],
+        inactiveIcons: [
+          Icon(Icons.headset_mic, color: Color(themeProvider.isDarkMode 
+              ? Constants.darkNavbarInactiveIcon 
+              : Constants.lightNavbarInactiveIcon)),
+          Icon(Icons.credit_card, color: Color(themeProvider.isDarkMode 
+              ? Constants.darkNavbarInactiveIcon 
+              : Constants.lightNavbarInactiveIcon)),
+          Icon(Icons.home, color: Color(themeProvider.isDarkMode 
+              ? Constants.darkNavbarInactiveIcon 
+              : Constants.lightNavbarInactiveIcon)),
+          Icon(Icons.account_balance, color: Color(themeProvider.isDarkMode 
+              ? Constants.darkNavbarInactiveIcon 
+              : Constants.lightNavbarInactiveIcon)),
+          Icon(Icons.settings, color: Color(themeProvider.isDarkMode 
+              ? Constants.darkNavbarInactiveIcon 
+              : Constants.lightNavbarInactiveIcon)),
+        ],
+        levels: const ["Support", "Cards", "Home", "Loans", "Account"],
+        activeLevelsStyle: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: Color(themeProvider.isDarkMode 
+              ? Constants.darkNavbarActiveText 
+              : Constants.lightNavbarActiveText),
+        ),
+        inactiveLevelsStyle: TextStyle(
+          fontSize: 14,
+          color: Color(themeProvider.isDarkMode 
+              ? Constants.darkNavbarInactiveText 
+              : Constants.lightNavbarInactiveText),
+        ),
+        color: navBackgroundColor,
+        height: 70,
+        circleWidth: 60,
+        activeIndex: _tabIndex,
+        onTap: (index) {
+          if (index == 3) {  // Loans tab
+            setState(() {
+              _tabIndex = index;
+            });
+            return;  // Don't navigate if we're already on loans
+          }
+
+          Widget? page;
+          switch (index) {
+            case 0:
+              page = const CustomerServiceScreen(isArabic: false);
+              break;
+            case 1:
+              page = const CardsPage();
+              break;
+            case 2:
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MainPage(
+                    isArabic: false,
+                    onLanguageChanged: (bool value) {},
+                    userData: {},
+                    initialRoute: '',
+                    isDarkMode: Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
                   ),
                 ),
-              ),
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: isDarkMode ? Colors.grey[700] : const Color(0xFF0077B6),
-          boxShadow: [
-            BoxShadow(
-              color: isDarkMode ? Colors.grey[900]! : const Color(0xFF0077B6),
-              blurRadius: isDarkMode ? 10 : 8,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: CircleNavBar(
-          activeIcons: [
-            Icon(Icons.headset_mic, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-            Icon(Icons.credit_card, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-            Icon(Icons.home, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-            Icon(Icons.account_balance, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-            Icon(Icons.settings, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-          ],
-          inactiveIcons: [
-            Icon(Icons.headset_mic, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-            Icon(Icons.credit_card, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-            Icon(Icons.home, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-            Icon(Icons.account_balance, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-            Icon(Icons.settings, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-          ],
-          levels: const ["Support", "Cards", "Home", "Loans", "Account"],
-          activeLevelsStyle: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6),
-          ),
-          inactiveLevelsStyle: TextStyle(
-            fontSize: 14,
-            color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6),
-          ),
-          color: isDarkMode ? Colors.black : Colors.white,
-          height: 70,
-          circleWidth: 60,
-          activeIndex: _tabIndex,
-          onTap: (index) {
-            if (index == 3) {  // Loans tab
-              setState(() {
-                _tabIndex = index;
-              });
+              );
+              return;
+            case 3:
               return;  // Don't navigate if we're already on loans
-            }
+            case 4:
+              page = const AccountPage();
+              break;
+          }
 
-            Widget page;
-            switch (index) {
-              case 0:
-                page = const CustomerServiceScreen(isArabic: false);
-                break;
-              case 1:
-                page = const CardsPage();
-                break;
-              case 2:
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => MainPage(
-                      isArabic: false,
-                      onLanguageChanged: (bool value) {},
-                      userData: const {},
-                    ),
-                  ),
-                );
-                return;
-              case 3:
-                return;  // Don't navigate if we're already on loans
-              case 4:
-                page = const AccountPage();
-                break;
-              default:
-                return;
-            }
-
+          if (page != null) {
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(
-                builder: (context) => page,
-              ),
+              MaterialPageRoute(builder: (context) => page!),
             );
-          },
-          cornerRadius: const BorderRadius.only(
-            topLeft: Radius.circular(0),
-            topRight: Radius.circular(0),
-            bottomRight: Radius.circular(0),
-            bottomLeft: Radius.circular(0),
-          ),
-          shadowColor: Colors.transparent,
-          elevation: 20,
+          }
+        },
+        cornerRadius: const BorderRadius.only(
+          topLeft: Radius.circular(0),
+          topRight: Radius.circular(0),
+          bottomRight: Radius.circular(0),
+          bottomLeft: Radius.circular(0),
         ),
+        shadowColor: Colors.transparent,
+        elevation: 20,
       ),
     );
   }

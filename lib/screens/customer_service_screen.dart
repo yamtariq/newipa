@@ -16,6 +16,8 @@ import 'loans_page_ar.dart';
 import 'account_page_ar.dart';
 import 'main_page.dart';
 import 'map_with_branches.dart';
+import '../utils/constants.dart';
+import '../services/theme_service.dart';
 
 class CustomerServiceScreen extends StatefulWidget {
   final bool isArabic;
@@ -105,8 +107,10 @@ class _CustomerServiceScreenState extends State<CustomerServiceScreen> {
   }
 
   Widget _buildHeader() {
-    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
-    final themeColor = isDarkMode ? Colors.black : const Color(0xFF0077B6);
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
 
     return Container(
       height: 100,
@@ -114,38 +118,25 @@ class _CustomerServiceScreenState extends State<CustomerServiceScreen> {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Center title with right padding
           Padding(
-            padding: const EdgeInsets.only(right: 50.0),
+            padding: const EdgeInsets.only(right: 90.0),
             child: Center(
               child: Text(
                 widget.isArabic ? 'خدمة العملاء' : 'Customer Service',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: themeColor,
+                  color: primaryColor,
                 ),
               ),
             ),
           ),
-          // Logo positioned at right
           Positioned(
             right: 0,
-            child: isDarkMode 
-              ? ColorFiltered(
-                  colorFilter: const ColorFilter.mode(
-                    Colors.black,
-                    BlendMode.srcIn,
-                  ),
-                  child: Image.asset(
-                    'assets/images/nayifat-logo-no-bg.png',
-                    height: screenHeight * 0.06,
-                  ),
-                )
-              : Image.asset(
-                  'assets/images/nayifat-logo-no-bg.png',
-                  height: screenHeight * 0.06,
-                ),
+            child: Image.asset(
+              'assets/images/nayifat-logo-no-bg.png',
+              height: screenHeight * 0.06,
+            ),
           ),
         ],
       ),
@@ -157,21 +148,30 @@ class _CustomerServiceScreenState extends State<CustomerServiceScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
-    final themeColor = isDarkMode ? Colors.black : const Color(0xFF0077B6);
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final cardColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkFormBackgroundColor 
+        : Constants.lightFormBackgroundColor);
 
     return Container(
       margin: const EdgeInsets.all(16.0),
       padding: const EdgeInsets.all(20.0),
       decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey[100] : Colors.white,
-        borderRadius: BorderRadius.circular(12.0),
+        color: cardColor,
+        borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
         border: Border.all(
-          color: themeColor.withOpacity(0.2),
+          color: Color(themeProvider.isDarkMode 
+              ? Constants.darkFormBorderColor 
+              : Constants.lightFormBorderColor),
         ),
         boxShadow: [
           BoxShadow(
-            color: isDarkMode ? Colors.grey[400]! : Colors.black.withOpacity(0.05),
+            color: Color(themeProvider.isDarkMode 
+                ? Constants.darkPrimaryShadowColor 
+                : Constants.lightPrimaryShadowColor),
             blurRadius: 5,
             offset: const Offset(0, 2),
           ),
@@ -188,7 +188,7 @@ class _CustomerServiceScreenState extends State<CustomerServiceScreen> {
               widget.isArabic ? 'اتصل بنا' : 'Contact Us',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: themeColor,
+                color: primaryColor,
                 fontSize: 16,
               ),
             ),
@@ -203,7 +203,7 @@ class _CustomerServiceScreenState extends State<CustomerServiceScreen> {
                 _contactDetails?.phone ?? "8001000088",
                 fontSize: 13,
                 isLink: true,
-                color: themeColor,
+                color: primaryColor,
               ),
             ),
           ),
@@ -217,7 +217,7 @@ class _CustomerServiceScreenState extends State<CustomerServiceScreen> {
                 _contactDetails?.email ?? "CustomerCare@nayifat.com",
                 fontSize: 13,
                 isLink: true,
-                color: themeColor,
+                color: primaryColor,
               ),
             ),
           ),
@@ -238,29 +238,36 @@ class _CustomerServiceScreenState extends State<CustomerServiceScreen> {
                 widget.isArabic ? 'ابحث عن أقرب فرع' : 'Find Nearest Branch',
                 fontSize: 14,
                 isLink: true,
-                color: themeColor,
+                color: primaryColor,
               ),
             ),
           ),
           const SizedBox(height: 16),
-          _buildSocialLinks(color: themeColor),
+          _buildSocialLinks(color: primaryColor),
         ],
       ),
     );
   }
 
-  Widget _buildContactItem(IconData icon, String text, {
+  Widget _buildContactItem(
+    IconData icon,
+    String text, {
     double fontSize = 16,
     bool isLink = false,
     Color? color,
   }) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final themeColor = color ?? Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+
     return Row(
       textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
           icon,
-          color: color ?? const Color(0xFF0077B6),
+          color: themeColor,
           size: 20,
         ),
         const SizedBox(width: 8),
@@ -269,8 +276,9 @@ class _CustomerServiceScreenState extends State<CustomerServiceScreen> {
             text,
             style: TextStyle(
               fontSize: fontSize,
-              color: isLink ? color ?? const Color(0xFF0077B6) : Colors.black87,
-              decoration: isLink ? TextDecoration.underline : null,
+              color: isLink ? themeColor : Color(themeProvider.isDarkMode 
+                  ? Constants.darkLabelTextColor 
+                  : Constants.lightLabelTextColor),
             ),
             overflow: TextOverflow.ellipsis,
           ),
@@ -318,21 +326,39 @@ class _CustomerServiceScreenState extends State<CustomerServiceScreen> {
   }
 
   Widget _buildContactForm() {
-    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
-    final themeColor = isDarkMode ? Colors.black : const Color(0xFF0077B6);
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final cardColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkFormBackgroundColor 
+        : Constants.lightFormBackgroundColor);
+    final inputBgColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkFormBackgroundColor 
+        : Constants.lightFormBackgroundColor);
+    final textColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
+    final hintColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkHintTextColor 
+        : Constants.lightHintTextColor);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16.0),
       padding: const EdgeInsets.all(20.0),
       decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey[100] : Colors.white,
-        borderRadius: BorderRadius.circular(12.0),
+        color: cardColor,
+        borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
         border: Border.all(
-          color: themeColor.withOpacity(0.2),
+          color: Color(themeProvider.isDarkMode 
+              ? Constants.darkFormBorderColor 
+              : Constants.lightFormBorderColor),
         ),
         boxShadow: [
           BoxShadow(
-            color: isDarkMode ? Colors.grey[400]! : Colors.black.withOpacity(0.05),
+            color: Color(themeProvider.isDarkMode 
+                ? Constants.darkPrimaryShadowColor 
+                : Constants.lightPrimaryShadowColor),
             blurRadius: 5,
             offset: const Offset(0, 2),
           ),
@@ -350,7 +376,7 @@ class _CustomerServiceScreenState extends State<CustomerServiceScreen> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: themeColor,
+                color: primaryColor,
               ),
             ),
           ),
@@ -363,13 +389,24 @@ class _CustomerServiceScreenState extends State<CustomerServiceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
-    final themeColor = isDarkMode ? Colors.black : const Color(0xFF0077B6);
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final backgroundColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkBackgroundColor 
+        : Constants.lightBackgroundColor);
+    final navBackgroundColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkNavbarBackground 
+        : Constants.lightNavbarBackground);
+    final secondaryTextColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
 
     return Directionality(
       textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
-        backgroundColor: isDarkMode ? Colors.grey[100] : Colors.grey[50],
+        backgroundColor: backgroundColor,
         body: SafeArea(
           child: SingleChildScrollView(
             child: Column(
@@ -385,12 +422,37 @@ class _CustomerServiceScreenState extends State<CustomerServiceScreen> {
         ),
         bottomNavigationBar: Container(
           decoration: BoxDecoration(
-            color: isDarkMode ? Colors.grey[700] : const Color(0xFF0077B6),
+            color: Color(themeProvider.isDarkMode 
+                ? Constants.darkNavbarBackground 
+                : Constants.lightNavbarBackground),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarGradientStart
+                    : Constants.lightNavbarGradientStart),
+                Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarGradientEnd
+                    : Constants.lightNavbarGradientEnd),
+              ],
+            ),
             boxShadow: [
               BoxShadow(
-                color: isDarkMode ? Colors.grey[900]! : const Color(0xFF0077B6),
-                blurRadius: isDarkMode ? 10 : 8,
+                color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarShadowPrimary
+                    : Constants.lightNavbarShadowPrimary),
                 offset: const Offset(0, -2),
+                blurRadius: 6,
+                spreadRadius: 2,
+              ),
+              BoxShadow(
+                color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarShadowSecondary
+                    : Constants.lightNavbarShadowSecondary),
+                offset: const Offset(0, -1),
+                blurRadius: 4,
+                spreadRadius: 0,
               ),
             ],
           ),
@@ -398,30 +460,70 @@ class _CustomerServiceScreenState extends State<CustomerServiceScreen> {
             textDirection: TextDirection.ltr,
             child: CircleNavBar(
               activeIcons: widget.isArabic ? [
-                Icon(Icons.settings, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-                Icon(Icons.account_balance, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-                Icon(Icons.home, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-                Icon(Icons.credit_card, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-                Icon(Icons.headset_mic, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
+                Icon(Icons.settings, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarActiveIcon 
+                    : Constants.lightNavbarActiveIcon)),
+                Icon(Icons.account_balance, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarActiveIcon 
+                    : Constants.lightNavbarActiveIcon)),
+                Icon(Icons.home, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarActiveIcon 
+                    : Constants.lightNavbarActiveIcon)),
+                Icon(Icons.credit_card, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarActiveIcon 
+                    : Constants.lightNavbarActiveIcon)),
+                Icon(Icons.headset_mic, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarActiveIcon 
+                    : Constants.lightNavbarActiveIcon)),
               ] : [
-                Icon(Icons.headset_mic, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-                Icon(Icons.credit_card, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-                Icon(Icons.home, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-                Icon(Icons.account_balance, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-                Icon(Icons.settings, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
+                Icon(Icons.headset_mic, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarActiveIcon 
+                    : Constants.lightNavbarActiveIcon)),
+                Icon(Icons.credit_card, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarActiveIcon 
+                    : Constants.lightNavbarActiveIcon)),
+                Icon(Icons.home, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarActiveIcon 
+                    : Constants.lightNavbarActiveIcon)),
+                Icon(Icons.account_balance, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarActiveIcon 
+                    : Constants.lightNavbarActiveIcon)),
+                Icon(Icons.settings, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarActiveIcon 
+                    : Constants.lightNavbarActiveIcon)),
               ],
               inactiveIcons: widget.isArabic ? [
-                Icon(Icons.settings, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-                Icon(Icons.account_balance, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-                Icon(Icons.home, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-                Icon(Icons.credit_card, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-                Icon(Icons.headset_mic, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
+                Icon(Icons.settings, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarInactiveIcon 
+                    : Constants.lightNavbarInactiveIcon)),
+                Icon(Icons.account_balance, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarInactiveIcon 
+                    : Constants.lightNavbarInactiveIcon)),
+                Icon(Icons.home, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarInactiveIcon 
+                    : Constants.lightNavbarInactiveIcon)),
+                Icon(Icons.credit_card, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarInactiveIcon 
+                    : Constants.lightNavbarInactiveIcon)),
+                Icon(Icons.headset_mic, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarInactiveIcon 
+                    : Constants.lightNavbarInactiveIcon)),
               ] : [
-                Icon(Icons.headset_mic, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-                Icon(Icons.credit_card, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-                Icon(Icons.home, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-                Icon(Icons.account_balance, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
-                Icon(Icons.settings, color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6)),
+                Icon(Icons.headset_mic, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarInactiveIcon 
+                    : Constants.lightNavbarInactiveIcon)),
+                Icon(Icons.credit_card, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarInactiveIcon 
+                    : Constants.lightNavbarInactiveIcon)),
+                Icon(Icons.home, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarInactiveIcon 
+                    : Constants.lightNavbarInactiveIcon)),
+                Icon(Icons.account_balance, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarInactiveIcon 
+                    : Constants.lightNavbarInactiveIcon)),
+                Icon(Icons.settings, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarInactiveIcon 
+                    : Constants.lightNavbarInactiveIcon)),
               ],
               levels: widget.isArabic 
                 ? const ["حسابي", "التمويل", "الرئيسية", "البطاقات", "الدعم"]
@@ -429,13 +531,19 @@ class _CustomerServiceScreenState extends State<CustomerServiceScreen> {
               activeLevelsStyle: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6),
+                color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarActiveText 
+                    : Constants.lightNavbarActiveText),
               ),
               inactiveLevelsStyle: TextStyle(
                 fontSize: 14,
-                color: isDarkMode ? Colors.grey[400] : const Color(0xFF0077B6),
+                color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarInactiveText 
+                    : Constants.lightNavbarInactiveText),
               ),
-              color: isDarkMode ? Colors.black : Colors.white,
+              color: Color(themeProvider.isDarkMode 
+                  ? Constants.darkNavbarBackground 
+                  : Constants.lightNavbarBackground),
               height: 70,
               circleWidth: 60,
               activeIndex: widget.isArabic ? 4 : 0,
@@ -463,7 +571,9 @@ class _CustomerServiceScreenState extends State<CustomerServiceScreen> {
                           builder: (context) => MainPage(
                             isArabic: true,
                             onLanguageChanged: (bool value) {},
-                            userData: const {},
+                            userData: {},
+                            initialRoute: '',
+                            isDarkMode: Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
                           ),
                         ),
                       );
@@ -484,7 +594,9 @@ class _CustomerServiceScreenState extends State<CustomerServiceScreen> {
                           builder: (context) => MainPage(
                             isArabic: false,
                             onLanguageChanged: (bool value) {},
-                            userData: const {},
+                            userData: {},
+                            initialRoute: '',
+                            isDarkMode: Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
                           ),
                         ),
                       );
@@ -538,10 +650,98 @@ class _CustomerFormState extends State<CustomerForm> {
   final TextEditingController bodyController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
+  void _showSuccessDialog(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final textColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
+
+    showDialog(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
+        child: AlertDialog(
+          backgroundColor: Color(themeProvider.isDarkMode 
+              ? Constants.darkSurfaceColor 
+              : Constants.lightSurfaceColor),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
+            side: BorderSide(
+              color: Color(themeProvider.isDarkMode 
+                  ? Constants.darkFormBorderColor 
+                  : Constants.lightFormBorderColor),
+            ),
+          ),
+          title: Column(
+            children: [
+              Icon(
+                Icons.check_circle,
+                color: textColor,
+                size: 48,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                widget.isArabic ? 'تم الإرسال!' : 'Submitted!',
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            widget.isArabic
+                ? 'تم إرسال النموذج بنجاح.'
+                : 'The form has been submitted successfully.',
+            textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
+            style: TextStyle(
+              color: textColor,
+              fontSize: 14,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                bodyController.clear();
+              },
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+              child: Text(
+                widget.isArabic ? 'حسناً' : 'OK',
+                style: TextStyle(
+                  color: textColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
-    final themeColor = isDarkMode ? Colors.black : const Color(0xFF0077B6);
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final cardColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
+    final inputBgColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
+    final textColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
+    final hintColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkHintTextColor 
+        : Constants.lightHintTextColor);
 
     return Form(
       key: _formKey,
@@ -552,9 +752,13 @@ class _CustomerFormState extends State<CustomerForm> {
           Container(
             width: double.infinity,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: themeColor.withOpacity(0.2)),
-              color: isDarkMode ? Colors.grey[100] : Colors.white,
+              borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+              border: Border.all(
+                color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkFormBorderColor 
+                    : Constants.lightFormBorderColor),
+              ),
+              color: inputBgColor,
             ),
             child: Directionality(
               textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
@@ -566,11 +770,11 @@ class _CustomerFormState extends State<CustomerForm> {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 icon: Icon(
                   Icons.arrow_drop_down,
-                  color: themeColor.withOpacity(0.5),
+                  color: primaryColor.withOpacity(0.5),
                 ),
-                dropdownColor: isDarkMode ? Colors.grey[100] : Colors.white,
+                dropdownColor: inputBgColor,
                 style: TextStyle(
-                  color: isDarkMode ? Colors.black87 : Colors.black,
+                  color: textColor,
                   fontSize: 14,
                 ),
                 selectedItemBuilder: (BuildContext context) {
@@ -587,6 +791,11 @@ class _CustomerFormState extends State<CustomerForm> {
                             : item == 'request'
                                 ? (widget.isArabic ? 'طلب' : 'Request')
                                 : (widget.isArabic ? 'اقتراح' : 'Suggestion'),
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          color: textColor,
+                          fontSize: 14,
+                        ),
                       ),
                     );
                   }).toList();
@@ -601,17 +810,38 @@ class _CustomerFormState extends State<CustomerForm> {
                   DropdownMenuItem(
                     alignment: widget.isArabic ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
                     value: 'complaint',
-                    child: Text(widget.isArabic ? 'شكوى' : 'Complaint'),
+                    child: Text(
+                      widget.isArabic ? 'شكوى' : 'Complaint',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        color: textColor,
+                        fontSize: 14,
+                      ),
+                    ),
                   ),
                   DropdownMenuItem(
                     alignment: widget.isArabic ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
                     value: 'request',
-                    child: Text(widget.isArabic ? 'طلب' : 'Request'),
+                    child: Text(
+                      widget.isArabic ? 'طلب' : 'Request',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        color: textColor,
+                        fontSize: 14,
+                      ),
+                    ),
                   ),
                   DropdownMenuItem(
                     alignment: widget.isArabic ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
                     value: 'suggestion',
-                    child: Text(widget.isArabic ? 'اقتراح' : 'Suggestion'),
+                    child: Text(
+                      widget.isArabic ? 'اقتراح' : 'Suggestion',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        color: textColor,
+                        fontSize: 14,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -622,9 +852,13 @@ class _CustomerFormState extends State<CustomerForm> {
             Container(
               width: double.infinity,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: themeColor.withOpacity(0.2)),
-                color: isDarkMode ? Colors.grey[100] : Colors.white,
+                borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+                border: Border.all(
+                  color: Color(themeProvider.isDarkMode 
+                      ? Constants.darkFormBorderColor 
+                      : Constants.lightFormBorderColor),
+                ),
+                color: inputBgColor,
               ),
               child: Directionality(
                 textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
@@ -636,11 +870,11 @@ class _CustomerFormState extends State<CustomerForm> {
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   icon: Icon(
                     Icons.arrow_drop_down,
-                    color: themeColor.withOpacity(0.5),
+                    color: primaryColor.withOpacity(0.5),
                   ),
-                  dropdownColor: isDarkMode ? Colors.grey[100] : Colors.white,
+                  dropdownColor: inputBgColor,
                   style: TextStyle(
-                    color: isDarkMode ? Colors.black87 : Colors.black,
+                    color: textColor,
                     fontSize: 14,
                   ),
                   selectedItemBuilder: (BuildContext context) {
@@ -660,6 +894,11 @@ class _CustomerFormState extends State<CustomerForm> {
                                   : item == 'sme'
                                       ? (widget.isArabic ? 'المشاريع الصغيرة' : 'SME')
                                       : (widget.isArabic ? 'أخرى' : 'Others'),
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            color: textColor,
+                            fontSize: 14,
+                          ),
                         ),
                       );
                     }).toList();
@@ -673,22 +912,50 @@ class _CustomerFormState extends State<CustomerForm> {
                     DropdownMenuItem(
                       alignment: widget.isArabic ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
                       value: 'loans',
-                      child: Text(widget.isArabic ? 'تمويل' : 'Loans'),
+                      child: Text(
+                        widget.isArabic ? 'تمويل' : 'Loans',
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          color: textColor,
+                          fontSize: 14,
+                        ),
+                      ),
                     ),
                     DropdownMenuItem(
                       alignment: widget.isArabic ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
                       value: 'credit cards',
-                      child: Text(widget.isArabic ? 'بطاقات الائتمان' : 'Credit Cards'),
+                      child: Text(
+                        widget.isArabic ? 'بطاقات الائتمان' : 'Credit Cards',
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          color: textColor,
+                          fontSize: 14,
+                        ),
+                      ),
                     ),
                     DropdownMenuItem(
                       alignment: widget.isArabic ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
                       value: 'sme',
-                      child: Text(widget.isArabic ? 'المشاريع الصغيرة' : 'SME'),
+                      child: Text(
+                        widget.isArabic ? 'المشاريع الصغيرة' : 'SME',
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          color: textColor,
+                          fontSize: 14,
+                        ),
+                      ),
                     ),
                     DropdownMenuItem(
                       alignment: widget.isArabic ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
                       value: 'others',
-                      child: Text(widget.isArabic ? 'أخرى' : 'Others'),
+                      child: Text(
+                        widget.isArabic ? 'أخرى' : 'Others',
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          color: textColor,
+                          fontSize: 14,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -697,11 +964,13 @@ class _CustomerFormState extends State<CustomerForm> {
           if (formType == 'request') const SizedBox(height: 16),
           Container(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(Constants.formBorderRadius),
               border: Border.all(
-                color: themeColor.withOpacity(0.2),
+                color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkFormBorderColor 
+                    : Constants.lightFormBorderColor),
               ),
-              color: isDarkMode ? Colors.grey[100] : Colors.white,
+              color: inputBgColor,
             ),
             child: TextFormField(
               controller: bodyController,
@@ -709,7 +978,7 @@ class _CustomerFormState extends State<CustomerForm> {
               textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
               textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
               style: TextStyle(
-                color: isDarkMode ? Colors.black87 : Colors.black,
+                color: textColor,
                 fontSize: 14,
               ),
               validator: (value) {
@@ -735,12 +1004,12 @@ class _CustomerFormState extends State<CustomerForm> {
                             ? 'اكتب أفكارك لتحسين خدماتنا *'
                             : 'Write your ideas to improve our services *'),
                 hintStyle: TextStyle(
-                  color: isDarkMode ? Colors.black54 : Colors.grey[400],
+                  color: hintColor,
                   fontSize: 14,
                 ),
                 alignLabelWithHint: true,
                 errorStyle: TextStyle(
-                  color: isDarkMode ? Colors.red[300] : Colors.red,
+                  color: Colors.red,
                   fontSize: 12,
                 ),
               ),
@@ -756,14 +1025,14 @@ class _CustomerFormState extends State<CustomerForm> {
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: themeColor,
+                backgroundColor: primaryColor,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
                 ),
-                elevation: isDarkMode ? 0 : 2,
+                elevation: themeProvider.isDarkMode ? 0 : 2,
                 side: BorderSide(
-                  color: themeColor, 
+                  color: primaryColor,
                 ),
               ),
               child: Text(
@@ -771,80 +1040,14 @@ class _CustomerFormState extends State<CustomerForm> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: isDarkMode ? Colors.white : Colors.white,
+                  color: Color(themeProvider.isDarkMode 
+                      ? Constants.darkBackgroundColor 
+                      : Constants.lightSurfaceColor),
                 ),
               ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showSuccessDialog(BuildContext context) {
-    final isDarkMode = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
-    final themeColor = isDarkMode ? Colors.black : const Color(0xFF0077B6);
-
-    showDialog(
-      context: context,
-      builder: (context) => Directionality(
-        textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
-        child: AlertDialog(
-          backgroundColor: isDarkMode ? Colors.grey[100] : Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(
-              color: themeColor.withOpacity(0.1),
-            ),
-          ),
-          title: Column(
-            children: [
-              Icon(
-                Icons.check_circle,
-                color: themeColor,
-                size: 48,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                widget.isArabic ? 'تم الإرسال!' : 'Submitted!',
-                style: TextStyle(
-                  color: themeColor,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          content: Text(
-            widget.isArabic
-                ? 'تم إرسال النموذج بنجاح.'
-                : 'The form has been submitted successfully.',
-            textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
-            style: TextStyle(
-              color: isDarkMode ? Colors.black87 : Colors.black,
-              fontSize: 14,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                bodyController.clear();
-              },
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              ),
-              child: Text(
-                widget.isArabic ? 'حسناً' : 'OK',
-                style: TextStyle(
-                  color: themeColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

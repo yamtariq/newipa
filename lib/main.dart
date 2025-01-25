@@ -5,8 +5,6 @@ import 'services/notification_service.dart';
 import 'services/navigation_service.dart';
 import 'screens/splash_screen.dart';
 import 'screens/main_page.dart';
-import 'screens/apply_user_details_screen.dart';
-import 'screens/apply_loan_calculation.dart';
 import 'screens/loans_page.dart';
 import 'screens/loans_page_ar.dart';
 import 'screens/cards_page.dart';
@@ -20,7 +18,6 @@ import 'providers/session_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:awesome_notifications/awesome_notifications.dart';
 import '../services/theme_service.dart';
-import '../screens/main_page_white.dart';
 import 'services/content_update_service.dart';
 import 'screens/loading_screen.dart';
 import 'providers/theme_provider.dart';
@@ -147,22 +144,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver, SingleTicker
             Locale('en', 'US'),
             Locale('ar', 'SA'),
           ],
-          theme: ThemeData(
-            primaryColor: const Color(0xFF1B3E6C), // Nayifat blue
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF1B3E6C),
-              secondary: const Color(0xFF00A650), // Nayifat green
-              onPrimary: Colors.white,
-              primary: const Color(0xFF1B3E6C),
-            ),
-            useMaterial3: true,
-            fontFamily: 'Roboto',
-            appBarTheme: const AppBarTheme(
-              backgroundColor: Color(0xFF1B3E6C),
-              foregroundColor: Colors.white,
-              elevation: 0,
-            ),
-          ),
+          theme: themeProvider.themeData,
           builder: (context, child) {
             return Stack(
               children: [
@@ -173,7 +155,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver, SingleTicker
                     // Don't show overlay if we're on splash screen
                     if (!service.isUpdating || child is SplashScreen) return const SizedBox.shrink();
                     return Container(
-                      color: const Color(0xFF1B3E6C).withOpacity(0.8), // 70% opacity primary color
+                      color: const Color(0xFF000000).withOpacity(0.9), // Changed to black with 90% opacity
                       child: Center(
                         child: AnimatedBuilder(
                           animation: _animationController,
@@ -208,29 +190,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver, SingleTicker
                     return const Scaffold(body: Center(child: CircularProgressIndicator()));
                   }
                   final isDark = snapshot.data ?? args['isDarkMode'] ?? false;
-                  // Update ThemeProvider with the current theme
                   Provider.of<ThemeProvider>(context, listen: false).setDarkMode(isDark);
-                  // Return the new MainPage which will handle the theme switching
                   return MainPage(
                     isArabic: isArabic,
-                    userData: const {},
                     onLanguageChanged: _handleLanguageChange,
+                    userData: {},
+                    isDarkMode: isDark,
                   );
                 },
-              );
-            },
-            '/UserDetailsScreen': (context) {
-              final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
-              return UserDetailsScreen(
-                isArabic: isArabic,
-                formData: args,
-              );
-            },
-            '/loanCalculation': (context) {
-              final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
-              return LoanCalculationScreen(
-                formData: args,
-                isArabic: isArabic,
               );
             },
             '/loans': (context) => isArabic ? const LoansPageAr() : const LoansPage(),

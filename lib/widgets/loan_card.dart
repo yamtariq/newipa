@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/loan.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
+import '../utils/constants.dart';
 
 class LoanCard extends StatelessWidget {
   final Loan loan;
@@ -25,38 +26,59 @@ class LoanCard extends StatelessWidget {
   }
 
   Color _getStatusColor(String status, bool isDarkMode) {
-    if (isDarkMode) {
-      return Colors.black;
-    }
+    final Color activeColor = Color(isDarkMode ? 0xFF00A650 : 0xFF008040);
+    final Color pendingColor = Color(isDarkMode ? 0xFFFFA726 : 0xFFF57C00);
+    final Color completedColor = Color(isDarkMode ? 0xFF42A5F5 : 0xFF1976D2);
+    final Color overdueColor = Color(isDarkMode ? 0xFFEF5350 : 0xFFD32F2F);
+    final Color defaultColor = Color(isDarkMode ? 0xFF9E9E9E : 0xFF757575);
+
     switch (status.toLowerCase()) {
       case 'active':
-        return Colors.green;
+        return activeColor;
       case 'pending':
-        return Colors.orange;
+        return pendingColor;
       case 'completed':
-        return Colors.blue;
+        return completedColor;
       case 'overdue':
-        return Colors.red;
+        return overdueColor;
       default:
-        return Colors.grey;
+        return defaultColor;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
-    final themeColor = isDarkMode ? Colors.black : const Color(0xFF0077B6);
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final surfaceColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
+    final borderColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkFormBorderColor 
+        : Constants.lightFormBorderColor);
+    final shadowColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryShadowColor 
+        : Constants.lightPrimaryShadowColor);
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      elevation: 2,
-      color: isDarkMode ? Colors.grey[100] : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12.0),
-        side: BorderSide(
-          color: themeColor.withOpacity(0.2),
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
+        border: Border.all(
+          color: borderColor,
           width: 1,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: shadowColor,
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+            spreadRadius: 0,
+          ),
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -71,23 +93,23 @@ class LoanCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: themeColor,
+                    color: primaryColor,
                   ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: isDarkMode ? Colors.black.withOpacity(0.1) : _getStatusColor(loan.status, isDarkMode).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
+                    color: _getStatusColor(loan.status, themeProvider.isDarkMode).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(Constants.formBorderRadius),
                     border: Border.all(
-                      color: _getStatusColor(loan.status, isDarkMode),
+                      color: _getStatusColor(loan.status, themeProvider.isDarkMode),
                       width: 1,
                     ),
                   ),
                   child: Text(
                     loan.status,
                     style: TextStyle(
-                      color: _getStatusColor(loan.status, isDarkMode),
+                      color: _getStatusColor(loan.status, themeProvider.isDarkMode),
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
                     ),
@@ -99,74 +121,109 @@ class LoanCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildInfoColumn(
-                  'Monthly Payment',
-                  _formatCurrency(loan.monthlyPayment),
-                  isDarkMode,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Monthly Payment',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Color(themeProvider.isDarkMode 
+                            ? Constants.darkLabelTextColor 
+                            : Constants.lightLabelTextColor),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _formatCurrency(loan.monthlyPayment),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: primaryColor,
+                      ),
+                    ),
+                  ],
                 ),
-                _buildInfoColumn(
-                  'Remaining Amount',
-                  _formatCurrency(loan.remainingAmount),
-                  isDarkMode,
-                ),
-                _buildInfoColumn(
-                  'Interest Rate',
-                  '${loan.interestRate}%',
-                  isDarkMode,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      'Next Payment',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Color(themeProvider.isDarkMode 
+                            ? Constants.darkLabelTextColor 
+                            : Constants.lightLabelTextColor),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _formatDate(loan.nextPaymentDate),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: primaryColor,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-            Divider(
-              height: 24,
-              color: themeColor.withOpacity(0.2),
-            ),
+            const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildInfoColumn(
-                  'Start Date',
-                  _formatDate(loan.startDate),
-                  isDarkMode,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Remaining',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Color(themeProvider.isDarkMode 
+                            ? Constants.darkLabelTextColor 
+                            : Constants.lightLabelTextColor),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _formatCurrency(loan.remainingAmount),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: primaryColor,
+                      ),
+                    ),
+                  ],
                 ),
-                _buildInfoColumn(
-                  'End Date',
-                  _formatDate(loan.endDate),
-                  isDarkMode,
-                ),
-                _buildInfoColumn(
-                  'Next Payment',
-                  _formatDate(loan.nextPaymentDate),
-                  isDarkMode,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      'End Date',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Color(themeProvider.isDarkMode 
+                            ? Constants.darkLabelTextColor 
+                            : Constants.lightLabelTextColor),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _formatDate(loan.endDate),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: primaryColor,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildInfoColumn(String label, String value, bool isDarkMode) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: isDarkMode ? Colors.black54 : Colors.grey[600],
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: isDarkMode ? Colors.black87 : Colors.black87,
-          ),
-        ),
-      ],
     );
   }
 } 

@@ -7,6 +7,8 @@ import '../../services/card_service.dart';
 import '../../screens/main_page.dart';
 import '../../screens/cards_page.dart';
 import '../../screens/cards_page_ar.dart';
+import '../../providers/theme_provider.dart';
+import 'package:provider/provider.dart';
 
 class CardOfferScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -437,12 +439,15 @@ class _CardOfferScreenState extends State<CardOfferScreen> {
                       MaterialPageRoute(
                         builder: (context) => MainPage(
                           isArabic: isArabic,
+                          onLanguageChanged: (bool value) {},
                           userData: {
                             ...?userData,
                             'isSessionActive': true,
                             'isSignedIn': true,
                             'deviceRegistered': isDeviceRegistered,
                           },
+                          initialRoute: '',
+                          isDarkMode: Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
                         ),
                       ),
                       (route) => false,
@@ -597,12 +602,15 @@ class _CardOfferScreenState extends State<CardOfferScreen> {
         MaterialPageRoute(
           builder: (context) => MainPage(
             isArabic: isArabic,
+            onLanguageChanged: (bool value) {},
             userData: {
               ...?userData,
               'isSessionActive': true,
               'isSignedIn': true,
               'deviceRegistered': isDeviceRegistered,
             },
+            initialRoute: '',
+            isDarkMode: Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
           ),
         ),
         (route) => false,
