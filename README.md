@@ -1,7 +1,6 @@
 # Nayifat App
 
-This is the Nayifat App.
-
+This is the Nayifat App. 1.0
 nayifat.com
 
 ## Getting Started
