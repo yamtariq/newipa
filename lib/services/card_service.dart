@@ -28,18 +28,18 @@ class CardService {
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
-        
+            
         // If decision is approved, determine card type based on credit limit
         if (responseData['status'] == 'success' && responseData['decision'] == 'approved') {
           final creditLimit = double.tryParse(responseData['credit_limit']?.toString() ?? '0') ?? 0;
           final cardType = creditLimit >= 17500 ? 'GOLD' : 'REWARD';
           responseData['card_type'] = cardType;
-        }
+  }
         
         return responseData;
       } else {
         throw Exception('Failed to get card decision');
-      }
+        }
     } catch (e) {
       print('Error getting card decision: $e');
       return {

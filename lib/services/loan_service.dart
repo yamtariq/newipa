@@ -8,7 +8,7 @@ import '../services/content_update_service.dart';
 
 class LoanService {
   final _secureStorage = const FlutterSecureStorage();
-
+  
   Future<Map<String, dynamic>> getLoanDecision({
     required double salary,
     required double liabilities,
@@ -22,12 +22,29 @@ class LoanService {
         throw Exception('User data not found');
       }
 
+      final userData = jsonDecode(userDataStr);
+      final nationalId = userData['national_id'];
+
+      // Prepare the Finnone request body according to the API documentation
       final requestBody = {
-        'salary': salary.round(),
-        'liabilities': liabilities.round(),
-        'expenses': expenses.round(),
-        'requested_tenure': requestedTenure,
-        'national_id': jsonDecode(userDataStr)['national_id'],
+        'Header': {
+          'Type': 'LOAN_APPLICATION',
+          'RequestId': DateTime.now().millisecondsSinceEpoch
+        },
+        'Body': {
+          'ApplicationId': 'LOAN_${DateTime.now().millisecondsSinceEpoch}',
+          'CustomerInfo': [{
+            'NationalId': nationalId,
+            'FinancialAmount': salary.round().toString(),
+            'Tenure': requestedTenure.toString(),
+          }],
+          'IncomeDetails': [{
+            'Amount': salary.round().toString(),
+            'Frequency': 'MONTHLY',
+          }],
+          'FinancialEMI': liabilities.round().toString(),
+          'InstallmentNumbers': requestedTenure.toString(),
+        }
       };
 
       print('DEBUG - API Request:');
@@ -50,14 +67,34 @@ class LoanService {
       }
 
       final data = jsonDecode(response.body);
-      if (data['status'] == 'error') {
-        if (data['code'] == 'ACTIVE_APPLICATION_EXISTS') {
-          return data;
-        }
-        throw Exception(data['message']);
+      
+      // Transform Finnone response to match the expected format
+      if (data['status'] == 'error' || data['Status'] == 'error') {
+        return {
+          'status': 'error',
+          'code': data['code'] ?? data['Code'] ?? 'SYSTEM_ERROR',
+          'message': data['message'] ?? data['Message'] ?? 'An error occurred',
+          'message_ar': data['message_ar'] ?? data['MessageAr'] ?? 'حدث خطأ',
+        };
       }
 
-      return data;
+      // Generate application number if not provided by Finnone
+      final applicationNumber = data['ApplicationNumber'] ?? 
+        data['application_number'] ?? 
+        'LOAN_${DateTime.now().millisecondsSinceEpoch}';
+
+      return {
+        'status': 'success',
+        'decision': 'approved',
+        'finance_amount': data['FinanceAmount'] ?? data['finance_amount'] ?? 0,
+        'tenure': data['Tenure'] ?? data['tenure'] ?? requestedTenure,
+        'emi': data['Emi'] ?? data['emi'] ?? 0,
+        'flat_rate': data['FlatRate'] ?? data['flat_rate'] ?? 0.16,
+        'total_repayment': data['TotalRepayment'] ?? data['total_repayment'] ?? 0,
+        'interest': data['Interest'] ?? data['interest'] ?? 0,
+        'application_number': applicationNumber,
+        'debug': data['Debug'] ?? data['debug'] ?? {},
+      };
     } catch (e) {
       print('Error getting loan decision: $e');
       rethrow;

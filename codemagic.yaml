@@ -1,39 +1,11 @@
 workflows:
   ios-workflow:
-    name: iOS Workflow
-    instance_type: mac_mini_m1
+    name: iOS Debug Workflow
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.example.nayifat_app_2025_new
-      vars:
-        XCODE_WORKSPACE: "ios/Runner.xcworkspace"
-        XCODE_SCHEME: "Runner"
       flutter: stable
       xcode: latest
       cocoapods: default
     scripts:
-      - name: Set up code signing settings
-        script: |
-          keychain initialize
-      - name: Get Flutter packages
-        script: |
-          flutter packages pub get
-      - name: Install pods
-        script: |
-          find . -name "Podfile" -execdir pod install \;
-      - name: Flutter build ipa
-        script: |
-          flutter build ipa --release \
-            --export-options-plist=/Users/builder/export_options.plist
-    artifacts:
-      - build/ios/ipa/*.ipa
-      - /tmp/xcodebuild_logs/*.log
-      - flutter_drive.log
-    publishing:
-      email:
-        recipients:
-          - user@example.com # Replace with your email
-        notify:
-          success: true
-          failure: true 
+      - flutter pub get
+      - cd ios && pod install --repo-update && cd ..
+      - flutter build ios --debug --no-codesign

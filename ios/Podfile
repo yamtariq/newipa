@@ -39,6 +39,9 @@ target 'Runner' do
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end
 
+# Explicitly include PhoneNumberKit pod
+pod 'PhoneNumberKit', '~> 6.0'
+
 post_install do |installer|
   # Disable "Build Libraries for Distribution" to prevent module interface conflicts
   installer.pods_project.build_configurations.each do |config|

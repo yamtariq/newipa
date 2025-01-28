@@ -46,6 +46,14 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<ILoanService, LoanService>();
 builder.Services.AddScoped<ICardDecisionService, CardDecisionService>();
 builder.Services.AddScoped<IGovService, GovService>();
+builder.Services.AddScoped<IFinnoneService, FinnoneService>();
+
+// Configure Finnone HTTP client
+builder.Services.AddHttpClient("FinnoneClient", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+
 builder.Services.AddHttpContextAccessor();
 
 // Add CORS

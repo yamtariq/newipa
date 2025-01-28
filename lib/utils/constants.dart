@@ -102,7 +102,7 @@ class Constants {
   // Used in: RegistrationService (registration_service.dart) - getGovernmentData()
 
   // Loan Endpoints
-  static const String endpointLoanDecision = '/loan_decision.php';
+  static const String endpointLoanDecision = '/api/v1/Finnone/GetCustomerCreate';
   // Used in: LoanService (loan_service.dart) - getLoanDecision()
 
   static const String endpointUpdateLoanApplication = '/update_loan_application.php';
