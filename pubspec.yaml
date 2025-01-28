@@ -43,6 +43,7 @@ dependencies:
   awesome_notifications: ^0.8.2
   path_provider: ^2.1.5
   permission_handler: ^11.0.1
+  libphonenumber_plugin: ^0.3.3 
 
 dev_dependencies:
   flutter_test:
