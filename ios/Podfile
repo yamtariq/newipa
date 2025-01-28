@@ -34,7 +34,7 @@ target 'Runner' do
   use_frameworks! :linkage => :static
 
   # Remove manual PhoneNumberKit pod to let the plugin manage it
-  # pod 'PhoneNumberKit', '~> 3.6.0'
+  # pod 'PhoneNumberKit', '~> 6.0'
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end
