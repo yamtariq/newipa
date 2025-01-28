@@ -27,22 +27,20 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 flutter_ios_podfile_setup
 
 target 'Runner' do
-  # Remove 'use_modular_headers!' to avoid Swift bridging conflicts:
+  # Remove or comment out use_modular_headers! to avoid Swift bridging conflicts
   # use_modular_headers!
 
-  # If you see plugin or library errors with dynamic linking, you can try:
-  # use_frameworks!
-  # or
+  # Use frameworks with static linkage to prevent dynamic conflicts
   use_frameworks! :linkage => :static
 
-  # Remove custom pinned PhoneNumberKit to let the plugin handle it:
+  # Remove manual PhoneNumberKit pod to let the plugin manage it
   # pod 'PhoneNumberKit', '~> 3.6.0'
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end
 
 post_install do |installer|
-  # This disables "Build Libraries for Distribution" globally
+  # Disable "Build Libraries for Distribution" to prevent module interface conflicts
   installer.pods_project.build_configurations.each do |config|
     config.build_settings['BUILD_LIBRARIES_FOR_DISTRIBUTION'] = 'NO'
   end
@@ -54,7 +52,7 @@ post_install do |installer|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
       config.build_settings['ENABLE_BITCODE'] = 'NO'
       config.build_settings['BUILD_LIBRARIES_FOR_DISTRIBUTION'] = 'NO'
-      # If not needed, remove bridging headers:
+      # If you have a bridging header and it's not needed, disable it
       # config.build_settings['SWIFT_INSTALL_OBJC_HEADER'] = 'NO'
     end
   end
