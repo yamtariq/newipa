@@ -27,6 +27,8 @@ if ($user_role === 'sales') {
     $status_conditions = "WHERE status IN ('pending', 'rejected', 'declined', 'missing', 'followup', 'fulfilled', 'accepted')";
 } elseif ($user_role === 'credit') {
     $status_conditions = "WHERE status IN ('pending', 'fulfilled')";
+} elseif ($user_role === 'admin') {
+    $status_conditions = ""; // Admin can see all applications
 }
 
 // Simple query first to check if table exists and has correct structure
@@ -619,7 +621,7 @@ if ($result === false) {
             </div>
         </div>
         <nav>
-            <a href="dashboard.php" class="nav-link">
+            <a href="../index.php" class="nav-link">
                 <i class="fas fa-home"></i>
                 <span>Dashboard</span>
             </a>
@@ -702,7 +704,17 @@ if ($result === false) {
             <span class="close">&times;</span>
             <div class="modal-header">
                 <h2>Card Application Details</h2>
-                <div id="statusBadge" class="status-badge"></div>
+                <div class="action-buttons">
+                    <?php if ($_SESSION['role'] === 'credit'): ?>
+                        <button onclick="updateCardStatus('accepted')" class="action-button accept">Accept</button>
+                        <button onclick="updateCardStatus('rejected')" class="action-button reject">Reject</button>
+                    <?php endif; ?>
+                    <?php if ($_SESSION['role'] === 'sales'): ?>
+                        <button onclick="updateCardStatus('followup')" class="action-button followup">Follow Up</button>
+                        <button onclick="updateCardStatus('missing')" class="action-button missing">Missing Info</button>
+                        <button onclick="updateCardStatus('fulfilled')" class="action-button fulfill">Mark as Fulfilled</button>
+                    <?php endif; ?>
+                </div>
             </div>
             <div class="modal-body">
                 <div class="tab-container">
@@ -777,16 +789,6 @@ if ($result === false) {
                         </div>
                     </div>
                 </div>
-
-                <!-- Action Buttons -->
-                <?php if ($_SESSION['role'] === 'credit'): ?>
-                <div class="action-buttons">
-                    <button onclick="updateCardStatus('approved')" class="btn btn-success">Approve</button>
-                    <button onclick="updateCardStatus('rejected')" class="btn btn-danger">Reject</button>
-                    <button onclick="updateCardStatus('missing')" class="btn btn-warning">Missing Info</button>
-                    <button onclick="updateCardStatus('followup')" class="btn btn-info">Follow Up</button>
-                </div>
-                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -841,11 +843,6 @@ if ($result === false) {
                 document.getElementById('employer').value = app.employer;
                 document.getElementById('salary').value = app.salary;
                 
-                // Update status badge
-                const statusBadge = document.getElementById('statusBadge');
-                statusBadge.textContent = app.status.toUpperCase();
-                statusBadge.className = 'status-badge ' + app.status.toLowerCase();
-
                 // Show modal and first tab
                 document.getElementById('applicationModal').style.display = 'block';
                 openTab({ currentTarget: document.querySelector('.tab-button') }, 'card-info');
@@ -855,19 +852,7 @@ if ($result === false) {
             }
         }
 
-        // Close modal when clicking the close button or outside the modal
-        document.querySelector('.close').onclick = function() {
-            document.getElementById('applicationModal').style.display = 'none';
-        }
-
-        window.onclick = function(event) {
-            const modal = document.getElementById('applicationModal');
-            if (event.target == modal) {
-                modal.style.display = 'none';
-            }
-        }
-
-        async function updateCardStatus(newStatus) {
+        async function updateCardStatus(status) {
             const cardId = document.getElementById('card_id').value;
             const remarks = document.getElementById('remarks').value;
             
@@ -879,7 +864,7 @@ if ($result === false) {
                     },
                     body: JSON.stringify({
                         card_id: cardId,
-                        status: newStatus,
+                        status: status,
                         remarks: remarks
                     })
                 });
@@ -899,6 +884,18 @@ if ($result === false) {
             } catch (error) {
                 console.error('Error:', error);
                 alert(error.message);
+            }
+        }
+
+        // Close modal when clicking the close button or outside the modal
+        document.querySelector('.close').onclick = function() {
+            document.getElementById('applicationModal').style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('applicationModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
             }
         }
     </script>

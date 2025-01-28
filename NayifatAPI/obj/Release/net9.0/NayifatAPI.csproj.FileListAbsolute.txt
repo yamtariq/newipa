@@ -1,0 +1,8 @@
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\obj\Release\net9.0\NayifatAPI.csproj.AssemblyReference.cache
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\obj\Release\net9.0\NayifatAPI.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\obj\Release\net9.0\NayifatAPI.AssemblyInfoInputs.cache
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\obj\Release\net9.0\NayifatAPI.AssemblyInfo.cs
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\obj\Release\net9.0\NayifatAPI.csproj.CoreCompileInputs.cache
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\obj\Release\net9.0\NayifatAPI.MvcApplicationPartsAssemblyInfo.cs
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\obj\Release\net9.0\NayifatAPI.MvcApplicationPartsAssemblyInfo.cache
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\obj\Release\net9.0\NayifatAPI.sourcelink.json
