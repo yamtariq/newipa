@@ -4,7 +4,7 @@ import GoogleMaps
 import AVFoundation
 import BackgroundTasks
 
-@UIApplicationMain
+@main
 @objc class AppDelegate: FlutterAppDelegate {
     
     override func application(
