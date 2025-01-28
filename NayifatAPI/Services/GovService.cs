@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using MySql.Data.MySqlClient;
 using NayifatAPI.Models;
 using System.Data;
+using System.Text.Json;
 
 namespace NayifatAPI.Services
 {
@@ -14,18 +15,29 @@ namespace NayifatAPI.Services
     public class GovService : IGovService
     {
         private readonly DatabaseService _db;
-        private readonly AuditService _audit;
+        private readonly IAuditService _auditService;
+        private readonly ILogger<GovService> _logger;
 
-        public GovService(DatabaseService db, AuditService audit)
+        public GovService(
+            DatabaseService db, 
+            IAuditService auditService,
+            ILogger<GovService> logger)
         {
             _db = db;
-            _audit = audit;
+            _auditService = auditService;
+            _logger = logger;
         }
 
         public async Task<GovServiceResponse> GetGovernmentData(string nationalId)
         {
             try
             {
+                // Get user ID for audit logging
+                using var userCmd = _db.CreateCommand("SELECT id FROM Customers WHERE national_id = @nationalId");
+                userCmd.Parameters.AddWithValue("@nationalId", nationalId);
+                var userId = await userCmd.ExecuteScalarAsync();
+                var userIdInt = userId != null ? Convert.ToInt32(userId) : 0;
+
                 using var connection = await _db.CreateConnectionAsync();
                 using var command = connection.CreateCommand();
                 
@@ -63,7 +75,13 @@ namespace NayifatAPI.Services
                         UpdatedAt = reader.IsDBNull("updated_at") ? null : reader.GetDateTime("updated_at")
                     };
 
-                    await _audit.LogAsync(nationalId, "Get Government Data Success", "Record retrieved successfully");
+                    await _auditService.LogAuditAsync(userIdInt, "Government Data Retrieved", 
+                        JsonSerializer.Serialize(new {
+                            national_id = nationalId,
+                            has_employment = !string.IsNullOrEmpty(data.EmploymentStatus),
+                            has_address = !string.IsNullOrEmpty(data.NationalAddress),
+                            last_updated = data.UpdatedAt
+                        }));
 
                     return new GovServiceResponse
                     {
@@ -72,7 +90,9 @@ namespace NayifatAPI.Services
                     };
                 }
 
-                await _audit.LogAsync(nationalId, "Get Government Data Failed", "Record not found");
+                await _auditService.LogAuditAsync(userIdInt, "Government Data Not Found", 
+                    $"No government data found for national_id: {nationalId}");
+
                 return new GovServiceResponse
                 {
                     Status = "error",
@@ -82,7 +102,11 @@ namespace NayifatAPI.Services
             }
             catch (Exception ex)
             {
-                await _audit.LogAsync(null, "Get Government Data Failed", "An unexpected error occurred");
+                _logger.LogError(ex, "Error retrieving government data for national ID: {NationalId}", nationalId);
+                
+                await _auditService.LogAuditAsync(0, "Government Data Error", 
+                    $"Error retrieving government data for national_id: {nationalId}. Error: {ex.Message}");
+
                 throw new Exception("Failed to get government data", ex);
             }
         }

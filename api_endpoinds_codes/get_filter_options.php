@@ -33,11 +33,11 @@ try {
 
     $filterOptions = [];
 
-    // Get columns from Users table
-    $result = $con->query("SHOW COLUMNS FROM Users");
-    $filterOptions['Users'] = [];
+    // Get columns from Customers table
+    $result = $con->query("SHOW COLUMNS FROM Customers");
+    $filterOptions['Customers'] = [];
     while ($row = $result->fetch_assoc()) {
-        $filterOptions['Users'][] = [
+        $filterOptions['Customers'][] = [
             'column' => $row['Field'],
             'type' => $row['Type'],
             'operators' => getOperatorsForType($row['Type'])

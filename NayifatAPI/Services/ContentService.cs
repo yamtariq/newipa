@@ -17,15 +17,21 @@ public class ContentService : IContentService
     private readonly DatabaseService _db;
     private readonly ILogger<ContentService> _logger;
     private readonly IMemoryCache _cache;
+    private readonly IAuditService _auditService;
     private const string UPDATES_CACHE_KEY = "content_updates";
     private const string CONTENT_CACHE_KEY = "content_all";
     private static readonly TimeSpan CACHE_DURATION = TimeSpan.FromMinutes(5);
 
-    public ContentService(DatabaseService db, ILogger<ContentService> logger, IMemoryCache cache)
+    public ContentService(
+        DatabaseService db, 
+        ILogger<ContentService> logger, 
+        IMemoryCache cache,
+        IAuditService auditService)
     {
         _db = db;
         _logger = logger;
         _cache = cache;
+        _auditService = auditService;
     }
 
     public async Task<Dictionary<string, string>> FetchLastUpdatesAsync()
@@ -34,6 +40,7 @@ public class ContentService : IContentService
         if (_cache.TryGetValue<Dictionary<string, string>>(UPDATES_CACHE_KEY, out var cachedUpdates))
         {
             _logger.LogInformation("Returning cached updates");
+            await _auditService.LogAuditAsync(0, "Content Updates Retrieved", "Retrieved from cache");
             return cachedUpdates;
         }
 
@@ -57,7 +64,9 @@ public class ContentService : IContentService
             catch (MySqlException ex)
             {
                 _logger.LogError(ex, "Error fetching last_updated for {Page}/{KeyName}", type.Page, type.KeyName);
-                continue; // Skip this content type if there's an error, matching PHP behavior
+                await _auditService.LogAuditAsync(0, "Content Update Error", 
+                    $"Error fetching last_updated for {type.Page}/{type.KeyName}: {ex.Message}");
+                continue;
             }
         }
 
@@ -67,6 +76,8 @@ public class ContentService : IContentService
             var cacheOptions = new MemoryCacheEntryOptions()
                 .SetAbsoluteExpiration(CACHE_DURATION);
             _cache.Set(UPDATES_CACHE_KEY, updates, cacheOptions);
+            await _auditService.LogAuditAsync(0, "Content Updates Cached", 
+                $"Cached {updates.Count} content updates");
         }
 
         return updates;
@@ -78,6 +89,7 @@ public class ContentService : IContentService
         if (_cache.TryGetValue<Dictionary<string, ContentData>>(CONTENT_CACHE_KEY, out var cachedContent))
         {
             _logger.LogInformation("Returning cached content");
+            await _auditService.LogAuditAsync(0, "Content Retrieved", "Retrieved from cache");
             return cachedContent;
         }
 
@@ -114,7 +126,9 @@ public class ContentService : IContentService
                     {
                         _logger.LogError(ex, "Invalid JSON format for {Page}/{KeyName}: {Value}", 
                             type.Page, type.KeyName, value);
-                        continue; // Skip invalid JSON data
+                        await _auditService.LogAuditAsync(0, "Content JSON Error", 
+                            $"Invalid JSON format for {type.Page}/{type.KeyName}: {ex.Message}");
+                        continue;
                     }
                 }
             }
@@ -122,7 +136,9 @@ public class ContentService : IContentService
             {
                 _logger.LogError(ex, "Database error fetching content for {Page}/{KeyName}", 
                     type.Page, type.KeyName);
-                continue; // Skip this content type if there's an error, matching PHP behavior
+                await _auditService.LogAuditAsync(0, "Content Fetch Error", 
+                    $"Database error fetching content for {type.Page}/{type.KeyName}: {ex.Message}");
+                continue;
             }
         }
 
@@ -132,6 +148,8 @@ public class ContentService : IContentService
             var cacheOptions = new MemoryCacheEntryOptions()
                 .SetAbsoluteExpiration(CACHE_DURATION);
             _cache.Set(CONTENT_CACHE_KEY, content, cacheOptions);
+            await _auditService.LogAuditAsync(0, "Content Cached", 
+                $"Cached {content.Count} content items");
         }
 
         return content;

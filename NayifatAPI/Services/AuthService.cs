@@ -5,6 +5,7 @@ using NayifatAPI.Models;
 using System.Security.Cryptography;
 using Dapper;
 using BCrypt.Net;
+using System.Text.Json;
 
 namespace NayifatAPI.Services;
 
@@ -27,6 +28,8 @@ public interface IAuthService
     Task<(bool success, string message)> RegisterUser(UserRegistrationRequest request);
     GovData GetGovernmentData(UserRegistrationRequest request);
     Task<DeviceRegistrationResponse> RegisterDevice(DeviceRegistrationRequest request, string ipAddress, string userAgent);
+    Task<(string Status, string Message)> LogoutAsync(string sessionToken);
+    Task<bool> ValidateApiKeyAsync(string apiKey);
 }
 
 public class AuthService : IAuthService
@@ -34,43 +37,123 @@ public class AuthService : IAuthService
     private readonly DatabaseService _db;
     private readonly ILogger<AuthService> _logger;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly IAuditService _auditService;
+    private const int MAX_RETRY_ATTEMPTS = 3;
+    private const int RETRY_DELAY_MS = 1000; // 1 second delay between retries
     public const int TOKEN_EXPIRY = 3600; // 1 hour, matching PHP
 
-    public AuthService(DatabaseService db, ILogger<AuthService> logger, IHttpContextAccessor httpContextAccessor)
+    public AuthService(
+        DatabaseService db, 
+        ILogger<AuthService> logger, 
+        IHttpContextAccessor httpContextAccessor,
+        IAuditService auditService)
     {
         _db = db;
         _logger = logger;
         _httpContextAccessor = httpContextAccessor;
+        _auditService = auditService;
+    }
+
+    private async Task<T> ExecuteWithRetryAsync<T>(Func<Task<T>> operation, string operationName)
+    {
+        for (int attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++)
+        {
+            try
+            {
+                return await operation();
+            }
+            catch (MySqlException ex) when (IsTransientError(ex))
+            {
+                if (attempt == MAX_RETRY_ATTEMPTS)
+                    throw;
+
+                _logger.LogWarning(ex, 
+                    "Transient database error during {Operation} (Attempt {Attempt}/{MaxAttempts}). Retrying...", 
+                    operationName, attempt, MAX_RETRY_ATTEMPTS);
+
+                await Task.Delay(RETRY_DELAY_MS * attempt);
+            }
+        }
+
+        throw new Exception($"Failed to execute {operationName} after {MAX_RETRY_ATTEMPTS} attempts");
+    }
+
+    private bool IsTransientError(MySqlException ex)
+    {
+        // Common transient error codes in MySQL
+        int[] transientErrorCodes = {
+            1205,  // Lock wait timeout
+            1213,  // Deadlock
+            1047,  // Lost connection
+            1053,  // Server shutdown
+            2006,  // Server gone
+            2013   // Lost connection during query
+        };
+
+        return transientErrorCodes.Contains(ex.Number);
+    }
+
+    private async Task LogAuthFailureAsync(string nationalId, string? deviceId, string reason)
+    {
+        try
+        {
+            await LogAuthAttempt(nationalId, deviceId, "failed", reason);
+            await _auditService.LogAuditAsync(
+                0, // Use 0 for failed auth attempts
+                "Auth Failure",
+                JsonSerializer.Serialize(new {
+                    national_id = nationalId,
+                    device_id = deviceId,
+                    reason = reason,
+                    ip_address = _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString(),
+                    user_agent = _httpContextAccessor.HttpContext?.Request.Headers.UserAgent.ToString()
+                })
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to log auth failure for user {NationalId}", nationalId);
+        }
     }
 
     public async Task<Dictionary<string, object>?> GetCustomerByNationalId(string nationalId)
     {
-        try
+        return await ExecuteWithRetryAsync(async () =>
         {
-            using var connection = _db.CreateConnection();
-            await connection.OpenAsync();
-
-            using var command = new MySqlCommand("SELECT * FROM Customers WHERE national_id = @nationalId", (MySqlConnection)connection);
-            command.Parameters.Add("@nationalId", MySqlDbType.VarChar).Value = nationalId;
-
-            using var reader = await command.ExecuteReaderAsync();
-            if (!await reader.ReadAsync())
-                return null;
-
-            var result = new Dictionary<string, object>();
-            for (int i = 0; i < reader.FieldCount; i++)
+            try
             {
-                var value = reader.GetValue(i);
-                result[reader.GetName(i)] = value == DBNull.Value ? null : value;
-            }
+                using var connection = _db.CreateConnection();
+                await connection.OpenAsync();
 
-            return result;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting customer by national ID: {NationalId}", nationalId);
-            throw;
-        }
+                using var command = new MySqlCommand(
+                    "SELECT * FROM Customers WHERE national_id = @nationalId", 
+                    (MySqlConnection)connection
+                );
+                command.Parameters.Add("@nationalId", MySqlDbType.VarChar).Value = nationalId;
+
+                using var reader = await command.ExecuteReaderAsync();
+                if (!await reader.ReadAsync())
+                {
+                    await LogAuthFailureAsync(nationalId, null, "User not found");
+                    return null;
+                }
+
+                var result = new Dictionary<string, object>();
+                for (int i = 0; i < reader.FieldCount; i++)
+                {
+                    var value = reader.GetValue(i);
+                    result[reader.GetName(i)] = value == DBNull.Value ? null : value;
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting customer by national ID: {NationalId}", nationalId);
+                await LogAuthFailureAsync(nationalId, null, $"Database error: {ex.Message}");
+                throw;
+            }
+        }, "GetCustomerByNationalId");
     }
 
     public async Task LogAuthAttempt(string nationalId, string? deviceId, string status, string? failureReason = null)
@@ -210,8 +293,11 @@ public class AuthService : IAuthService
 
             if (existingOtp.HasValue)
             {
-                await LogAuditAsync(connection, nationalId, "OTP Generation Failed", 
-                    $"Rate limit exceeded for national_id: {nationalId}");
+                await _auditService.LogAuditAsync(
+                    int.Parse(nationalId), 
+                    "OTP Generation Failed",
+                    $"Rate limit exceeded for national_id: {nationalId}"
+                );
                 
                 return ("error", "OTP request rate limit exceeded. Please wait before requesting again.", null);
             }
@@ -232,39 +318,18 @@ public class AuthService : IAuthService
                 NationalId = nationalId
             });
 
-            await LogAuditAsync(connection, nationalId, "OTP Generation Successful", 
-                "OTP generated and sent to user phone");
+            await _auditService.LogAuditAsync(
+                int.Parse(nationalId),
+                "OTP Generation Successful",
+                "OTP generated and sent to user phone"
+            );
 
             return ("success", "OTP generated successfully and sent to the user phone", otpCode);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error generating OTP for national ID: {NationalId}", nationalId);
-            return ("error", "Failed to generate OTP", null);
-        }
-    }
-
-    private async Task LogAuditAsync(IDbConnection connection, string? nationalId, string action, string details)
-    {
-        try
-        {
-            var riyadhTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Riyadh");
-            var currentTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, riyadhTimeZone);
-
-            var query = @"INSERT INTO audit_logs (national_id, action, details, created_at) 
-                         VALUES (@NationalId, @Action, @Details, @CreatedAt)";
-            
-            await connection.ExecuteAsync(query, new
-            {
-                NationalId = nationalId,
-                Action = action,
-                Details = details,
-                CreatedAt = currentTime
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error logging audit for national ID: {NationalId}, action: {Action}", nationalId, action);
+            throw;
         }
     }
 
@@ -273,65 +338,52 @@ public class AuthService : IAuthService
         try
         {
             using var connection = await _db.CreateConnectionAsync();
-            var currentTime = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
             
-            // Hash the OTP code before verification
+            var currentTime = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
             var hashedOtp = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(otpCode)));
 
-            // Verify the OTP
-            var query = @"SELECT otp_id, expires_at 
-                         FROM OTP_Codes 
+            var query = @"SELECT id FROM OTP_Codes 
                          WHERE national_id = @NationalId 
                          AND otp_code = @HashedOtp 
+                         AND expires_at > @CurrentTime 
                          AND is_used = 0 
-                         AND expires_at > @CurrentTime";
+                         ORDER BY expires_at DESC LIMIT 1";
 
-            var result = await connection.QueryFirstOrDefaultAsync<dynamic>(
-                query,
-                new { NationalId = nationalId, HashedOtp = hashedOtp, CurrentTime = currentTime }
+            var otpId = await connection.QueryFirstOrDefaultAsync<int?>(query, new
+            {
+                NationalId = nationalId,
+                HashedOtp = hashedOtp,
+                CurrentTime = currentTime
+            });
+
+            if (!otpId.HasValue)
+            {
+                await _auditService.LogAuditAsync(
+                    int.Parse(nationalId),
+                    "OTP Verification Failed",
+                    $"Invalid or expired OTP for national_id: {nationalId}"
+                );
+                return ("error", "Invalid or expired OTP code", null);
+            }
+
+            // Mark OTP as used
+            await connection.ExecuteAsync(
+                "UPDATE OTP_Codes SET is_used = 1 WHERE id = @Id",
+                new { Id = otpId.Value }
             );
 
-            if (result == null)
-            {
-                await LogAuditAsync(connection, nationalId, "OTP Verification Failed", 
-                    $"Invalid or expired OTP for national_id: {nationalId}");
+            await _auditService.LogAuditAsync(
+                int.Parse(nationalId),
+                "OTP Verification Successful",
+                $"OTP verified successfully for national_id: {nationalId}"
+            );
 
-                return ("error", "Invalid or expired OTP", new Dictionary<string, object>
-                {
-                    { "national_id", nationalId },
-                    { "otp_code", otpCode }
-                });
-            }
-
-            // Check if the OTP has expired (double check even though we have it in the query)
-            if (DateTime.Parse(result.expires_at.ToString()) < DateTime.UtcNow)
-            {
-                await LogAuditAsync(connection, nationalId, "OTP Verification Failed", 
-                    $"OTP expired for national_id: {nationalId}");
-                return ("error", "OTP has expired", null);
-            }
-
-            // Mark the OTP as used
-            var updateQuery = "UPDATE OTP_Codes SET is_used = TRUE WHERE otp_id = @OtpId";
-            var updateResult = await connection.ExecuteAsync(updateQuery, new { OtpId = result.otp_id });
-
-            if (updateResult > 0)
-            {
-                await LogAuditAsync(connection, nationalId, "OTP Verification Successful", 
-                    $"OTP verified successfully for national_id: {nationalId}");
-                return ("success", "OTP verified successfully", null);
-            }
-            else
-            {
-                await LogAuditAsync(connection, nationalId, "OTP Verification Failed", 
-                    $"Failed to mark OTP as used for national_id: {nationalId}");
-                return ("error", "Failed to mark OTP as used", null);
-            }
+            return ("success", "OTP verified successfully", null);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error verifying OTP for national ID: {NationalId}", nationalId);
-            return ("error", "Failed to verify OTP", null);
+            throw;
         }
     }
 
@@ -403,8 +455,11 @@ public class AuthService : IAuthService
 
             await transaction.CommitAsync();
 
-            await LogAuditAsync(connection, customer.id.ToString(), "Password Change Successful", 
-                $"Password changed successfully for national_id: {nationalId}");
+            await _auditService.LogAuditAsync(
+                int.Parse(nationalId),
+                "Password Change Successful",
+                $"Password changed successfully for national_id: {nationalId}"
+            );
 
             return ("success", "", "Password changed successfully", "تم تغيير كلمة المرور بنجاح");
         }
@@ -566,14 +621,20 @@ public class AuthService : IAuthService
                 await command.ExecuteNonQueryAsync();
 
                 // Log the registration in audit_logs
-                await LogAuditAsync(connection, request.NationalId, "User Registration", 
-                    $"User registered successfully with device: {request.DeviceInfo.DeviceId}");
+                await _auditService.LogAuditAsync(
+                    int.Parse(request.NationalId),
+                    "User Registration",
+                    $"User registered successfully with device: {request.DeviceInfo.DeviceId}"
+                );
             }
             else
             {
                 // Log the registration without device info
-                await LogAuditAsync(connection, request.NationalId, "User Registration", 
-                    "User registered successfully without device info");
+                await _auditService.LogAuditAsync(
+                    int.Parse(request.NationalId),
+                    "User Registration",
+                    "User registered successfully without device info"
+                );
             }
 
             await transaction.CommitAsync();
@@ -713,6 +774,89 @@ public class AuthService : IAuthService
             }
 
             return DeviceRegistrationResponse.Error(ex.Message);
+        }
+    }
+
+    public async Task<(string Status, string Message)> LogoutAsync(string sessionToken)
+    {
+        try
+        {
+            using var connection = _db.CreateConnection();
+            await connection.OpenAsync();
+
+            // First validate the session token and check expiration
+            var currentTime = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+            using var validateCommand = new MySqlCommand(
+                "SELECT * FROM Sessions WHERE session_token = @sessionToken AND expires_at > @currentTime",
+                (MySqlConnection)connection);
+            validateCommand.Parameters.Add("@sessionToken", MySqlDbType.VarChar).Value = sessionToken;
+            validateCommand.Parameters.Add("@currentTime", MySqlDbType.VarChar).Value = currentTime;
+
+            using var reader = await validateCommand.ExecuteReaderAsync();
+            if (!await reader.ReadAsync())
+            {
+                await _auditService.LogAuditAsync(
+                    null,
+                    "User Logout Failed",
+                    "Invalid or expired session token"
+                );
+                return ("error", "Invalid or expired session token");
+            }
+            reader.Close();
+
+            // Invalidate the session token
+            using var deleteCommand = new MySqlCommand(
+                "DELETE FROM Sessions WHERE session_token = @sessionToken",
+                (MySqlConnection)connection);
+            deleteCommand.Parameters.Add("@sessionToken", MySqlDbType.VarChar).Value = sessionToken;
+
+            var result = await deleteCommand.ExecuteNonQueryAsync();
+            if (result > 0)
+            {
+                await _auditService.LogAuditAsync(
+                    null,
+                    "User Logout Successful",
+                    "Session successfully terminated"
+                );
+                return ("success", "Logout successful");
+            }
+            
+            await _auditService.LogAuditAsync(
+                null,
+                "User Logout Failed",
+                "Failed to terminate session"
+            );
+            return ("error", "Failed to logout");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during logout for session token: {SessionToken}", sessionToken);
+            return ("error", "An error occurred during logout");
+        }
+    }
+
+    public async Task<bool> ValidateApiKeyAsync(string apiKey)
+    {
+        try
+        {
+            using var connection = _db.CreateConnection();
+            await connection.OpenAsync();
+
+            var currentTime = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+            using var command = new MySqlCommand(
+                "SELECT * FROM API_Keys WHERE api_key = @apiKey AND (expires_at IS NULL OR expires_at > @currentTime)",
+                (MySqlConnection)connection);
+            
+            command.Parameters.Add("@apiKey", MySqlDbType.VarChar).Value = apiKey;
+            command.Parameters.Add("@currentTime", MySqlDbType.VarChar).Value = currentTime;
+
+            using var reader = await command.ExecuteReaderAsync();
+            return await reader.ReadAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error validating API key");
+            return false;
         }
     }
 } 

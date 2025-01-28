@@ -120,7 +120,7 @@ try {
                 u.employment_date,
                 u.national_address
             FROM card_application_details ca
-            LEFT JOIN Users u ON ca.national_id = u.national_id
+            LEFT JOIN Customers u ON ca.national_id = u.national_id
             WHERE ca.card_id = ?
         ";
         
@@ -144,7 +144,7 @@ try {
                 u.employment_date,
                 u.national_address
             FROM loan_applications la
-            LEFT JOIN Users u ON la.national_id = u.national_id
+            LEFT JOIN Customers u ON la.national_id = u.national_id
             WHERE la.loan_id = ?
         ";
         

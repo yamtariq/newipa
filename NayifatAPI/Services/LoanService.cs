@@ -1,5 +1,6 @@
 using MySql.Data.MySqlClient;
 using NayifatAPI.Models;
+using System.Text.Json;
 
 namespace NayifatAPI.Services;
 
@@ -13,15 +14,18 @@ public class LoanService : ILoanService
     private readonly DatabaseService _db;
     private readonly ILogger<LoanService> _logger;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly IAuditService _auditService;
 
     public LoanService(
         DatabaseService db,
         ILogger<LoanService> logger,
-        IHttpContextAccessor httpContextAccessor)
+        IHttpContextAccessor httpContextAccessor,
+        IAuditService auditService)
     {
         _db = db;
         _logger = logger;
         _httpContextAccessor = httpContextAccessor;
+        _auditService = auditService;
     }
 
     public async Task<LoanDecisionResponse> GetLoanDecisionAsync(LoanDecisionRequest request)
@@ -30,6 +34,13 @@ public class LoanService : ILoanService
         {
             using var connection = await _db.GetConnectionAsync();
             await connection.OpenAsync();
+
+            // Get user ID for audit logging
+            using var userCmd = connection.CreateCommand();
+            userCmd.CommandText = "SELECT id FROM Customers WHERE national_id = @nationalId";
+            userCmd.Parameters.Add("@nationalId", MySqlDbType.VarChar).Value = request.NationalId;
+            var userId = await userCmd.ExecuteScalarAsync();
+            var userIdInt = userId != null ? Convert.ToInt32(userId) : 0;
 
             // Check for active applications first
             using var command = connection.CreateCommand();
@@ -46,18 +57,27 @@ public class LoanService : ILoanService
             using var reader = await command.ExecuteReaderAsync();
             if (await reader.ReadAsync())
             {
+                var appNo = reader.GetString("application_no");
+                var status = reader.GetString("status");
+
+                await _auditService.LogAuditAsync(userIdInt, "Loan Decision Failed", 
+                    $"Active application exists: {appNo} with status: {status}");
+
                 return LoanDecisionResponse.Error(
                     "ACTIVE_APPLICATION_EXISTS",
                     "You have an active loan application. Please check your application status.",
                     "لديك طلب تمويل نشط. يرجى التحقق من حالة طلبك.",
-                    reader.GetString("application_no"),
-                    reader.GetString("status")
+                    appNo,
+                    status
                 );
             }
 
             // Basic validations
             if (request.Salary < 4000)
             {
+                await _auditService.LogAuditAsync(userIdInt, "Loan Decision Failed", 
+                    "Validation error: Salary below minimum requirement");
+
                 return LoanDecisionResponse.Error(
                     "VALIDATION_ERROR",
                     "Invalid input data",
@@ -124,6 +144,16 @@ public class LoanService : ILoanService
                 RecalculatedEmi = actualEmi
             };
 
+            await _auditService.LogAuditAsync(userIdInt, "Loan Decision Approved", 
+                JsonSerializer.Serialize(new {
+                    application_no = applicationNumber,
+                    principal = finalPrincipal,
+                    tenure = tenureMonths,
+                    emi = actualEmi,
+                    total_repayment = totalRepayment,
+                    debug_info = debugInfo
+                }));
+
             return LoanDecisionResponse.Success(
                 "approved",
                 finalPrincipal,
@@ -139,6 +169,10 @@ public class LoanService : ILoanService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing loan decision for national ID: {NationalId}", request.NationalId);
+            
+            await _auditService.LogAuditAsync(0, "Loan Decision Error", 
+                $"Error processing loan decision for national ID: {request.NationalId}. Error: {ex.Message}");
+
             return LoanDecisionResponse.Error(
                 "SYSTEM_ERROR",
                 ex.Message

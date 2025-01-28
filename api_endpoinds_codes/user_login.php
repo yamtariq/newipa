@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Check if the user exists
-    $query = "SELECT * FROM Users WHERE national_id = ?";
+    $query = "SELECT * FROM Customers WHERE national_id = ?";
     $stmt = $con->prepare($query);
     $stmt->bind_param("s", $national_id);
     $stmt->execute();

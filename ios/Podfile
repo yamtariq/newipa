@@ -33,8 +33,8 @@ target 'Runner' do
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 
   # Add Google Maps pods with specific versions
-  pod 'GoogleMaps', '7.4.0'
-  pod 'Google-Maps-iOS-Utils', '4.2.2'
+  # pod 'GoogleMaps', '7.4.0'
+  # pod 'Google-Maps-iOS-Utils', '4.2.2'
   
   # Update PhoneNumberKit to latest stable
   pod 'PhoneNumberKit', '~> 3.6.0'

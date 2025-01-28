@@ -1,4 +1,7 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 session_start();
 require_once '../db_connect.php';
 
@@ -26,9 +29,13 @@ if ($user_role === 'sales') {
     $status_conditions = "WHERE status IN ('pending', 'fulfilled')";
 }
 
-// Fetch card applications
+// Simple query first to check if table exists and has correct structure
 $query = "SELECT * FROM card_application_details $status_conditions ORDER BY status_date DESC";
 $result = $conn->query($query);
+
+if ($result === false) {
+    die("Error executing query: " . $conn->error);
+}
 ?>
 
 <!DOCTYPE html>
@@ -237,94 +244,129 @@ $result = $conn->query($query);
             font-weight: 600;
         }
 
-        .applications-table {
-            width: 100%;
+        .table-container {
+            margin: 20px;
             background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            border-collapse: collapse;
-            margin-top: 20px;
-            overflow: hidden;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            overflow-x: auto;
         }
 
-        .applications-table th,
-        .applications-table td {
-            padding: 15px 20px;
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            color: #1e293b;
+            font-weight: 600;
             text-align: left;
+            padding: 12px 20px;
             border-bottom: 1px solid #e2e8f0;
         }
 
-        .applications-table th {
-            background-color: #f8fafc;
-            font-weight: 600;
-            color: var(--text-color);
-            font-size: 0.875rem;
+        td {
+            padding: 12px 20px;
+            border-bottom: 1px solid #e2e8f0;
+            color: #475569;
         }
 
-        .applications-table tr:hover {
-            background-color: #f8fafc;
+        tr:hover {
+            background-color: var(--hover-bg);
         }
 
         .status-badge {
-            padding: 6px 12px;
-            border-radius: 9999px;
-            font-size: 0.75rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
             font-weight: 500;
-            text-transform: capitalize;
+            text-transform: uppercase;
         }
 
-        .status-pending {
-            background-color: #fff7ed;
-            color: #c2410c;
+        .pending {
+            background-color: #fff7e6;
+            color: #d97706;
         }
 
-        .status-approved {
-            background-color: #f0fdf4;
-            color: #15803d;
-        }
-
-        .status-rejected {
-            background-color: #fef2f2;
-            color: #b91c1c;
-        }
-
-        .status-fulfilled {
+        .approved {
             background-color: #ecfdf5;
-            color: #047857;
+            color: #059669;
         }
 
-        .status-missing {
-            background-color: #fff7ed;
-            color: #c2410c;
+        .declined {
+            background-color: #fef2f2;
+            color: #dc2626;
         }
 
-        .status-followup {
-            background-color: #eff6ff;
-            color: #1d4ed8;
+        .rejected {
+            background-color: #fef2f2;
+            color: #dc2626;
+        }
+
+        .view-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .view-btn:hover {
+            background-color: var(--secondary-color);
+        }
+
+        .view-btn i {
+            font-size: 12px;
+        }
+
+        .no-data {
+            text-align: center;
+            color: #94a3b8;
+            padding: 40px 0;
         }
 
         .modal {
             display: none;
             position: fixed;
-            z-index: 1000;
+            z-index: 1050;
             left: 0;
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.4);
-            overflow-y: auto;
+            background-color: rgba(0, 0, 0, 0.5);
+            overflow: auto;
         }
 
         .modal-content {
             background-color: #fefefe;
-            margin: 50px auto;
-            padding: 20px;
-            border-radius: 8px;
+            margin: 5% auto;
+            padding: 30px;
+            border: none;
+            border-radius: 12px;
             width: 80%;
-            max-width: 900px;
-            position: relative;
-            max-height: 90vh;
+            max-width: 800px;
+            max-height: 80vh;
             overflow-y: auto;
+            position: relative;
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                transform: translateY(-10%);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
         }
 
         .close {
@@ -333,11 +375,13 @@ $result = $conn->query($query);
             top: 20px;
             font-size: 28px;
             font-weight: bold;
+            color: #64748b;
             cursor: pointer;
+            transition: color 0.2s ease;
         }
 
         .close:hover {
-            color: var(--primary-color);
+            color: var(--text-color);
         }
 
         .tab-container {
@@ -384,22 +428,92 @@ $result = $conn->query($query);
         .form-group label {
             display: block;
             margin-bottom: 8px;
-            color: #64748b;
-            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-color);
         }
 
         .form-group input,
+        .form-group select,
         .form-group textarea {
             width: 100%;
-            padding: 8px 12px;
             border: 1px solid #e2e8f0;
-            border-radius: 4px;
-            font-size: 14px;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            transition: border-color 0.2s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .form-group input[readonly],
+        .form-group select[readonly],
+        .form-group textarea[readonly] {
+            background-color: #f8fafc;
+            cursor: not-allowed;
+        }
+
+        .form-group select:not([readonly]) {
+            background-color: white;
+            cursor: pointer;
         }
 
         .form-group textarea {
             min-height: 100px;
             resize: vertical;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            font-size: 0.875rem;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--secondary-color);
+        }
+
+        .btn-secondary {
+            background-color: #e2e8f0;
+            color: var(--text-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: #cbd5e1;
+        }
+
+        .btn-warning {
+            background-color: #fbbf24;
+            color: #92400e;
+        }
+
+        .btn-warning:hover {
+            background-color: #f59e0b;
+        }
+
+        .btn-info {
+            background-color: #0ea5e9;
+            color: white;
+        }
+
+        .btn-info:hover {
+            background-color: #0284c7;
         }
 
         .button-group {
@@ -485,7 +599,7 @@ $result = $conn->query($query);
         }
 
         .modal-content::-webkit-scrollbar-thumb {
-            background-color: #cbd5e1;
+            background: #cbd5e1;
             border-radius: 4px;
         }
 
@@ -539,306 +653,274 @@ $result = $conn->query($query);
     <div class="main-content">
         <div class="top-bar">
             <h1 class="page-title">Card Applications</h1>
+            <button id="toggleSidebar" class="toggle-button">
+                <i class="fas fa-bars"></i>
+            </button>
         </div>
-
-        <div class="applications-table">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Card ID</th>
-                        <th>Application No</th>
-                        <th>National ID</th>
-                        <th>Card Type</th>
-                        <th>Monthly Income</th>
-                        <th>Status</th>
-                        <th>Date</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php while($row = $result->fetch_assoc()): ?>
+        
+        <div class="content-wrapper">
+            <div class="table-container">
+                <table>
+                    <thead>
                         <tr>
-                            <td><?php echo $row['card_id']; ?></td>
-                            <td><?php echo $row['application_no']; ?></td>
-                            <td><?php echo $row['national_id']; ?></td>
-                            <td><?php echo $row['card_type']; ?></td>
-                            <td>SAR <?php echo number_format($row['monthly_income'], 2); ?></td>
-                            <td>
-                                <span class="status-badge status-<?php echo strtolower($row['status']); ?>">
-                                    <?php echo ucfirst($row['status']); ?>
-                                </span>
-                            </td>
-                            <td><?php echo date('Y-m-d H:i', strtotime($row['status_date'])); ?></td>
-                            <td>
-                                <button class="action-btn" onclick="showApplicationDetails(<?php echo $row['card_id']; ?>)">
-                                    <i class="fas fa-eye"></i> View
-                                </button>
-                                <?php if ($_SESSION['role'] === 'credit' && $row['status'] === 'pending'): ?>
-                                    <button class="action-btn" onclick="handleStatusUpdate(<?php echo $row['card_id']; ?>, 'approved', 'card')">
-                                        <i class="fas fa-check"></i> Approve
-                                    </button>
-                                    <button class="action-btn" onclick="handleStatusUpdate(<?php echo $row['card_id']; ?>, 'rejected', 'card')">
-                                        <i class="fas fa-times"></i> Reject
-                                    </button>
-                                <?php endif; ?>
-                                <?php if ($_SESSION['role'] === 'sales' && $row['status'] === 'pending'): ?>
-                                    <button class="action-btn" onclick="handleStatusUpdate(<?php echo $row['card_id']; ?>, 'fulfilled', 'card')">
-                                        <i class="fas fa-check"></i> Mark Fulfilled
-                                    </button>
-                                    <button class="action-btn" onclick="handleStatusUpdate(<?php echo $row['card_id']; ?>, 'missing', 'card')">
-                                        <i class="fas fa-exclamation-triangle"></i> Mark Missing
-                                    </button>
-                                <?php endif; ?>
-                            </td>
+                            <th>Card ID</th>
+                            <th>National ID</th>
+                            <th>Status</th>
+                            <th>Application Date</th>
+                            <th style="width: 100px;">Actions</th>
                         </tr>
-                    <?php endwhile; ?>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        <?php
+                        if ($result && $result->num_rows > 0) {
+                            while ($row = $result->fetch_assoc()) {
+                                $statusClass = strtolower($row['status']);
+                                echo "<tr>";
+                                echo "<td>{$row['card_id']}</td>";
+                                echo "<td>{$row['national_id']}</td>";
+                                echo "<td><span class='status-badge {$statusClass}'>{$row['status']}</span></td>";
+                                echo "<td>" . date('Y-m-d H:i', strtotime($row['status_date'])) . "</td>";
+                                echo "<td>";
+                                echo "<button class='view-btn' onclick='showApplicationDetails({$row['card_id']})'>";
+                                echo "<i class='fas fa-eye'></i> View";
+                                echo "</button>";
+                                echo "</td>";
+                                echo "</tr>";
+                            }
+                        } else {
+                            echo "<tr><td colspan='5' class='no-data'>No applications found</td></tr>";
+                        }
+                        ?>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
     <div id="applicationModal" class="modal">
         <div class="modal-content">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-right: 50px;">
-                <div style="display: flex; align-items: center; gap: 20px;">
-                    <h2 id="modalTitle" class="page-title">Application Details</h2>
-                    <div class="status-badge" id="statusBadge"></div>
-                </div>
-                <span class="close">&times;</span>
+            <span class="close">&times;</span>
+            <div class="modal-header">
+                <h2>Card Application Details</h2>
+                <div id="statusBadge" class="status-badge"></div>
             </div>
+            <div class="modal-body">
+                <div class="tab-container">
+                    <div class="tab-header">
+                        <button class="tab-button active" onclick="openTab(event, 'card-info')">Card Info</button>
+                        <button class="tab-button" onclick="openTab(event, 'personal-info')">Personal Info</button>
+                        <button class="tab-button" onclick="openTab(event, 'employment-info')">Employment Info</button>
+                    </div>
 
-            <div class="tab-container">
-                <div class="tab-header">
-                    <button class="tab-button active" onclick="openTab(event, 'card-info')">Card Info</button>
-                    <button class="tab-button" onclick="openTab(event, 'personal-info')">Personal Info</button>
-                    <button class="tab-button" onclick="openTab(event, 'documents')">Documents</button>
-                    <button class="tab-button" onclick="openTab(event, 'status-history')">Status History</button>
+                    <div id="card-info" class="tab-content">
+                        <div class="form-group">
+                            <label>Card ID</label>
+                            <input type="text" id="card_id" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>Card Type</label>
+                            <input type="text" id="card_type" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>Credit Limit</label>
+                            <input type="text" id="credit_limit" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>Application Date</label>
+                            <input type="text" id="application_date" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <input type="text" id="status" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>Last Updated</label>
+                            <input type="text" id="last_updated" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>Remarks</label>
+                            <textarea id="remarks"></textarea>
+                        </div>
+                    </div>
+
+                    <div id="personal-info" class="tab-content" style="display: none;">
+                        <div class="form-group">
+                            <label>Full Name</label>
+                            <input type="text" id="name" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>National ID</label>
+                            <input type="text" id="national_id" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>Date of Birth</label>
+                            <input type="text" id="dob" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>Nationality</label>
+                            <input type="text" id="nationality" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>Mobile Number</label>
+                            <input type="text" id="phone" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="text" id="email" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>City</label>
+                            <input type="text" id="city" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>Address</label>
+                            <textarea id="address" readonly></textarea>
+                        </div>
+                    </div>
+
+                    <div id="employment-info" class="tab-content" style="display: none;">
+                        <div class="form-group">
+                            <label>Employment Status</label>
+                            <input type="text" id="employment_status" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>Employer</label>
+                            <input type="text" id="employer" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>Monthly Salary</label>
+                            <input type="text" id="salary" readonly>
+                        </div>
+                    </div>
                 </div>
 
-                <div id="card-info" class="tab-content">
-                    <div class="form-group">
-                        <label>Card Application ID</label>
-                        <input type="text" id="card_id" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label>Card Type</label>
-                        <input type="text" id="card_type" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label>Application Date</label>
-                        <input type="text" id="application_date" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label>Status</label>
-                        <input type="text" id="status" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label>Remarks</label>
-                        <textarea id="remarks"></textarea>
-                    </div>
-                    <div class="button-group">
-                        <button class="btn btn-primary" onclick="updateCardStatus('accepted')">Accept</button>
-                        <button class="btn btn-secondary" onclick="updateCardStatus('rejected')">Reject</button>
-                        <button class="btn btn-warning" onclick="updateCardStatus('missing')">Missing Info</button>
-                        <button class="btn btn-info" onclick="updateCardStatus('followup')">Follow Up</button>
-                    </div>
+                <!-- Action Buttons -->
+                <?php if ($_SESSION['role'] === 'credit'): ?>
+                <div class="action-buttons">
+                    <button onclick="updateCardStatus('approved')" class="btn btn-success">Approve</button>
+                    <button onclick="updateCardStatus('rejected')" class="btn btn-danger">Reject</button>
+                    <button onclick="updateCardStatus('missing')" class="btn btn-warning">Missing Info</button>
+                    <button onclick="updateCardStatus('followup')" class="btn btn-info">Follow Up</button>
                 </div>
-
-                <div id="personal-info" class="tab-content" style="display: none;">
-                    <div class="form-group">
-                        <label>Full Name</label>
-                        <input type="text" id="full_name" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label>National ID</label>
-                        <input type="text" id="national_id" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label>Mobile Number</label>
-                        <input type="text" id="mobile_number" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label>Email</label>
-                        <input type="text" id="email" readonly>
-                    </div>
-                </div>
-
-                <div id="documents" class="tab-content" style="display: none;">
-                    <div id="documents-container"></div>
-                </div>
-
-                <div id="status-history" class="tab-content" style="display: none;">
-                    <div id="status-history-container"></div>
-                </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
 
     <script>
-        // Sidebar toggle functionality
-        const sidebar = document.getElementById('sidebar');
-        const toggleButton = document.getElementById('toggleSidebar');
-        const mainContent = document.querySelector('.main-content');
-
-        function toggleSidebar() {
-            sidebar.classList.toggle('collapsed');
-            mainContent.classList.toggle('expanded');
-        }
-
-        // Modal functionality
-        const modal = document.getElementById('applicationModal');
-        const span = document.getElementsByClassName('close')[0];
-
-        span.onclick = function() {
-            modal.style.display = "none";
-        }
-
-        window.onclick = function(event) {
-            if (event.target == modal) {
-                modal.style.display = "none";
-            }
-        }
-
         function openTab(evt, tabName) {
-            var i, tabContent, tabButtons;
-            tabContent = document.getElementsByClassName("tab-content");
-            for (i = 0; i < tabContent.length; i++) {
-                tabContent[i].style.display = "none";
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tab-content");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
             }
-            tabButtons = document.getElementsByClassName("tab-button");
-            for (i = 0; i < tabButtons.length; i++) {
-                tabButtons[i].className = tabButtons[i].className.replace(" active", "");
+            tablinks = document.getElementsByClassName("tab-button");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
             }
             document.getElementById(tabName).style.display = "block";
             evt.currentTarget.className += " active";
         }
 
-        function showApplicationDetails(applicationId) {
-            fetch(`../api/get-card-details.php?id=${applicationId}`)
-                .then(response => response.json())
-                .then(data => {
-                    // Card Info
-                    document.getElementById('card_id').value = data.card_id;
-                    document.getElementById('card_type').value = data.card_type;
-                    document.getElementById('application_date').value = data.application_date;
-                    document.getElementById('status').value = data.status;
-                    document.getElementById('remarks').value = data.remarks || '';
+        async function showApplicationDetails(cardId) {
+            try {
+                const response = await fetch(`../api/get-card-details.php?id=${cardId}`);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message || 'Error fetching application details');
+                }
+                
+                if (!data.success) {
+                    throw new Error(data.message || 'Error fetching application details');
+                }
 
-                    // Personal Info
-                    document.getElementById('full_name').value = data.full_name;
-                    document.getElementById('national_id').value = data.national_id;
-                    document.getElementById('mobile_number').value = data.mobile_number;
-                    document.getElementById('email').value = data.email;
+                const app = data.details;
+                
+                // Update card info
+                document.getElementById('card_id').value = app.card_id;
+                document.getElementById('card_type').value = app.card_type;
+                document.getElementById('credit_limit').value = app.credit_limit;
+                document.getElementById('application_date').value = app.application_date;
+                document.getElementById('status').value = app.status;
+                document.getElementById('last_updated').value = app.last_updated;
+                document.getElementById('remarks').value = app.remarks || '';
+                
+                // Update personal info
+                document.getElementById('name').value = app.name;
+                document.getElementById('national_id').value = app.national_id;
+                document.getElementById('dob').value = app.dob;
+                document.getElementById('nationality').value = app.nationality;
+                document.getElementById('phone').value = app.phone;
+                document.getElementById('email').value = app.email;
+                document.getElementById('city').value = app.city;
+                document.getElementById('address').value = app.address;
+                
+                // Update employment info
+                document.getElementById('employment_status').value = app.employment_status;
+                document.getElementById('employer').value = app.employer;
+                document.getElementById('salary').value = app.salary;
+                
+                // Update status badge
+                const statusBadge = document.getElementById('statusBadge');
+                statusBadge.textContent = app.status.toUpperCase();
+                statusBadge.className = 'status-badge ' + app.status.toLowerCase();
 
-                    // Update status badge
-                    const statusBadge = document.getElementById('statusBadge');
-                    statusBadge.textContent = data.status.toUpperCase();
-                    statusBadge.className = 'status-badge ' + data.status;
-
-                    // Documents
-                    const documentsContainer = document.getElementById('documents-container');
-                    documentsContainer.innerHTML = '';
-                    if (data.documents && data.documents.length > 0) {
-                        data.documents.forEach(doc => {
-                            const docElement = document.createElement('div');
-                            docElement.className = 'document-item';
-                            docElement.innerHTML = `
-                                <span>${doc.name}</span>
-                                <a href="${doc.url}" target="_blank" class="btn btn-primary">View</a>
-                            `;
-                            documentsContainer.appendChild(docElement);
-                        });
-                    } else {
-                        documentsContainer.innerHTML = '<p>No documents available</p>';
-                    }
-
-                    // Status History
-                    const historyContainer = document.getElementById('status-history-container');
-                    historyContainer.innerHTML = '';
-                    if (data.status_history && data.status_history.length > 0) {
-                        const historyTable = document.createElement('table');
-                        historyTable.className = 'status-history-table';
-                        historyTable.innerHTML = `
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Status</th>
-                                    <th>Remarks</th>
-                                    <th>Updated By</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${data.status_history.map(history => `
-                                    <tr>
-                                        <td>${history.date}</td>
-                                        <td><span class="status-badge ${history.status}">${history.status.toUpperCase()}</span></td>
-                                        <td>${history.remarks || ''}</td>
-                                        <td>${history.updated_by}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        `;
-                        historyContainer.appendChild(historyTable);
-                    } else {
-                        historyContainer.innerHTML = '<p>No status history available</p>';
-                    }
-
-                    modal.style.display = "block";
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error fetching application details');
-                });
+                // Show modal and first tab
+                document.getElementById('applicationModal').style.display = 'block';
+                openTab({ currentTarget: document.querySelector('.tab-button') }, 'card-info');
+            } catch (error) {
+                console.error('Error:', error);
+                alert(error.message);
+            }
         }
 
-        function updateCardStatus(status) {
+        // Close modal when clicking the close button or outside the modal
+        document.querySelector('.close').onclick = function() {
+            document.getElementById('applicationModal').style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('applicationModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        async function updateCardStatus(newStatus) {
             const cardId = document.getElementById('card_id').value;
             const remarks = document.getElementById('remarks').value;
             
-            fetch('../api/update-card-status.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    card_id: cardId,
-                    status: status,
-                    remarks: remarks
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
+            try {
+                const response = await fetch('../api/update-card-status.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        card_id: cardId,
+                        status: newStatus,
+                        remarks: remarks
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message || 'Error updating status');
+                }
+                
                 if (data.success) {
                     alert('Status updated successfully');
                     location.reload();
                 } else {
-                    alert('Error updating status: ' + data.message);
+                    throw new Error(data.message || 'Error updating status');
                 }
-            })
-            .catch(error => {
+            } catch (error) {
                 console.error('Error:', error);
-                alert('Error updating status');
-            });
-        }
-    </script>
-    <script>
-        const sidebar = document.getElementById('sidebar');
-        const toggleButton = document.getElementById('toggleSidebar');
-
-        toggleButton.addEventListener('click', () => {
-            sidebar.classList.toggle('collapsed');
-        });
-
-        // Handle responsive behavior
-        if (window.innerWidth <= 768) {
-            sidebar.classList.add('collapsed');
-        }
-
-        window.addEventListener('resize', () => {
-            if (window.innerWidth <= 768) {
-                sidebar.classList.add('collapsed');
+                alert(error.message);
             }
-        });
+        }
     </script>
     <script src="../assets/js/main.js?v=<?php echo time(); ?>"></script>
 </body>

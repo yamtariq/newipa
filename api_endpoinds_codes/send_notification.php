@@ -50,7 +50,7 @@ try {
 
     // Case 1: Single user
     if (!empty($data['national_id'])) {
-        $stmt = $con->prepare("SELECT national_id FROM Users WHERE national_id = ?");
+        $stmt = $con->prepare("SELECT national_id FROM Customers WHERE national_id = ?");
         $stmt->bind_param("s", $data['national_id']);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -63,7 +63,7 @@ try {
     else if (!empty($data['national_ids']) && is_array($data['national_ids'])) {
         $ids = array_map([$con, 'real_escape_string'], $data['national_ids']);
         $idList = "'" . implode("','", $ids) . "'";
-        $result = $con->query("SELECT national_id FROM Users WHERE national_id IN ($idList)");
+        $result = $con->query("SELECT national_id FROM Customers WHERE national_id IN ($idList)");
         while ($row = $result->fetch_assoc()) {
             $targetUsers[] = $row['national_id'];
         }
@@ -259,7 +259,7 @@ try {
         }
 
         if (!empty($conditions)) {
-            $query = "SELECT national_id FROM Users WHERE " . implode(" AND ", $conditions);
+            $query = "SELECT national_id FROM Customers WHERE " . implode(" AND ", $conditions);
             // Debug logging
             error_log("Generated SQL Query: " . $query);
             error_log("Parameters: " . json_encode($params));

@@ -1,7 +1,7 @@
 using MySql.Data.MySqlClient;
 using NayifatAPI.Models.CardDecision;
 using System.Security.Cryptography;
-using System.TimeZone;
+using System.Text.Json;
 
 namespace NayifatAPI.Services;
 
@@ -14,32 +14,49 @@ public interface ICardDecisionService
 public class CardDecisionService : ICardDecisionService
 {
     private readonly IDatabaseService _db;
-    private readonly IAuditLogService _auditLog;
+    private readonly IAuditService _auditService;
+    private readonly ILogger<CardDecisionService> _logger;
     private const decimal MIN_CREDIT_LIMIT = 2000m;
     private const decimal MAX_CREDIT_LIMIT = 50000m;
     private const decimal MIN_SALARY = 4000m;
     private const decimal DBR_RATE = 0.15m;
 
-    public CardDecisionService(IDatabaseService db, IAuditLogService auditLog)
+    public CardDecisionService(
+        IDatabaseService db, 
+        IAuditService auditService,
+        ILogger<CardDecisionService> logger)
     {
         _db = db;
-        _auditLog = auditLog;
+        _auditService = auditService;
+        _logger = logger;
     }
 
     public async Task<object> ProcessCardDecision(CardDecisionRequest request)
     {
         try
         {
+            // Get user ID for audit logging
+            using var userCmd = _db.CreateCommand("SELECT id FROM Customers WHERE national_id = @nationalId");
+            userCmd.Parameters.AddWithValue("@nationalId", request.NationalId);
+            var userId = await userCmd.ExecuteScalarAsync();
+            var userIdInt = userId != null ? Convert.ToInt32(userId) : 0;
+
             // Check for active applications first
             var activeApplication = await CheckActiveApplications(request.NationalId);
             if (activeApplication != null)
             {
+                await _auditService.LogAuditAsync(userIdInt, "Card Decision Failed", 
+                    $"Active application exists: {activeApplication.ApplicationNo} with status: {activeApplication.CurrentStatus}");
+
                 return activeApplication;
             }
 
             // Validate salary
             if (request.Salary < MIN_SALARY)
             {
+                await _auditService.LogAuditAsync(userIdInt, "Card Decision Failed", 
+                    "Validation error: Salary below minimum requirement");
+
                 return new CardDecisionErrorResponse
                 {
                     Code = "VALIDATION_ERROR",
@@ -61,7 +78,13 @@ public class CardDecisionService : ICardDecisionService
             await SaveCardApplication(request.NationalId, applicationNumber, cardType, creditLimit);
 
             // Log success
-            await _auditLog.LogAudit(null, "Card Decision", $"Card decision processed with credit limit: {creditLimit}");
+            await _auditService.LogAuditAsync(userIdInt, "Card Decision Approved", 
+                JsonSerializer.Serialize(new {
+                    application_no = applicationNumber,
+                    card_type = cardType,
+                    credit_limit = creditLimit,
+                    debug_info = debugInfo
+                }));
 
             // Return response
             return new CardDecisionResponse
@@ -76,7 +99,11 @@ public class CardDecisionService : ICardDecisionService
         }
         catch (Exception ex)
         {
-            await _auditLog.LogAudit(null, "Card Decision Error", ex.Message);
+            _logger.LogError(ex, "Error processing card decision for national ID: {NationalId}", request.NationalId);
+            
+            await _auditService.LogAuditAsync(0, "Card Decision Error", 
+                $"Error processing card decision for national ID: {request.NationalId}. Error: {ex.Message}");
+
             return new CardDecisionErrorResponse
             {
                 Code = "SYSTEM_ERROR",

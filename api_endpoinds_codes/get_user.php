@@ -42,7 +42,7 @@ try {
     $nationalId = $_GET['nationalId'];
 
     // Prepare SQL query to fetch user details
-    $stmt = $con->prepare("SELECT * FROM Users WHERE national_id = ?");
+    $stmt = $con->prepare("SELECT * FROM Customers WHERE national_id = ?");
     $stmt->bind_param("s", $nationalId);
     $stmt->execute();
     $result = $stmt->get_result();
