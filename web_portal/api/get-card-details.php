@@ -51,11 +51,7 @@ try {
                u.phone, 
                u.sector as employment_status, 
                u.employer, 
-               u.salary_customer as salary,
-               u.dob,
-               u.nationality,
-               u.city,
-               u.address
+               u.salary_customer as salary
         FROM card_application_details c
         LEFT JOIN Customers u ON c.national_id = u.national_id
         WHERE c.card_id = ?
@@ -87,10 +83,6 @@ try {
                 'employment_status' => $row['employment_status'],
                 'employer' => $row['employer'],
                 'salary' => $row['salary'],
-                'dob' => $row['dob'],
-                'nationality' => $row['nationality'],
-                'city' => $row['city'],
-                'address' => $row['address'],
                 'card_type' => $row['card_type'] ?? 'Standard',
                 'credit_limit' => $row['credit_limit'] ?? 0,
                 'application_date' => $row['status_date'],

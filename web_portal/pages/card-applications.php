@@ -753,28 +753,12 @@ if ($result === false) {
                             <input type="text" id="national_id" readonly>
                         </div>
                         <div class="form-group">
-                            <label>Date of Birth</label>
-                            <input type="text" id="dob" readonly>
-                        </div>
-                        <div class="form-group">
-                            <label>Nationality</label>
-                            <input type="text" id="nationality" readonly>
-                        </div>
-                        <div class="form-group">
                             <label>Mobile Number</label>
                             <input type="text" id="phone" readonly>
                         </div>
                         <div class="form-group">
                             <label>Email</label>
                             <input type="text" id="email" readonly>
-                        </div>
-                        <div class="form-group">
-                            <label>City</label>
-                            <input type="text" id="city" readonly>
-                        </div>
-                        <div class="form-group">
-                            <label>Address</label>
-                            <textarea id="address" readonly></textarea>
                         </div>
                     </div>
 
@@ -849,12 +833,8 @@ if ($result === false) {
                 // Update personal info
                 document.getElementById('name').value = app.name;
                 document.getElementById('national_id').value = app.national_id;
-                document.getElementById('dob').value = app.dob;
-                document.getElementById('nationality').value = app.nationality;
                 document.getElementById('phone').value = app.phone;
                 document.getElementById('email').value = app.email;
-                document.getElementById('city').value = app.city;
-                document.getElementById('address').value = app.address;
                 
                 // Update employment info
                 document.getElementById('employment_status').value = app.employment_status;
