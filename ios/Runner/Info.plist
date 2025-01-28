@@ -63,11 +63,11 @@
 		<key>NSFaceIDUsageDescription</key>
 		<string>This app needs face id access for biometric authentication</string>
 		<key>NSLocationWhenInUseUsageDescription</key>
-		<string>This app needs access to location when open to verify your location for loan applications.</string>
+		<string>We need your location to show you nearby branches and provide better service.</string>
 		<key>NSLocationAlwaysUsageDescription</key>
-		<string>This app needs access to location when in the background to verify your location for loan applications.</string>
+		<string>We need your location to show you nearby branches and provide better service even when the app is in background.</string>
 		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-		<string>This app needs access to location when open and in the background to verify your location for loan applications.</string>
+		<string>We need your location to show you nearby branches and provide better service.</string>
 		<key>UIUserNotificationTypes</key>
 		<array>
 			<string>alert</string>
@@ -84,7 +84,7 @@
 		<true/>
 		<key>BGTaskSchedulerPermittedIdentifiers</key>
 		<array>
-			<string>$(PRODUCT_BUNDLE_IDENTIFIER).notification_refresh</string>
+			<string>com.nayifat.app.notification_refresh</string>
 		</array>
 		<key>NSFileProtectionComplete</key>
 		<true/>
@@ -108,7 +108,19 @@
 		<key>NSAppTransportSecurity</key>
 		<dict>
 			<key>NSAllowsArbitraryLoads</key>
-			<true/>
+			<false/>
+			<key>NSExceptionDomains</key>
+			<dict>
+				<key>nayifat.com</key>
+				<dict>
+					<key>NSIncludesSubdomains</key>
+					<true/>
+					<key>NSTemporaryExceptionAllowsInsecureHTTPLoads</key>
+					<true/>
+					<key>NSTemporaryExceptionMinimumTLSVersion</key>
+					<string>TLSv1.2</string>
+				</dict>
+			</dict>
 		</dict>
 	</dict>
 </plist>

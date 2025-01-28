@@ -41,54 +41,68 @@ try {
     $new_password = isset($_POST['new_password']) ? $_POST['new_password'] : null;
     $type = isset($_POST['type']) ? $con->real_escape_string($_POST['type']) : 'reset_password';
 
-    if (!$national_id || !$new_password) {
-        throw new Exception('Missing required fields');
+    if (!$national_id) {
+        throw new Exception('Missing required field: national_id');
     }
 
     // Start transaction
     $con->begin_transaction();
 
     try {
-        // Validate password requirements
-        if (strlen($new_password) < 8 || 
-            !preg_match('/[A-Z]/', $new_password) || 
-            !preg_match('/[a-z]/', $new_password) || 
-            !preg_match('/[0-9]/', $new_password)) {
-            throw new Exception('Password must be at least 8 characters and include uppercase, lowercase, and numbers');
+        // Validate password requirements only if password is provided
+        if ($new_password) {
+            if (strlen($new_password) < 8 || 
+                !preg_match('/[A-Z]/', $new_password) || 
+                !preg_match('/[a-z]/', $new_password) || 
+                !preg_match('/[0-9]/', $new_password)) {
+                throw new Exception('Password must be at least 8 characters and include uppercase, lowercase, and numbers');
+            }
         }
 
         // Check if user exists
-        $query = "SELECT user_id, password FROM Users WHERE national_id = ?";
+        $query = "SELECT id, password FROM Customers WHERE national_id = ?";
         $stmt = $con->prepare($query);
         $stmt->bind_param("s", $national_id);
         $stmt->execute();
         $result = $stmt->get_result();
 
         if ($result->num_rows === 0) {
-            throw new Exception('User not found');
+            throw new Exception('Customer not found');
         }
 
-        $user = $result->fetch_assoc();
+        $customer = $result->fetch_assoc();
 
-        // Check if new password is same as old password
-        if (password_verify($new_password, $user['password'])) {
-            throw new Exception('New password must be different from current password');
+        // Only proceed with password update if new password is provided
+        if ($new_password) {
+            // Check if new password is same as old password
+            if ($customer['password'] && password_verify($new_password, $customer['password'])) {
+                throw new Exception('New password must be different from current password');
+            }
+
+            // Hash the new password
+            $hashedPassword = password_hash($new_password, PASSWORD_BCRYPT);
+
+            // Update the password
+            $query = "UPDATE Customers SET password = ? WHERE national_id = ?";
+            $stmt = $con->prepare($query);
+            $stmt->bind_param("ss", $hashedPassword, $national_id);
+            
+            if (!$stmt->execute()) {
+                throw new Exception('Failed to update password');
+            }
+
+            // Log the password change
+            $log_query = "INSERT INTO password_change_logs (
+                national_id, 
+                type, 
+                status, 
+                ip_address, 
+                user_agent
+            ) VALUES (?, ?, 'success', ?, ?)";
+            $stmt = $con->prepare($log_query);
+            $stmt->bind_param("ssss", $national_id, $type, $_SERVER['REMOTE_ADDR'], $_SERVER['HTTP_USER_AGENT']);
+            $stmt->execute();
         }
-
-        // Hash the new password
-        $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
-
-        // Update the password
-        $query = "UPDATE Users SET password = ? WHERE national_id = ?";
-        $stmt = $con->prepare($query);
-        $stmt->bind_param("ss", $hashed_password, $national_id);
-        
-        if (!$stmt->execute()) {
-            throw new Exception('Failed to update password');
-        }
-
-        // Log the password change
-        log_audit($con, $user['user_id'], 'Password Change Successful', 'Password changed via ' . $type);
 
         // Commit transaction
         $con->commit();
@@ -110,7 +124,7 @@ try {
     $error_message_ar = '';
     
     switch ($error_message) {
-        case 'User not found':
+        case 'Customer not found':
             $error_code = 'USER_NOT_FOUND';
             $error_message_ar = 'المستخدم غير موجود';
             break;
@@ -131,8 +145,8 @@ try {
             $error_message_ar = 'حدث خطأ غير متوقع';
     }
 
-    if (isset($user['user_id'])) {
-        log_audit($con, $user['user_id'], 'Password Change Failed', $error_message);
+    if (isset($customer['id'])) {
+        log_audit($con, $customer['id'], 'Password Change Failed', $error_message);
     }
 
     echo json_encode([

@@ -1,0 +1,58 @@
+-- Create Customers table
+CREATE TABLE Customers (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    national_id VARCHAR(20) NOT NULL UNIQUE,
+    first_name_en VARCHAR(50),
+    second_name_en VARCHAR(50),
+    third_name_en VARCHAR(50),
+    family_name_en VARCHAR(50),
+    first_name_ar VARCHAR(50),
+    second_name_ar VARCHAR(50),
+    third_name_ar VARCHAR(50),
+    family_name_ar VARCHAR(50),
+    date_of_birth TIMESTAMP,
+    id_expiry_date TIMESTAMP,
+    email VARCHAR(100) UNIQUE,
+    phone VARCHAR(20),
+    building_no VARCHAR(20),
+    street VARCHAR(100),
+    district VARCHAR(100),
+    city VARCHAR(50),
+    zipcode VARCHAR(10),
+    add_no VARCHAR(50),
+    iban VARCHAR(50),
+    dependents INT,
+    salary_dakhli DECIMAL(15,2),
+    salary_customer DECIMAL(15,2),
+    los INT, -- Length of Service in months
+    sector VARCHAR(100),
+    employer VARCHAR(100),
+    password VARCHAR(255),
+    registration_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    consent BOOLEAN DEFAULT FALSE,
+    consent_date TIMESTAMP,
+    nafath_status VARCHAR(50),
+    nafath_timestamp TIMESTAMP,
+    INDEX idx_national_id (national_id),
+    INDEX idx_email (email),
+    INDEX idx_phone (phone)
+);
+
+-- Create Applications table
+CREATE TABLE Applications (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    application_id VARCHAR(50) UNIQUE,
+    application_status VARCHAR(50),
+    status VARCHAR(50),
+    amount DECIMAL(15,2),
+    emi DECIMAL(15,2),
+    type VARCHAR(50),
+    purpose VARCHAR(100),
+    rate DECIMAL(5,2),
+    app_status VARCHAR(50),
+    status_date TIMESTAMP,
+    app_status_date TIMESTAMP,
+    INDEX idx_application_id (application_id),
+    INDEX idx_status (status),
+    INDEX idx_app_status (app_status)
+); 

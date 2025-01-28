@@ -311,10 +311,6 @@ class _SignInScreenState extends State<SignInScreen> {
       Provider.of<SessionProvider>(context, listen: false).resetManualSignOff();
 
       try {
-        print('Storing user data...');
-        // Store user data in local storage
-        await _authService.storeUserData(response['user']);
-
         // For quick sign-in (MPIN/biometric), go directly to main page
         if (!_isPasswordMode) {
           print('Quick sign-in successful, navigating to main page');
@@ -327,7 +323,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   onLanguageChanged: (bool newIsArabic) {
                     // Handle language change if needed
                   },
-                  userData: response['user'],
+                  userData: response['user'] ?? {},
                   isDarkMode: Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
                 ),
               ),
@@ -344,21 +340,6 @@ class _SignInScreenState extends State<SignInScreen> {
 
         if (registerResponse['status'] == 'success') {
           if (mounted) {
-            // Show quick success message
-            // ScaffoldMessenger.of(context).showSnackBar(
-            //   SnackBar(
-            //     content: Text(
-            //       widget.isArabic 
-            //         ? 'تم تسجيل الجهاز بنجاح'
-            //         : 'Device registered successfully',
-            //       style: const TextStyle(color: Colors.white),
-            //     ),
-            //     backgroundColor: Colors.green,
-            //     duration: const Duration(seconds: 2),
-            //   ),
-            // );
-
-            // Navigate to MPIN setup
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
@@ -366,7 +347,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   isArabic: widget.isArabic,
                   nationalId: _nationalIdController.text,
                   password: _passwordController.text,
-                  user: response['user'],
+                  user: response['user'] ?? {},
                   showSteps: false,
                 ),
               ),
@@ -389,7 +370,7 @@ class _SignInScreenState extends State<SignInScreen> {
       print('Sign in failed with code: ${response['code']}');
 
       switch (response['code']) {
-        case 'USER_NOT_FOUND':
+        case 'CUSTOMER_NOT_FOUND':
           await showDialog(
             context: context,
             barrierDismissible: false,
@@ -501,7 +482,7 @@ class _SignInScreenState extends State<SignInScreen> {
           if (mounted) {
             _showErrorBanner(
               widget.isArabic
-                  ? 'حدث خطأ أثناء تسجيل الدخول'
+                  ? response['message_ar'] ?? 'حدث خطأ أثناء تسجيل الدخول'
                   : response['message'] ?? 'Error during sign in process'
             );
           }
@@ -688,7 +669,7 @@ class _SignInScreenState extends State<SignInScreen> {
       _isTimerActive = true;
     });
 
-    // Start 7-second timer
+    // Start 10-second timer
     Future.delayed(const Duration(seconds: 10), () {
       if (mounted) {
         setState(() {
@@ -698,9 +679,29 @@ class _SignInScreenState extends State<SignInScreen> {
     });
 
     try {
-      // Generate OTP first
-      await _generateOTP(_nationalIdController.text);
+      // Step 1 & 2: Check user exists and verify password
+      print('\n=== STARTING SIGN IN PROCESS ===');
+      final signInResult = await _authService.signIn(
+        nationalId: _nationalIdController.text,
+        password: _passwordController.text,
+      );
 
+      if (signInResult['status'] != 'success') {
+        print('Sign in failed: ${signInResult['code']}');
+      await _handleSignInResponse(signInResult);
+        return;
+      }
+
+      // Step 3: Generate OTP
+      print('\n=== GENERATING OTP ===');
+      final otpGenResult = await _authService.generateOTP(_nationalIdController.text);
+      if (otpGenResult['status'] != 'success') {
+        throw Exception(widget.isArabic 
+          ? (otpGenResult['message_ar'] ?? 'فشل في إرسال رمز التحقق')
+          : (otpGenResult['message'] ?? 'Failed to send OTP'));
+      }
+
+      // Step 4: Show OTP dialog and verify
       final otpVerified = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
@@ -713,14 +714,27 @@ class _SignInScreenState extends State<SignInScreen> {
       );
 
       if (otpVerified == true) {
-        await _authenticateWithPassword();
+        // Step 5: Register device and proceed with sign in
+        final deviceRegistration = await _authService.registerDevice(
+          nationalId: _nationalIdController.text,
+        );
+
+        if (deviceRegistration['status'] != 'success') {
+          throw Exception(deviceRegistration['message'] ?? 'Failed to register device');
+        }
+
+        // Step 6: Complete sign in process
+        await _handleSignInResponse({
+          ...signInResult,
+          'device_registered': true
+        });
       }
     } catch (e) {
-      print('Error during OTP process: $e');
+      print('Error during sign in process: $e');
       if (mounted) {
         _showErrorBanner(
           widget.isArabic
-              ? 'حدث خطأ أثناء التحقق'
+              ? 'حدث خطأ أثناء تسجيل الدخول'
               : e.toString()
         );
       }
@@ -1095,6 +1109,9 @@ class _SignInScreenState extends State<SignInScreen> {
     
     return Card(
       elevation: 0,
+      color: isDarkMode 
+          ? Color(Constants.darkFormBackgroundColor)
+          : Color(Constants.lightFormBackgroundColor),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
         side: BorderSide(
@@ -1103,9 +1120,6 @@ class _SignInScreenState extends State<SignInScreen> {
               : Color(Constants.lightFormBorderColor),
         ),
       ),
-      color: isDarkMode 
-          ? Color(Constants.darkFormBackgroundColor)
-          : Color(Constants.lightFormBackgroundColor),
       child: InkWell(
         onTap: _isLoading ? null : onTap,
         borderRadius: BorderRadius.circular(Constants.containerBorderRadius),

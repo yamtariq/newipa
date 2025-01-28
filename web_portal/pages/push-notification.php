@@ -19,7 +19,7 @@ function getTableColumns($conn, $table) {
 
 // Get columns for each table
 $tables = [
-    'Users' => getTableColumns($conn, 'Users'),
+    'Customers' => getTableColumns($conn, 'Customers'),
     'card_application_details' => getTableColumns($conn, 'card_application_details'),
     'loan_application_details' => getTableColumns($conn, 'loan_application_details')
 ];
@@ -764,9 +764,9 @@ while($row = $notification_templates_result->fetch_assoc()) {
                 <i class="fas fa-credit-card"></i>
                 <span>Card Applications</span>
             </a>
-            <a href="users.php" class="nav-link">
+            <a href="customers.php" class="nav-link">
                 <i class="fas fa-users"></i>
-                <span>Users</span>
+                <span>Customers</span>
             </a>
             <a href="master-config.php" class="nav-link">
                 <i class="fas fa-cogs"></i>
@@ -848,13 +848,13 @@ while($row = $notification_templates_result->fetch_assoc()) {
                     <div class="form-group">
                         <label>Target Method *</label>
                         <select id="targetType" onchange="toggleTargetInputs()">
-                            <option value="filtered">Filtered Users</option>
-                            <!-- <option value="single">Single User</option>
-                            <option value="multiple">Multiple Users</option> -->
+                            <option value="filtered">Filtered Customers</option>
+                            <!-- <option value="single">Single Customer</option>
+                            <option value="multiple">Multiple Customers</option> -->
                         </select>
                     </div>
 
-                    <!-- Single User Input -->
+                    <!-- Single Customer Input -->
                     <div id="singleUserInput" class="form-group target-input" style="display: none;">
                         <div class="form-group">
                             <label>National ID *</label>
@@ -862,7 +862,7 @@ while($row = $notification_templates_result->fetch_assoc()) {
                         </div>
                     </div>
 
-                    <!-- Multiple Users Input -->
+                    <!-- Multiple Customers Input -->
                     <div id="multipleUserInput" class="form-group target-input" style="display: none;">
                         <div class="form-group">
                             <label>National IDs *</label>
@@ -870,7 +870,7 @@ while($row = $notification_templates_result->fetch_assoc()) {
                         </div>
                     </div>
 
-                    <!-- Filtered Users Input -->
+                    <!-- Filtered Customers Input -->
                     <div id="filteredUserInput" class="target-input" style="display: block;">
                         <div class="filter-section">
                             <h3>Build Filter</h3>
@@ -1340,7 +1340,7 @@ while($row = $notification_templates_result->fetch_assoc()) {
             // Prepare the request data
             const data = {};
             
-            // Handle target users
+            // Handle target customers
             switch(targetType) {
                 case 'single':
                     const nationalId = document.getElementById('nationalId').value.trim();
@@ -1464,7 +1464,7 @@ while($row = $notification_templates_result->fetch_assoc()) {
             }
             
             try {
-                const response = await fetch('https://icreditdept.com/api/send_notification.php', {
+                const response = await fetch('../send_notification.php', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

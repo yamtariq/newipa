@@ -358,49 +358,46 @@ class AuthService {
     String? deviceId,
   }) async {
     try {
-      // Always register device first
-      final deviceRegistration = await registerDevice(nationalId: nationalId);
-      if (deviceRegistration['status'] != 'success') {
-        return deviceRegistration;
-      }
+      print('\n=== SIGN IN PROCESS ===');
+      final signInEndpoint = '${Constants.apiBaseUrl}${Constants.endpointSignIn}';
+      print('Endpoint: ${Constants.endpointSignIn}');
+      print('Full URL: $signInEndpoint');
 
+      // Get device info
       final deviceInfo = await getDeviceInfo();
       
+      // Prepare request body
       final Map<String, dynamic> requestBody = {
         'national_id': nationalId,
         'deviceId': deviceId ?? deviceInfo['deviceId'],
         'device_info': deviceInfo,
       };
 
+      // Add password if provided (for password sign-in)
       if (password != null) {
         requestBody['password'] = password;
       }
 
+      print('Request Headers: ${Constants.authHeaders}');
+      print('Request Body: ${json.encode(requestBody)}');
+
       final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointSignIn}'),
-        headers: await getAuthHeaders(),
+        Uri.parse(signInEndpoint),
+        headers: Constants.authHeaders,
         body: jsonEncode(requestBody),
       );
 
-      print('Login API Response:');
-      print(response.body);
+      print('Response Status Code: ${response.statusCode}');
+      print('Response Body: ${response.body}');
 
-      final data = jsonDecode(response.body);
-      
-      if (data['status'] == 'success') {
-        // Store tokens and start session
-        if (data['token'] != null) {
-          await storeToken(data['token']);
-        }
-        if (data['user'] != null) {
-          await storeUserData(data['user']);
-          await startSession(data['user']['national_id']);
-        }
-      }
+      final responseData = jsonDecode(response.body);
+      print('Parsed Response: ${json.encode(responseData)}');
 
-      return data;
-    } catch (e) {
-      print('Error during sign in: $e');
+      return responseData;
+    } catch (e, stackTrace) {
+      print('\n=== ERROR IN SIGN IN PROCESS ===');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
       return {
         'status': 'error',
         'message': 'Error during sign in: $e',

@@ -12,9 +12,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['id'])) {
     $loanId = $_GET['id'];
     
     $stmt = $conn->prepare("
-        SELECT l.*, u.name, u.email, u.phone, u.employment_status, u.employer_name, u.salary
+        SELECT l.*, u.first_name_en as name, u.email, u.phone, u.sector as employment_status, u.employer, u.salary_customer as salary
         FROM loan_application_details l
-        LEFT JOIN Users u ON l.national_id = u.national_id
+        LEFT JOIN Customers u ON l.national_id = u.national_id
         WHERE l.loan_id = ?
     ");
     $stmt->bind_param("i", $loanId);

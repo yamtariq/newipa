@@ -19,9 +19,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['id'])) {
     $cardId = $_GET['id'];
     
     $stmt = $conn->prepare("
-        SELECT c.*, u.name, u.email, u.phone
+        SELECT c.*, u.first_name_en as name, u.email, u.phone
         FROM card_application_details c
-        LEFT JOIN Users u ON c.national_id = u.national_id
+        LEFT JOIN Customers u ON c.national_id = u.national_id
         WHERE c.card_id = ?
     ");
     $stmt->bind_param("i", $cardId);

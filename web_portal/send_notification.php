@@ -8,7 +8,7 @@ header("Pragma: no-cache");
 header('Content-Type: application/json');
 
 require 'db_connect.php';
-require 'audit_log.php';
+require '../audit_log.php';
 
 try {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -21,9 +21,9 @@ try {
     }
 
     // Validate API key
-    $api_key = $con->real_escape_string($headers['api-key']);
+    $api_key = $conn->real_escape_string($headers['api-key']);
     $query = "SELECT * FROM API_Keys WHERE api_key = ? AND (expires_at IS NULL OR expires_at > NOW())";
-    $stmt = $con->prepare($query);
+    $stmt = $conn->prepare($query);
     $stmt->bind_param("s", $api_key);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -50,7 +50,7 @@ try {
 
     // Case 1: Single user
     if (!empty($data['national_id'])) {
-        $stmt = $con->prepare("SELECT national_id FROM Users WHERE national_id = ?");
+        $stmt = $conn->prepare("SELECT national_id FROM Customers WHERE national_id = ?");
         $stmt->bind_param("s", $data['national_id']);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -61,9 +61,9 @@ try {
 
     // Case 2: Multiple specific users
     else if (!empty($data['national_ids']) && is_array($data['national_ids'])) {
-        $ids = array_map([$con, 'real_escape_string'], $data['national_ids']);
+        $ids = array_map([$conn, 'real_escape_string'], $data['national_ids']);
         $idList = "'" . implode("','", $ids) . "'";
-        $result = $con->query("SELECT national_id FROM Users WHERE national_id IN ($idList)");
+        $result = $conn->query("SELECT national_id FROM Customers WHERE national_id IN ($idList)");
         while ($row = $result->fetch_assoc()) {
             $targetUsers[] = $row['national_id'];
         }
@@ -71,6 +71,8 @@ try {
 
     // Case 3: Filtered users
     else if (!empty($data['filters']) && is_array($data['filters'])) {
+        error_log("Processing filters: " . json_encode($data['filters']));
+        
         $conditions = [];
         $params = [];
         $types = "";
@@ -79,207 +81,122 @@ try {
         $isOrOperation = isset($data['filter_operation']) && strtoupper($data['filter_operation']) === 'OR';
         $filterGroups = [];
 
-        foreach ($data['filters'] as $key => $value) {
-            $currentConditions = [];
-            switch ($key) {
-                case 'salary_range':
-                    if (isset($value['min'])) {
-                        $currentConditions[] = "salary >= ?";
-                        $params[] = $value['min'];
-                        $types .= "i";
-                    }
-                    if (isset($value['max'])) {
-                        $currentConditions[] = "salary <= ?";
-                        $params[] = $value['max'];
-                        $types .= "i";
-                    }
-                    if (!empty($currentConditions)) {
-                        $filterGroups[] = "(" . implode(" AND ", $currentConditions) . ")";
-                    }
-                    break;
+        foreach ($data['filters'] as $key => $filter) {
+            error_log("Processing filter for key: $key");
+            error_log("Filter data: " . json_encode($filter));
+            
+            $tableColumn = explode('.', $key);
+            if (count($tableColumn) === 2) {
+                $table = $tableColumn[0];
+                $column = $tableColumn[1];
+                
+                // Validate table name to prevent SQL injection
+                $validTables = ['Customers', 'card_application_details', 'loan_application_details'];
+                if (!in_array($table, $validTables)) {
+                    error_log("Invalid table name: $table");
+                    continue;
+                }
 
-                case 'employment_status':
-                    $currentConditions[] = "employment_status = ?";
-                    $params[] = $value;
-                    $types .= "s";
-                    $filterGroups[] = implode(" AND ", $currentConditions);
-                    break;
+                if (!isset($filter['operator']) || !isset($filter['value'])) {
+                    error_log("Missing operator or value for filter");
+                    continue;
+                }
 
-                case 'employer_name':
-                    $currentConditions[] = "employer_name = ?";
-                    $params[] = $value;
-                    $types .= "s";
-                    $filterGroups[] = implode(" AND ", $currentConditions);
-                    break;
-
-                case 'language':
-                    $currentConditions[] = "language = ?";
-                    $params[] = $value;
-                    $types .= "s";
-                    $filterGroups[] = implode(" AND ", $currentConditions);
-                    break;
-
-                case 'loan_status':
-                    $currentConditions[] = "EXISTS (SELECT 1 FROM loan_application_details WHERE loan_application_details.national_id = Users.national_id AND loan_application_details.status = ?)";
-                    $params[] = $value;
-                    $types .= "s";
-                    $filterGroups[] = implode(" AND ", $currentConditions);
-                    break;
-
-                case 'card_status':
-                    $currentConditions[] = "EXISTS (SELECT 1 FROM card_application_details WHERE card_application_details.national_id = Users.national_id AND card_application_details.status = ?)";
-                    $params[] = $value;
-                    $types .= "s";
-                    $filterGroups[] = implode(" AND ", $currentConditions);
-                    break;
-
-                default:
-                    // Dynamic filter handling for all three tables
-                    $tableColumn = explode('.', $key);
-                    if (count($tableColumn) === 2) {
-                        $table = $tableColumn[0];
-                        $column = $tableColumn[1];
+                $operator = strtoupper($filter['operator']);
+                $value = $filter['value'];
+                
+                error_log("Operator: $operator, Value: " . json_encode($value));
+                
+                $condition = "";
+                switch ($operator) {
+                    case '=':
+                    case '!=':
+                    case '>':
+                    case '<':
+                    case '>=':
+                    case '<=':
+                        if ($table === 'Customers') {
+                            $condition = "$table.$column $operator ?";
+                        } else {
+                            $condition = "EXISTS (SELECT 1 FROM $table WHERE $table.national_id = Customers.national_id AND $table.$column $operator ?)";
+                        }
+                        $params[] = $value;
+                        $types .= "s";
+                        break;
                         
-                        // Validate table name to prevent SQL injection
-                        $allowedTables = [
-                            'Users', 
-                            'loan_application_details',
-                            'card_application_details'
-                        ];
-                        if (!in_array($table, $allowedTables)) {
-                            continue;
+                    case 'LIKE':
+                        if ($table === 'Customers') {
+                            $condition = "$table.$column LIKE ?";
+                        } else {
+                            $condition = "EXISTS (SELECT 1 FROM $table WHERE $table.national_id = Customers.national_id AND $table.$column LIKE ?)";
                         }
-
-                        // Add debug logging
-                        error_log("Processing filter for table: $table, column: $column");
-                        error_log("Filter value: " . json_encode($value));
-
-                        if (is_array($value) && isset($value[0])) {
-                            // Multiple conditions for same column (already OR'ed)
-                            $columnConditions = [];
-                            foreach ($value as $condition) {
-                                if (!isset($condition['operator']) || !isset($condition['value'])) {
-                                    continue;
-                                }
-
-                                $operator = $condition['operator'];
-                                $filterValue = $condition['value'];
-
-                                // Validate operator to prevent SQL injection
-                                $allowedOperators = ['=', '!=', '>', '<', '>=', '<=', 'LIKE', 'IN', 'BETWEEN'];
-                                if (!in_array($operator, $allowedOperators)) {
-                                    continue;
-                                }
-
-                                if ($operator === 'BETWEEN' && is_array($filterValue) && count($filterValue) === 2) {
-                                    if ($table === 'Users') {
-                                        $columnConditions[] = "($column >= ? AND $column <= ?)";
-                                    } else {
-                                        $columnConditions[] = "EXISTS (SELECT 1 FROM $table WHERE $table.national_id = Users.national_id AND $table.$column >= ? AND $table.$column <= ?)";
-                                    }
-                                    $params[] = $filterValue[0];
-                                    $params[] = $filterValue[1];
-                                    $types .= "ss";
-                                } else if ($operator === 'IN' && is_array($filterValue)) {
-                                    $placeholders = str_repeat('?,', count($filterValue) - 1) . '?';
-                                    if ($table === 'Users') {
-                                        $columnConditions[] = "$column IN ($placeholders)";
-                                    } else {
-                                        $columnConditions[] = "EXISTS (SELECT 1 FROM $table WHERE $table.national_id = Users.national_id AND $table.$column IN ($placeholders))";
-                                    }
-                                    foreach ($filterValue as $val) {
-                                        $params[] = $val;
-                                        $types .= 's';
-                                    }
-                                } else {
-                                    if ($table === 'Users') {
-                                        $columnConditions[] = "$column $operator ?";
-                                    } else {
-                                        $columnConditions[] = "EXISTS (SELECT 1 FROM $table WHERE $table.national_id = Users.national_id AND $table.$column $operator ?)";
-                                    }
-                                    $params[] = $filterValue;
-                                    $types .= 's';
-                                }
-                            }
-                            
-                            if (!empty($columnConditions)) {
-                                $filterGroups[] = "(" . implode(" OR ", $columnConditions) . ")";
-                            }
-                        } else if (is_array($value) && isset($value['operator'])) {
-                            // Single condition
-                            $operator = $value['operator'];
-                            $filterValue = $value['value'];
-                            
-                            $allowedOperators = ['=', '!=', '>', '<', '>=', '<=', 'LIKE', 'IN', 'BETWEEN'];
-                            if (!in_array($operator, $allowedOperators)) {
-                                continue;
-                            }
-                            
-                            if ($operator === 'BETWEEN' && is_array($filterValue) && count($filterValue) === 2) {
-                                if ($table === 'Users') {
-                                    $currentConditions[] = "($column >= ? AND $column <= ?)";
-                                } else {
-                                    $currentConditions[] = "EXISTS (SELECT 1 FROM $table WHERE $table.national_id = Users.national_id AND $table.$column >= ? AND $table.$column <= ?)";
-                                }
-                                $params[] = $filterValue[0];
-                                $params[] = $filterValue[1];
-                                $types .= "ss";
-                            } else if ($operator === 'IN' && is_array($filterValue)) {
-                                $placeholders = str_repeat('?,', count($filterValue) - 1) . '?';
-                                if ($table === 'Users') {
-                                    $currentConditions[] = "$column IN ($placeholders)";
-                                } else {
-                                    $currentConditions[] = "EXISTS (SELECT 1 FROM $table WHERE $table.national_id = Users.national_id AND $table.$column IN ($placeholders))";
-                                }
-                                foreach ($filterValue as $val) {
-                                    $params[] = $val;
-                                    $types .= 's';
-                                }
+                        $params[] = "%$value%";
+                        $types .= "s";
+                        break;
+                        
+                    case 'IN':
+                        if (is_array($value)) {
+                            $placeholders = str_repeat('?,', count($value) - 1) . '?';
+                            if ($table === 'Customers') {
+                                $condition = "$table.$column IN ($placeholders)";
                             } else {
-                                if ($table === 'Users') {
-                                    $currentConditions[] = "$column $operator ?";
-                                } else {
-                                    $currentConditions[] = "EXISTS (SELECT 1 FROM $table WHERE $table.national_id = Users.national_id AND $table.$column $operator ?)";
-                                }
-                                $params[] = $filterValue;
-                                $types .= 's';
+                                $condition = "EXISTS (SELECT 1 FROM $table WHERE $table.national_id = Customers.national_id AND $table.$column IN ($placeholders))";
                             }
-                            if (!empty($currentConditions)) {
-                                $filterGroups[] = implode(" AND ", $currentConditions);
+                            foreach ($value as $v) {
+                                $params[] = $v;
+                                $types .= "s";
                             }
                         }
-                    }
-                    break;
+                        break;
+                        
+                    case 'BETWEEN':
+                        if (is_array($value) && count($value) === 2) {
+                            if ($table === 'Customers') {
+                                $condition = "$table.$column BETWEEN ? AND ?";
+                            } else {
+                                $condition = "EXISTS (SELECT 1 FROM $table WHERE $table.national_id = Customers.national_id AND $table.$column BETWEEN ? AND ?)";
+                            }
+                            $params[] = $value[0];
+                            $params[] = $value[1];
+                            $types .= "ss";
+                        }
+                        break;
+                }
+                
+                if ($condition) {
+                    error_log("Adding condition: $condition");
+                    $filterGroups[] = "($condition)";
+                }
             }
         }
 
         if (!empty($filterGroups)) {
             // Combine all filter groups with AND or OR
             $conditions[] = "(" . implode($isOrOperation ? " OR " : " AND ", $filterGroups) . ")";
-        }
-
-        if (!empty($conditions)) {
-            $query = "SELECT national_id FROM Users WHERE " . implode(" AND ", $conditions);
-            // Debug logging
-            error_log("Generated SQL Query: " . $query);
-            error_log("Parameters: " . json_encode($params));
-            error_log("Types string: " . $types);
             
-            $stmt = $con->prepare($query);
+            // Build the final query
+            $query = "SELECT DISTINCT national_id FROM Customers";
+            if (!empty($conditions)) {
+                $query .= " WHERE " . implode(" AND ", $conditions);
+            }
+            
+            error_log("Final SQL Query: $query");
+            error_log("Parameters: " . json_encode($params));
+            error_log("Types string: $types");
+            
+            // Prepare and execute the query
+            $stmt = $conn->prepare($query);
             if (!empty($params)) {
                 $stmt->bind_param($types, ...$params);
             }
             $stmt->execute();
             $result = $stmt->get_result();
             
-            // Debug logging
             error_log("Number of rows found: " . $result->num_rows);
             
             while ($row = $result->fetch_assoc()) {
                 $targetUsers[] = $row['national_id'];
             }
-        } else {
-            error_log("No conditions were generated from the filters");
         }
     }
 
@@ -288,7 +205,7 @@ try {
     }
 
     // First, save the notification template
-    $stmt = $con->prepare("INSERT INTO notification_templates (
+    $stmt = $conn->prepare("INSERT INTO notification_templates (
         title, body, title_en, body_en, title_ar, body_ar, 
         route, additional_data, target_criteria, created_at, expiry_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -320,7 +237,7 @@ try {
     error_log("Created notification template with ID: " . $templateId);
 
     // Log the notification template creation
-    log_audit($con, null, 'notification_sent', json_encode([
+    log_audit($conn, null, 'notification_sent', json_encode([
         'template_id' => $templateId,
         'recipient_count' => count($targetUsers),
         'target_criteria' => $data['filters'] ?? null,
@@ -342,7 +259,7 @@ try {
         error_log("Processing notifications for user: " . $user);
         
         // Check if user already has notifications
-        $stmt = $con->prepare("SELECT notifications FROM user_notifications WHERE national_id = ?");
+        $stmt = $conn->prepare("SELECT notifications FROM user_notifications WHERE national_id = ?");
         $stmt->bind_param("s", $user);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -363,7 +280,7 @@ try {
                 error_log("Trimmed to 50 notifications");
             }
             
-            $stmt = $con->prepare("UPDATE user_notifications SET notifications = ? WHERE national_id = ?");
+            $stmt = $conn->prepare("UPDATE user_notifications SET notifications = ? WHERE national_id = ?");
             $notificationsJson = json_encode($existingNotifications);
             error_log("Updating notifications for user: " . $user);
             error_log("New JSON data: " . $notificationsJson);
@@ -372,7 +289,7 @@ try {
         } else {
             error_log("No existing notifications for user: " . $user);
             // Create new notifications entry
-            $stmt = $con->prepare("INSERT INTO user_notifications (national_id, notifications) VALUES (?, ?)");
+            $stmt = $conn->prepare("INSERT INTO user_notifications (national_id, notifications) VALUES (?, ?)");
             $notificationsJson = json_encode([$notificationRef]);
             error_log("Creating new notification entry with JSON: " . $notificationsJson);
             
@@ -399,7 +316,7 @@ try {
 
     // After successful notification sending
     if ($successCount > 0) {
-        log_audit($con, null, 'notification_delivered', json_encode([
+        log_audit($conn, null, 'notification_delivered', json_encode([
             'template_id' => $templateId,
             'successful_sends' => $successCount,
             'total_recipients' => count($targetUsers),
@@ -422,5 +339,8 @@ try {
     ]);
 }
 
-$con->close();
+// Close connection if it exists
+if (isset($conn)) {
+    $conn->close();
+}
 ?> 

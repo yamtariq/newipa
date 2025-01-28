@@ -53,21 +53,20 @@ try {
         $query = "
             SELECT 
                 ca.*,
-                u.name,
-                u.arabic_name,
-                u.email,
-                u.phone,
-                u.dob,
-                u.doe,
-                u.language,
-                u.dependents,
-                u.salary,
-                u.employment_status,
-                u.employer_name,
-                u.employment_date,
-                u.national_address
+                c.first_name_en as name,
+                c.first_name_ar as arabic_name,
+                c.email,
+                c.phone,
+                c.date_of_birth as dob,
+                c.id_expiry_date as doe,
+                c.dependents,
+                c.salary_customer as salary,
+                c.sector as employment_status,
+                c.employer,
+                c.los as employment_date,
+                CONCAT(c.building_no, ' ', c.street, ' ', c.district, ' ', c.city, ' ', c.zipcode) as national_address
             FROM card_application_details ca
-            LEFT JOIN Users u ON ca.national_id = u.national_id
+            LEFT JOIN Customers c ON ca.national_id = c.national_id
             WHERE ca.card_id = ?
         ";
         
@@ -77,21 +76,20 @@ try {
         $query = "
             SELECT 
                 la.*,
-                u.name,
-                u.arabic_name,
-                u.email,
-                u.phone,
-                u.dob,
-                u.doe,
-                u.language,
-                u.dependents,
-                u.salary,
-                u.employment_status,
-                u.employer_name,
-                u.employment_date,
-                u.national_address
+                c.first_name_en as name,
+                c.first_name_ar as arabic_name,
+                c.email,
+                c.phone,
+                c.date_of_birth as dob,
+                c.id_expiry_date as doe,
+                c.dependents,
+                c.salary_customer as salary,
+                c.sector as employment_status,
+                c.employer,
+                c.los as employment_date,
+                CONCAT(c.building_no, ' ', c.street, ' ', c.district, ' ', c.city, ' ', c.zipcode) as national_address
             FROM loan_applications la
-            LEFT JOIN Users u ON la.national_id = u.national_id
+            LEFT JOIN Customers c ON la.national_id = c.national_id
             WHERE la.application_id = ?
         ";
     }
@@ -226,7 +224,7 @@ try {
             <h3>Employment Information</h3>
             <div class="detail-grid">
                 <div class="detail-item"><strong>Employment Status:</strong> <?php echo htmlspecialchars($application['employment_status']); ?></div>
-                <div class="detail-item"><strong>Employer:</strong> <?php echo htmlspecialchars($application['employer_name']); ?></div>
+                <div class="detail-item"><strong>Employer:</strong> <?php echo htmlspecialchars($application['employer']); ?></div>
                 <div class="detail-item"><strong>Employment Date:</strong> <?php echo htmlspecialchars($application['employment_date']); ?></div>
                 <div class="detail-item"><strong>Salary:</strong> <?php echo htmlspecialchars($application['salary']); ?></div>
                 <div class="detail-item"><strong>Dependents:</strong> <?php echo htmlspecialchars($application['dependents']); ?></div>

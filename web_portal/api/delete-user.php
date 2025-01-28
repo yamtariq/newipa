@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true);
     $userId = $data['userId'];
 
-    $stmt = $conn->prepare("DELETE FROM Users WHERE user_id = ?");
+    $stmt = $conn->prepare("DELETE FROM Customers WHERE id = ?");
     $stmt->bind_param("i", $userId);
 
     if ($stmt->execute()) {

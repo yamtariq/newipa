@@ -1,7 +1,7 @@
 <div class="sidebar">
     <h3>Welcome, <?php echo $_SESSION['name']; ?></h3>
     <nav>
-        <a href="../pages/users.php" class="nav-link">Manage Users</a>
+        <a href="../pages/customers.php" class="nav-link">Manage Customers</a>
         <a href="../pages/card-applications.php" class="nav-link">Card Applications</a>
         <a href="../pages/loan-applications.php" class="nav-link">Loan Applications</a>
         <a href="../pages/push-notification.php" class="nav-link">Push Notification</a>

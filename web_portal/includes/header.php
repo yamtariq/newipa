@@ -12,7 +12,7 @@
     <ul class="sidebar-menu">
         <li><a href="index.php?page=dashboard">Dashboard</a></li>
         <?php if (checkPermission('super_admin')): ?>
-            <li><a href="index.php?page=users">Manage Users</a></li>
+            <li><a href="index.php?page=customers">Manage Customers</a></li>
         <?php endif; ?>
         <?php if (checkPermission('sales_admin') || checkPermission('super_admin')): ?>
             <li><a href="index.php?page=card-applications">Card Applications</a></li>

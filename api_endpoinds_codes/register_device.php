@@ -1,6 +1,6 @@
 <?php
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
+error_reporting(0); // Suppress all errors in production
+ini_set('display_errors', 0);
 
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Cache-Control: post-check=0, pre-check=0", false);
@@ -9,6 +9,16 @@ header('Content-Type: application/json');
 
 require 'db_connect.php';
 require 'audit_log.php';
+
+// Function to safely bind parameters
+function bindParameters($stmt, $types, ...$params) {
+    $refs = array();
+    $refs[0] = $types;
+    for($i = 0; $i < count($params); $i++) {
+        $refs[$i+1] = &$params[$i];
+    }
+    return call_user_func_array(array($stmt, 'bind_param'), $refs);
+}
 
 try {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -34,50 +44,89 @@ try {
             throw new Exception('Invalid JSON input');
         }
 
-        // Validate required fields
-        $requiredFields = ['national_id', 'deviceId', 'platform', 'model', 'manufacturer'];
-        foreach ($requiredFields as $field) {
-            if (empty($data[$field])) {
-                throw new Exception("Missing field: $field");
-            }
+        // Only national_id is required
+        if (empty($data['national_id'])) {
+            throw new Exception("Missing required field: national_id");
         }
 
-        // First, disable ALL existing devices for this user
-        $stmt = $con->prepare("UPDATE user_devices SET status = 'disabled' WHERE national_id = ?");
+        // First, disable ALL existing devices for this user if deviceId is provided
+        if (isset($data['deviceId'])) {
+            $stmt = $con->prepare("UPDATE customer_devices SET status = 'disabled' WHERE national_id = ?");
+            $stmt->bind_param("s", $data['national_id']);
+            $stmt->execute();
+        }
+
+        // Verify customer exists
+        $stmt = $con->prepare("SELECT id FROM Customers WHERE national_id = ?");
         $stmt->bind_param("s", $data['national_id']);
         $stmt->execute();
-
-        // Register new device
-        $stmt = $con->prepare("INSERT INTO user_devices (national_id, deviceId, platform, model, manufacturer, biometric_enabled, created_at) VALUES (?, ?, ?, ?, ?, 1, NOW())");
-        $stmt->bind_param("sssss", 
-            $data['national_id'],
-            $data['deviceId'],
-            $data['platform'],
-            $data['model'],
-            $data['manufacturer']
-        );
-
-        if (!$stmt->execute()) {
-            throw new Exception('Database error: ' . $stmt->error);
+        $result = $stmt->get_result();
+        
+        if ($result->num_rows === 0) {
+            throw new Exception('Customer not found');
         }
 
-        // Log the device registration
-        $ip = $_SERVER['REMOTE_ADDR'];
-        $user_agent = $_SERVER['HTTP_USER_AGENT'];
-        
-        $stmt = $con->prepare("INSERT INTO auth_logs (national_id, deviceId, auth_type, status, ip_address, user_agent) VALUES (?, ?, 'device_registration', 'success', ?, ?)");
-        $stmt->bind_param("ssss", 
-            $data['national_id'],
-            $data['deviceId'],
-            $ip,
-            $user_agent
-        );
-        $stmt->execute();
+        // Register new device only if device info is provided
+        if (isset($data['deviceId'])) {
+            $stmt = $con->prepare("INSERT INTO customer_devices (
+                national_id, 
+                deviceId, 
+                platform, 
+                model, 
+                manufacturer, 
+                biometric_enabled, 
+                status,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, 1, 'active', NOW())");
+            
+            if (!$stmt) {
+                throw new Exception('Failed to prepare device registration statement: ' . $con->error);
+            }
+            
+            $platform = isset($data['platform']) ? $data['platform'] : null;
+            $model = isset($data['model']) ? $data['model'] : null;
+            $manufacturer = isset($data['manufacturer']) ? $data['manufacturer'] : null;
+            
+            if (!bindParameters($stmt, "sssss", 
+                $data['national_id'],
+                $data['deviceId'],
+                $platform,
+                $model,
+                $manufacturer
+            )) {
+                throw new Exception('Failed to bind parameters: ' . $stmt->error);
+            }
+
+            if (!$stmt->execute()) {
+                throw new Exception('Database error: ' . $stmt->error);
+            }
+
+            // Log the device registration
+            $ip = $_SERVER['REMOTE_ADDR'];
+            $user_agent = $_SERVER['HTTP_USER_AGENT'];
+            
+            $stmt = $con->prepare("INSERT INTO auth_logs (
+                national_id, 
+                deviceId, 
+                auth_type,
+                status, 
+                ip_address, 
+                user_agent
+            ) VALUES (?, ?, 'device_registration', 'success', ?, ?)");
+            
+            $stmt->bind_param("ssss", 
+                $data['national_id'],
+                $data['deviceId'],
+                $ip,
+                $user_agent
+            );
+            $stmt->execute();
+        }
 
         echo json_encode([
             'status' => 'success', 
-            'message' => 'Device registered successfully',
-            'device_id' => $con->insert_id
+            'message' => isset($data['deviceId']) ? 'Device registered successfully' : 'Customer verified successfully',
+            'device_id' => isset($data['deviceId']) ? $con->insert_id : null
         ]);
     } else {
         throw new Exception('Invalid request method');

@@ -1,6 +1,7 @@
 <?php
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
+// Error reporting should be first
+error_reporting(0); // Suppress all errors in production
+ini_set('display_errors', 0);
 
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Cache-Control: post-check=0, pre-check=0", false);
@@ -9,6 +10,16 @@ header('Content-Type: application/json');
 
 require 'db_connect.php';
 require 'audit_log.php';
+
+// Function to safely bind parameters
+function bindParameters($stmt, $types, ...$params) {
+    $refs = array();
+    $refs[0] = $types;
+    for($i = 0; $i < count($params); $i++) {
+        $refs[$i+1] = &$params[$i];
+    }
+    return call_user_func_array(array($stmt, 'bind_param'), $refs);
+}
 
 try {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -35,7 +46,7 @@ try {
         
         // Check if this is just an ID check
         if (isset($data['check_only']) && $data['check_only'] === true) {
-            $query = "SELECT national_id FROM Users WHERE national_id = ?";
+            $query = "SELECT national_id FROM Customers WHERE national_id = ?";
             $stmt = $con->prepare($query);
             $stmt->bind_param("s", $data['national_id']);
             $stmt->execute();
@@ -57,7 +68,7 @@ try {
         }
 
         // Regular registration flow
-        $query = "SELECT national_id FROM Users WHERE national_id = ?";
+        $query = "SELECT national_id FROM Customers WHERE national_id = ?";
         $stmt = $con->prepare($query);
         $stmt->bind_param("s", $data['national_id']);
         $stmt->execute();
@@ -67,65 +78,73 @@ try {
             throw new Exception('This ID already registered');
         }
 
-        $requiredFields = ['national_id', 'name', 'arabic_name', 'email', 'password', 'phone'];
-        foreach ($requiredFields as $field) {
-            if (empty($data[$field])) {
-                throw new Exception("Missing field: $field");
-            }
+        // Only national_id is required
+        if (empty($data['national_id'])) {
+            throw new Exception("Missing required field: national_id");
         }
 
         // Start transaction
         $con->begin_transaction();
 
         try {
-            // Prepare variables for binding
+            // Prepare variables for binding with all fields optional
             $national_id = $data['national_id'];
-            $full_name = isset($data['full_name']) ? $data['full_name'] : $data['name'];
-            $arabic_name = $data['arabic_name'];
-            $email = $data['email'];
-            $hashedPassword = password_hash($data['password'], PASSWORD_BCRYPT);
-            $phone = $data['phone'];
-            $dob = isset($data['dob']) ? $data['dob'] : null;
-            $salary = isset($data['salary']) ? $data['salary'] : null;
-            $employment_status = isset($data['employment_status']) ? $data['employment_status'] : null;
-            $employer_name = isset($data['employer_name']) ? $data['employer_name'] : null;
-            $employment_date = isset($data['employment_date']) ? $data['employment_date'] : null;
-            $national_address = isset($data['national_address']) ? $data['national_address'] : null;
-            
-            // Add Nafath data
+            $first_name_en = isset($data['first_name_en']) ? $data['first_name_en'] : null;
+            $second_name_en = isset($data['second_name_en']) ? $data['second_name_en'] : null;
+            $third_name_en = isset($data['third_name_en']) ? $data['third_name_en'] : null;
+            $family_name_en = isset($data['family_name_en']) ? $data['family_name_en'] : null;
+            $first_name_ar = isset($data['first_name_ar']) ? $data['first_name_ar'] : null;
+            $second_name_ar = isset($data['second_name_ar']) ? $data['second_name_ar'] : null;
+            $third_name_ar = isset($data['third_name_ar']) ? $data['third_name_ar'] : null;
+            $family_name_ar = isset($data['family_name_ar']) ? $data['family_name_ar'] : null;
+            $email = isset($data['email']) ? $data['email'] : null;
+            $hashedPassword = isset($data['password']) ? password_hash($data['password'], PASSWORD_BCRYPT) : null;
+            $phone = isset($data['phone']) ? $data['phone'] : null;
+            $date_of_birth = isset($data['date_of_birth']) ? $data['date_of_birth'] : null;
+            $id_expiry_date = isset($data['id_expiry_date']) ? $data['id_expiry_date'] : null;
+            $building_no = isset($data['building_no']) ? $data['building_no'] : null;
+            $street = isset($data['street']) ? $data['street'] : null;
+            $district = isset($data['district']) ? $data['district'] : null;
+            $city = isset($data['city']) ? $data['city'] : null;
+            $zipcode = isset($data['zipcode']) ? $data['zipcode'] : null;
+            $add_no = isset($data['add_no']) ? $data['add_no'] : null;
+            $iban = isset($data['iban']) ? $data['iban'] : null;
+            $dependents = isset($data['dependents']) ? $data['dependents'] : null;
+            $salary_dakhli = isset($data['salary_dakhli']) ? $data['salary_dakhli'] : null;
+            $salary_customer = isset($data['salary_customer']) ? $data['salary_customer'] : null;
+            $los = isset($data['los']) ? $data['los'] : null;
+            $sector = isset($data['sector']) ? $data['sector'] : null;
+            $employer = isset($data['employer']) ? $data['employer'] : null;
+            $consent = isset($data['consent']) ? $data['consent'] : false;
+            $consent_date = isset($data['consent_date']) ? $data['consent_date'] : null;
             $nafath_status = isset($data['nafath_status']) ? $data['nafath_status'] : null;
-            $nafath_trans_id = isset($data['nafath_trans_id']) ? $data['nafath_trans_id'] : null;
-            $nafath_random = isset($data['nafath_random']) ? $data['nafath_random'] : null;
+            $nafath_timestamp = isset($data['nafath_timestamp']) ? $data['nafath_timestamp'] : null;
 
-            // Prepare and insert user with government data and Nafath info
-            $stmt = $con->prepare("INSERT INTO Users (
-                national_id, name, arabic_name, email, password, phone, 
-                dob, salary, employment_status, employer_name, 
-                employment_date, national_address, created_at,
-                nafath_status, nafath_trans_id, nafath_random, nafath_timestamp
+            // Prepare and insert customer with all fields
+            $stmt = $con->prepare("INSERT INTO Customers (
+                national_id, 
+                first_name_en, second_name_en, third_name_en, family_name_en,
+                first_name_ar, second_name_ar, third_name_ar, family_name_ar,
+                date_of_birth, id_expiry_date, email, phone,
+                building_no, street, district, city, zipcode, add_no,
+                iban, dependents, salary_dakhli, salary_customer,
+                los, sector, employer, password,
+                registration_date, consent, consent_date,
+                nafath_status, nafath_timestamp
             ) VALUES (
-                ?, ?, ?, ?, ?, ?, 
-                ?, ?, ?, ?, 
-                ?, ?, date('Y-m-d H:i:s'),
-                ?, ?, ?, date('Y-m-d H:i:s')
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
+                CURRENT_TIMESTAMP, ?, ?, ?, ?
             )");
             
-            $stmt->bind_param("sssssssssssssss", 
+            $stmt->bind_param("ssssssssssssssssssssisssissbsss", 
                 $national_id,
-                $full_name,
-                $arabic_name,
-                $email,
-                $hashedPassword,
-                $phone,
-                $dob,
-                $salary,
-                $employment_status,
-                $employer_name,
-                $employment_date,
-                $national_address,
-                $nafath_status,
-                $nafath_trans_id,
-                $nafath_random
+                $first_name_en, $second_name_en, $third_name_en, $family_name_en,
+                $first_name_ar, $second_name_ar, $third_name_ar, $family_name_ar,
+                $date_of_birth, $id_expiry_date, $email, $phone,
+                $building_no, $street, $district, $city, $zipcode, $add_no,
+                $iban, $dependents, $salary_dakhli, $salary_customer,
+                $los, $sector, $employer, $hashedPassword,
+                $consent, $consent_date, $nafath_status, $nafath_timestamp
             );
             
             if (!$stmt->execute()) {
@@ -146,7 +165,7 @@ try {
                 
                 // Disable any existing devices for this user
                 try {
-                    $disable_stmt = $con->prepare("UPDATE user_devices SET status = 'disabled' WHERE national_id = ? AND deviceId = ?");
+                    $disable_stmt = $con->prepare("UPDATE customer_devices SET status = 'disabled' WHERE national_id = ? AND deviceId = ?");
                     if (!$disable_stmt) {
                         error_log("Prepare failed: " . $con->error);
                         throw new Exception("Failed to prepare disable devices statement");
@@ -165,7 +184,7 @@ try {
                 }
 
                 // Register device
-                $stmt = $con->prepare("INSERT INTO user_devices (
+                $stmt = $con->prepare("INSERT INTO customer_devices (
                     national_id, 
                     deviceId, 
                     platform, 
@@ -176,15 +195,21 @@ try {
                     created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, 'active', NOW())");
                 
+                if (!$stmt) {
+                    throw new Exception('Failed to prepare device registration statement: ' . $con->error);
+                }
+                
                 $biometricEnabled = 1;
-                $stmt->bind_param("sssssi", 
+                if (!bindParameters($stmt, "sssssi", 
                     $data['national_id'],
                     $deviceInfo['deviceId'],
                     $deviceInfo['platform'],
                     $deviceInfo['model'],
                     $deviceInfo['manufacturer'],
                     $biometricEnabled
-                );
+                )) {
+                    throw new Exception('Failed to bind parameters: ' . $stmt->error);
+                }
                 
                 if (!$stmt->execute()) {
                     throw new Exception('Failed to register device: ' . $stmt->error);
@@ -198,7 +223,7 @@ try {
                     status, 
                     ip_address, 
                     user_agent
-                ) VALUES (?, ?, 'biometric', 'success', ?, ?)");
+                ) VALUES (?, ?, 'device_registration', 'success', ?, ?)");
                 
                 $stmt->bind_param("ssss", 
                     $data['national_id'],
@@ -218,14 +243,29 @@ try {
             // Prepare the government data for the response
             $gov_data = [
                 'national_id' => $national_id,
-                'full_name' => $full_name,
-                'arabic_name' => $arabic_name,
-                'dob' => $dob,
-                'salary' => $salary,
-                'employment_status' => $employment_status,
-                'employer_name' => $employer_name,
-                'employment_date' => $employment_date,
-                'national_address' => $national_address,
+                'first_name_en' => $first_name_en,
+                'family_name_en' => $family_name_en,
+                'first_name_ar' => $first_name_ar,
+                'family_name_ar' => $family_name_ar,
+                'date_of_birth' => $date_of_birth,
+                'id_expiry_date' => $id_expiry_date,
+                'building_no' => $building_no,
+                'street' => $street,
+                'district' => $district,
+                'city' => $city,
+                'zipcode' => $zipcode,
+                'add_no' => $add_no,
+                'iban' => $iban,
+                'dependents' => $dependents,
+                'salary_dakhli' => $salary_dakhli,
+                'salary_customer' => $salary_customer,
+                'los' => $los,
+                'sector' => $sector,
+                'employer' => $employer,
+                'consent' => $consent,
+                'consent_date' => $consent_date,
+                'nafath_status' => $nafath_status,
+                'nafath_timestamp' => $nafath_timestamp,
                 'updated_at' => date('Y-m-d H:i:s')
             ];
 

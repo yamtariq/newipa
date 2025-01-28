@@ -35,77 +35,74 @@ try {
     }
 
     // Validate required fields
-    if (empty($data['national_id']) || empty($data['deviceId'])) {
-        throw new Exception('Missing required fields');
+    if (empty($data['national_id'])) {
+        throw new Exception('Missing required field: national_id');
     }
 
     $national_id = $con->real_escape_string($data['national_id']);
-    $deviceId = $con->real_escape_string($data['deviceId']);
+    $deviceId = isset($data['deviceId']) ? $con->real_escape_string($data['deviceId']) : null;
     $isPasswordAuth = isset($data['password']);
     $password = $isPasswordAuth ? $data['password'] : null;
 
     // 1. Check if user exists
     $stmt = $con->prepare("
-        SELECT * FROM Users WHERE national_id = ?
+        SELECT * FROM Customers WHERE national_id = ?
     ");
     $stmt->bind_param("s", $national_id);
     $stmt->execute();
     $user_result = $stmt->get_result();
 
     if ($user_result->num_rows === 0) {
-        log_auth_attempt($con, $national_id, $deviceId, 'failed', 'User not found');
+        log_auth_attempt($con, $national_id, $deviceId, 'failed', 'Customer not found');
         echo json_encode([
             'status' => 'error',
-            'code' => 'USER_NOT_FOUND',
+            'code' => 'CUSTOMER_NOT_FOUND',
             'message' => 'Invalid credentials'
         ]);
         exit();
     }
 
-    $user = $user_result->fetch_assoc();
+    $customer = $user_result->fetch_assoc();
 
-    // 2. If password authentication, verify password
+    // Determine authentication method after confirming customer exists
     if ($isPasswordAuth) {
-        if (!password_verify($password, $user['password'])) {
-            log_auth_attempt($con, $national_id, $deviceId, 'failed', 'Invalid password');
-            echo json_encode([
-                'status' => 'error',
-                'code' => 'INVALID_PASSWORD',
-                'message' => 'Invalid credentials'
-            ]);
-            exit();
+        // Password authentication flow
+        if ($customer['password'] !== null) {
+            if (!password_verify($password, $customer['password'])) {
+                log_auth_attempt($con, $national_id, $deviceId, 'failed', 'Invalid password');
+                echo json_encode([
+                    'status' => 'error',
+                    'code' => 'INVALID_PASSWORD',
+                    'message' => 'Invalid credentials'
+                ]);
+                exit();
+            }
         }
+    } else {
+        // OTP authentication flow - only start after customer verification
+        echo json_encode([
+            'status' => 'success',
+            'code' => 'CUSTOMER_VERIFIED',
+            'message' => 'Customer verified, proceed with OTP',
+            'require_otp' => true
+        ]);
+        exit();
     }
 
-    // If we reach here, authentication is successful
-    // Expire existing sessions
-    $stmt = $con->prepare("
-        UPDATE user_sessions 
-        SET status = 'expired', expires_at = NOW() 
-        WHERE national_id = ? AND deviceId = ? AND status = 'active'
-    ");
-    $stmt->bind_param("ss", $national_id, $deviceId);
-    $stmt->execute();
-
-    // Create new session
+    // If we reach here, password authentication is successful
+    // Generate token regardless of device
     $token = bin2hex(random_bytes(32));
-    $stmt = $con->prepare("
-        INSERT INTO user_sessions (
-            national_id, deviceId, session_token, 
-            created_at, expires_at, status
-        ) VALUES (?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), 'active')
-    ");
-    $stmt->bind_param("sss", $national_id, $deviceId, $token);
-    $stmt->execute();
 
-    // Update last used timestamp for device
-    $stmt = $con->prepare("
-        UPDATE user_devices 
-        SET last_used_at = NOW()
-        WHERE national_id = ? AND deviceId = ?
-    ");
-    $stmt->bind_param("ss", $national_id, $deviceId);
-    $stmt->execute();
+    // Update last used timestamp for device if provided
+    if ($deviceId) {
+        $stmt = $con->prepare("
+            UPDATE customer_devices 
+            SET last_used_at = NOW()
+            WHERE national_id = ? AND deviceId = ?
+        ");
+        $stmt->bind_param("ss", $national_id, $deviceId);
+        $stmt->execute();
+    }
 
     // Log successful login
     log_auth_attempt($con, $national_id, $deviceId, 'success');
@@ -114,14 +111,15 @@ try {
     echo json_encode([
         'status' => 'success',
         'token' => $token,
-        'user' => $user
+        'user' => $customer
     ]);
 
 } catch (Exception $e) {
+    error_log("Signin error: " . $e->getMessage());
     echo json_encode([
         'status' => 'error',
         'code' => 'SYSTEM_ERROR',
-        'message' => 'An unexpected error occurred'
+        'message' => $e->getMessage()
     ]);
     exit();
 }
