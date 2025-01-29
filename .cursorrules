@@ -5,7 +5,8 @@
 - **Code Modification Practices**  
   Focus edits only on parts relevant to the issue.  
   Preserve all unrelated sections untouched.
-
+  when running commands, use powershell when possible as I'm using windows only.
+  when running multiple commands, don't use "&&", use ";" only when necessary.
 - 
 - **Response Protocol**  
   Start replies with a robot emoji (🤖).  

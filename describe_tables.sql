@@ -11,7 +11,7 @@ id                  bigint              NO      PRI     NULL     auto_increment
 user_id             varchar(20)          YES            NULL
 action_description  varchar(255)         NO             NULL
 ip_address          varchar(45)          NO             NULL
-created_at          timestamp           NO             CURRENT_TIMESTAMP
+created_at          datetime2           NO             CURRENT_TIMESTAMP
 details             text                YES            NULL
 
 -- auth_logs Table Structure
@@ -24,16 +24,16 @@ status              varchar(20)          NO             NULL
 ip_address          varchar(45)          YES            NULL
 user_agent          varchar(500)         YES            NULL
 failure_reason      varchar(500)         YES            NULL
-created_at          timestamp            NO             CURRENT_TIMESTAMP
+created_at          datetime2            NO             CURRENT_TIMESTAMP
 
 -- API_Keys Table Structure
 -- -----------------------
 Field                Type                Null    Key     Default  Extra
 api_key             varchar(255)         NO      UNI     NULL
 description         varchar(500)         YES            NULL
-expires_at          timestamp           YES            NULL
-created_at          timestamp           NO             CURRENT_TIMESTAMP
-last_used_at        timestamp           YES            NULL
+expires_at          datetime2           YES            NULL
+created_at          datetime2           NO             CURRENT_TIMESTAMP
+last_used_at        datetime2           YES            NULL
 
 
 /*
