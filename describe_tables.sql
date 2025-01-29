@@ -114,13 +114,13 @@ loan_id             bigint              NO      PRI     NULL     auto_increment
 application_no      varchar(20)         NO      UNI     NULL
 national_id         varchar(20)          NO      MUL     NULL
 status              varchar(50)          NO             NULL
-status_date         timestamp           NO             CURRENT_TIMESTAMP
+status_date         datetime2           NO             CURRENT_TIMESTAMP
 loan_amount         decimal(18,2)       YES            NULL
 tenure              int                 YES            NULL
 monthly_payment     decimal(18,2)       YES            NULL
 interest_rate       decimal(5,2)        YES            NULL
-created_at          timestamp           NO             CURRENT_TIMESTAMP
-last_updated        timestamp           NO             CURRENT_TIMESTAMP
+created_at          datetime2           NO             CURRENT_TIMESTAMP
+last_updated        datetime2           NO             CURRENT_TIMESTAMP
 
 -- card_application_details Table Structure
 -- --------------------------------------
@@ -131,9 +131,9 @@ national_id         varchar(20)          NO      MUL     NULL
 card_type           varchar(50)          NO             NULL
 card_limit          decimal(18,2)       YES            NULL
 status              varchar(50)          NO             NULL
-status_date         timestamp           NO             CURRENT_TIMESTAMP
-created_at          timestamp           NO             CURRENT_TIMESTAMP
-last_updated        timestamp           NO             CURRENT_TIMESTAMP
+status_date         datetime2           NO             CURRENT_TIMESTAMP
+created_at          datetime2           NO             CURRENT_TIMESTAMP
+last_updated        datetime2           NO             CURRENT_TIMESTAMP
 
 
 /*
@@ -148,8 +148,8 @@ Field                Type                Null    Key     Default  Extra
 notification_id     bigint              NO      PRI     NULL     auto_increment
 national_id         varchar(20)          NO      MUL     NULL
 notifications       json                YES            NULL
-created_at          timestamp           NO             CURRENT_TIMESTAMP
-last_updated        timestamp           NO             CURRENT_TIMESTAMP
+created_at          datetime2           NO             CURRENT_TIMESTAMP
+last_updated        datetime2           NO             CURRENT_TIMESTAMP
 
 -- notification_templates Table Structure
 -- ------------------------------------
@@ -163,9 +163,9 @@ title_ar            varchar(200)         YES            NULL
 body_ar             varchar(1000)        YES            NULL
 route               varchar(100)         YES            NULL
 additional_data     json                YES            NULL
-expiry_at           timestamp           YES            NULL
-created_at          timestamp           NO             CURRENT_TIMESTAMP
-last_updated        timestamp           NO             CURRENT_TIMESTAMP
+expiry_at           datetime2           YES            NULL
+created_at          datetime2           NO             CURRENT_TIMESTAMP
+last_updated        datetime2           NO             CURRENT_TIMESTAMP
 
 
 /*
@@ -181,4 +181,4 @@ config_id           bigint              NO      PRI     NULL     auto_increment
 page                varchar(50)          NO      MUL     NULL
 key_name            varchar(100)         NO             NULL
 value               json                YES            NULL
-last_updated        timestamp           NO             CURRENT_TIMESTAMP
+last_updated        datetime2           NO             CURRENT_TIMESTAMP

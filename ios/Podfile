@@ -1,7 +1,6 @@
 platform :ios, '14.0'
 
-# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
-ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+install! 'cocoapods', :deterministic_uuids => false
 
 project 'Runner', {
   'Debug' => :debug,
@@ -33,14 +32,11 @@ target 'Runner' do
   # Use frameworks with static linkage to prevent dynamic conflicts
   use_frameworks! :linkage => :static
 
-  # Remove manual PhoneNumberKit pod to let the plugin manage it
-  # pod 'PhoneNumberKit', '~> 6.0'
-
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  
+  # Add specific version constraint for PhoneNumberKit
+  pod 'PhoneNumberKit', '~> 3.3.4'
 end
-
-# Explicitly include PhoneNumberKit pod
-pod 'PhoneNumberKit', '~> 6.0'
 
 post_install do |installer|
   # Disable "Build Libraries for Distribution" to prevent module interface conflicts

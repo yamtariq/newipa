@@ -4,8 +4,14 @@ workflows:
     environment:
       flutter: stable
       xcode: latest
-      cocoapods: default
+      cocoapods: 1.15.2
+      vars:
+        COCOAPODS_DISABLE_STATS: true
+        SWIFT_VERSION: "5.0"
     scripts:
+      - flutter clean
       - flutter pub get
-      - cd ios && pod install --repo-update && cd ..
+      - cd ios && rm -f Podfile.lock
+      - cd ios && pod repo update
+      - cd ios && pod install --repo-update
       - flutter build ios --debug --no-codesign
