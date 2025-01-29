@@ -752,7 +752,7 @@ public class RegistrationController : ApiBaseController
     "government_data": {
         "national_id": "1234567890",
         "first_name_en": "John",
-        "family_name_en": "Doe",
+        "family_name_en": "Smith",
         "email": "john@example.com",
         "phone": "+966501234567",
         "date_of_birth": "1990-01-01",
@@ -1641,3 +1641,230 @@ public async Task<bool> TestConnection()
 - `Password=your_password` - SQL authentication password
 - `TrustServerCertificate=True` - Trust the SQL Server certificate
 - `MultipleActiveResultSets=true` - Allow multiple active result sets
+```
+
+## Proxy Controller Implementation
+
+### Overview
+The Proxy Controller acts as an intermediary between the app and local endpoints, allowing secure and controlled access to local services.
+
+### Endpoint
+```http
+POST /api/proxy/forward
+Headers:
+    api-key: your-api-key
+    Content-Type: application/json
+```
+
+### Request Format
+```json
+{
+    "endpoint": "your/local/endpoint",
+    "method": "POST",              // Optional, defaults to POST
+    "data": {                      // Optional, ignored for GET requests
+        // Your request data
+    },
+    "contentType": "application/json",  // Optional, defaults to application/json
+    "headers": {                   // Optional, additional headers
+        "custom-header": "value"
+    }
+}
+```
+
+### Configuration
+In `appsettings.json`:
+```json
+{
+  "LocalEndpoint": {
+    "BaseUrl": "http://localhost:5000"  // Your local service base URL
+  }
+}
+```
+
+### Usage Examples
+
+1. **Simple GET Request**
+```json
+{
+    "endpoint": "api/users",
+    "method": "GET"
+}
+```
+
+2. **POST with JSON Data**
+```json
+{
+    "endpoint": "api/users/create",
+    "method": "POST",
+    "data": {
+        "name": "John Doe",
+        "email": "john@example.com"
+    }
+}
+```
+
+3. **Form Data Submission**
+```json
+{
+    "endpoint": "api/auth/login",
+    "method": "POST",
+    "contentType": "application/x-www-form-urlencoded",
+    "data": {
+        "username": "john",
+        "password": "secret"
+    }
+}
+```
+
+4. **Request with Custom Headers**
+```json
+{
+    "endpoint": "api/secure/data",
+    "method": "GET",
+    "headers": {
+        "X-Custom-Auth": "token123",
+        "X-Feature": "secure"
+    }
+}
+```
+
+### Response Handling
+
+1. **JSON Response**
+```json
+{
+    "status": "success",
+    "data": {
+        // Response data
+    }
+}
+```
+
+2. **Error Response**
+```json
+{
+    "status": "error",
+    "message": "Error description",
+    "errorCode": "ERROR_CODE"
+}
+```
+
+### Features
+
+1. **HTTP Methods Support**
+   - GET
+   - POST
+   - PUT
+   - DELETE
+   - PATCH
+
+2. **Content Types**
+   - application/json (default)
+   - application/x-www-form-urlencoded
+   - application/xml
+   - text/plain
+
+3. **Security**
+   - API key validation
+   - Header forwarding
+   - Error logging
+   - Exception handling
+
+4. **Response Types**
+   - Automatic JSON parsing
+   - XML support
+   - Plain text fallback
+   - Status code preservation
+
+### Best Practices
+
+1. **Error Handling**
+   ```csharp
+   try {
+       var response = await client.PostAsync("/api/proxy/forward", content);
+       if (response.IsSuccessStatusCode) {
+           var result = await response.Content.ReadFromJsonAsync<T>();
+           // Process result
+       }
+   }
+   catch (Exception ex) {
+       // Handle exception
+   }
+   ```
+
+2. **Headers Management**
+   - Always include required headers:
+     - api-key
+     - Content-Type
+   - Use custom headers for specific features
+   - Avoid sensitive information in headers
+
+3. **Request Validation**
+   - Validate endpoint paths
+   - Ensure proper data format
+   - Check content type compatibility
+   - Verify required fields
+
+4. **Response Processing**
+   - Check status codes
+   - Handle different content types
+   - Parse responses appropriately
+   - Log errors and exceptions
+
+### Common Use Cases
+
+1. **User Authentication**
+```json
+{
+    "endpoint": "api/auth/login",
+    "method": "POST",
+    "data": {
+        "username": "user@example.com",
+        "password": "password123"
+    }
+}
+```
+
+2. **Data Retrieval**
+```json
+{
+    "endpoint": "api/data/user-profile",
+    "method": "GET",
+    "headers": {
+        "X-User-Id": "123"
+    }
+}
+```
+
+3. **File Upload**
+```json
+{
+    "endpoint": "api/documents/upload",
+    "method": "POST",
+    "contentType": "multipart/form-data",
+    "data": {
+        // File data
+    }
+}
+```
+
+### Troubleshooting
+
+1. **Common Issues**
+   - Invalid API key
+   - Incorrect endpoint path
+   - Malformed request data
+   - Network connectivity
+   - Content type mismatch
+
+2. **Logging**
+   - All requests are logged
+   - Error details are captured
+   - Response status is tracked
+   - Performance metrics are recorded
+
+3. **Error Codes**
+   - 401: Invalid API key
+   - 404: Endpoint not found
+   - 400: Bad request
+   - 500: Internal server error

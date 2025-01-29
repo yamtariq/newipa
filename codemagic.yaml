@@ -13,6 +13,8 @@ workflows:
         DEFINES_MODULE: "YES"
         IPHONEOS_DEPLOYMENT_TARGET: "14.0"
         BUILD_LIBRARIES_FOR_DISTRIBUTION: "NO"
+        SWIFT_INSTALL_OBJC_HEADER: "NO"
+        CLANG_ENABLE_MODULES: "YES"
     scripts:
       - flutter clean
       - flutter pub get
@@ -20,4 +22,8 @@ workflows:
       - cd ios && pod cache clean --all
       - cd ios && pod repo update
       - cd ios && pod install --repo-update --verbose
+      - |
+        cd ios
+        xcodebuild clean
+        cd ..
       - flutter build ios --debug --no-codesign
