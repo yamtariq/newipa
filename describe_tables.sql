@@ -72,11 +72,11 @@ los                 int                 YES            NULL
 sector              varchar(100)         YES            NULL
 employer            varchar(200)         YES            NULL
 password            varchar(255)         YES            NULL
-registration_date   timestamp           NO             CURRENT_TIMESTAMP
+registration_date   datetime2           NO             CURRENT_TIMESTAMP
 consent             tinyint(1)          NO             0
-consent_date        timestamp           YES            NULL
+consent_date        datetime2           YES            NULL
 nafath_status       varchar(50)         YES            NULL
-nafath_timestamp    timestamp           YES            NULL
+nafath_timestamp    datetime2           YES            NULL
 
 -- customer_devices Table Structure
 -- -------------------------------
@@ -88,17 +88,17 @@ model               varchar(100)         YES            NULL
 manufacturer        varchar(100)         YES            NULL
 biometric_enabled   tinyint(1)          NO             0
 status              varchar(20)          NO             'active'
-created_at          timestamp           NO             CURRENT_TIMESTAMP
-last_used_at        timestamp           YES            NULL
+created_at          datetime2           NO             CURRENT_TIMESTAMP
+last_used_at        datetime2           YES            NULL
 
 -- OTP_Codes Table Structure
 -- ------------------------
 Field                Type                Null    Key     Default  Extra
 national_id         varchar(20)          NO      MUL     NULL
 otp_code            varchar(255)         NO             NULL
-expires_at          timestamp           NO             NULL
+expires_at          datetime2           NO             NULL
 is_used             tinyint(1)          NO             0
-created_at          timestamp           NO             CURRENT_TIMESTAMP
+created_at          datetime2           NO             CURRENT_TIMESTAMP
 
 
 /*
