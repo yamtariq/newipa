@@ -53,13 +53,106 @@ NayifatAPI/
 
 ### Core Tables
 - `Customers` - User registration and auth (including MPIN and biometrics flags)
+  - Primary key: national_id
+  - Includes user details in both English and Arabic
+  - Timestamps using datetime2 for registration and consent
+
 - `user_notifications` - Notifications
+  - Uses nvarchar(max) for JSON data storage
+  - Foreign key to Customers table
+  - Indexed notification_id for fast retrieval
+
 - `master_config` - Dynamic content
+  - JSON storage using nvarchar(max)
+  - Unique constraint on page and key_name combination
+  - Performance index on page column
 
 ### Support Tables
 - `auth_logs` - Authentication logs
+  - Tracks all authentication attempts
+  - Indexed on created_at for performance
+  - No primary key, optimized for write operations
+
 - `OTP_Codes` - OTP management
-- `customer_devices` - Device management (including biometrics status)
+  - Foreign key to Customers table
+  - Tracks OTP status and expiry
+  - Default values for is_used flag
+
+- `customer_devices` - Device management
+  - Foreign key to Customers table
+  - Tracks biometric status
+  - Indexed on deviceId for fast lookups
+
+### SQL Server Specific Implementation
+```sql
+-- Database Creation
+IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'NayifatApp')
+BEGIN
+    CREATE DATABASE NayifatApp;
+END
+GO
+
+USE NayifatApp;
+GO
+
+-- Core Tables Creation Example
+CREATE TABLE Customers (
+    national_id varchar(20) PRIMARY KEY,
+    first_name_en varchar(50),
+    second_name_en varchar(50),
+    third_name_en varchar(50),
+    family_name_en varchar(50),
+    first_name_ar varchar(50),
+    second_name_ar varchar(50),
+    third_name_ar varchar(50),
+    family_name_ar varchar(50),
+    date_of_birth date,
+    id_expiry_date date,
+    email varchar(100),
+    phone varchar(20),
+    building_no varchar(20),
+    street varchar(100),
+    district varchar(100),
+    city varchar(100),
+    zipcode varchar(10),
+    add_no varchar(20),
+    iban varchar(50),
+    dependents int,
+    salary_dakhli decimal(18,2),
+    salary_customer decimal(18,2),
+    los int,
+    sector varchar(100),
+    employer varchar(200),
+    password varchar(255),
+    registration_date datetime2 NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    consent tinyint NOT NULL DEFAULT 0,
+    consent_date datetime2,
+    nafath_status varchar(50),
+    nafath_timestamp datetime2
+);
+
+-- Performance Indexes
+CREATE INDEX IX_auth_logs_created_at ON auth_logs(created_at);
+CREATE INDEX IX_customer_devices_deviceId ON customer_devices(deviceId);
+CREATE INDEX IX_loan_application_status ON loan_application_details(status);
+CREATE INDEX IX_card_application_status ON card_application_details(status);
+CREATE INDEX IX_notification_templates_expiry ON notification_templates(expiry_at);
+
+### Key Features
+- All timestamp fields use datetime2 type
+- JSON data stored in nvarchar(max) fields
+- Foreign key relationships maintained for data integrity
+- Performance indexes on frequently queried columns
+- Default values set using CURRENT_TIMESTAMP and 0 for flags
+
+### Connection String Format
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=localhost;Database=NayifatApp;User Id=sa;Password=your_password;TrustServerCertificate=True;"
+  }
+}
+```
 
 ## Feature Implementation
 

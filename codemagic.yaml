@@ -8,10 +8,12 @@ workflows:
       vars:
         COCOAPODS_DISABLE_STATS: true
         SWIFT_VERSION: "5.0"
+        ENABLE_BITCODE: "NO"
+        DEFINES_MODULE: "YES"
     scripts:
       - flutter clean
       - flutter pub get
-      - cd ios && rm -f Podfile.lock
+      - cd ios && rm -rf Pods Podfile.lock
       - cd ios && pod repo update
-      - cd ios && pod install --repo-update
+      - cd ios && pod install --repo-update --verbose
       - flutter build ios --debug --no-codesign
