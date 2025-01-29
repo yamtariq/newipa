@@ -32,6 +32,9 @@ target 'Runner' do
   
   # Configure PhoneNumberKit with specific settings
   pod 'PhoneNumberKit', '~> 3.3.4', :modular_headers => true
+  
+  # Add DKImagePickerController for file_picker compatibility
+  pod 'DKImagePickerController', '~> 4.3.4', :modular_headers => true
 end
 
 post_install do |installer|
