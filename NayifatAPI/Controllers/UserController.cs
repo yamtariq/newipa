@@ -36,29 +36,30 @@ namespace NayifatAPI.Controllers
 
                 var devices = await _context.CustomerDevices
                     .Where(d => d.NationalId == request.NationalId && d.IsActive)
-                    .Select(d => new
-                    {
-                        device_id = d.DeviceId,
-                        device_name = d.DeviceName,
-                        platform = d.Platform,
-                        os_version = d.OsVersion,
-                        is_biometric_enabled = d.IsBiometricEnabled,
-                        registered_at = d.RegisteredAt.ToString("yyyy-MM-dd HH:mm:ss"),
-                        last_used_at = d.LastUsedAt.HasValue ? d.LastUsedAt.Value.ToString("yyyy-MM-dd HH:mm:ss") : null
-                    })
                     .ToListAsync();
+
+                var deviceList = devices.Select(d => new
+                {
+                    device_id = d.DeviceId,
+                    device_name = d.DeviceName,
+                    platform = d.Platform,
+                    os_version = d.OsVersion,
+                    is_biometric_enabled = d.IsBiometricEnabled,
+                    registered_at = d.RegisteredAt.ToString("yyyy-MM-dd HH:mm:ss"),
+                    last_used_at = d.LastUsedAt?.ToString("yyyy-MM-dd HH:mm:ss")
+                }).ToList();
 
                 return Success(new
                 {
                     user = new
                     {
                         national_id = customer.NationalId,
-                        name_en = $"{customer.FirstNameEn} {customer.SecondNameEn} {customer.ThirdNameEn} {customer.FamilyNameEn}".Trim(),
-                        name_ar = $"{customer.FirstNameAr} {customer.SecondNameAr} {customer.ThirdNameAr} {customer.FamilyNameAr}".Trim(),
+                        name_en = customer.FullNameEn,
+                        name_ar = customer.FullNameAr,
                         email = customer.Email,
                         phone = customer.Phone,
-                        date_of_birth = customer.DateOfBirth.ToString("yyyy-MM-dd"),
-                        id_expiry_date = customer.IdExpiryDate.ToString("yyyy-MM-dd"),
+                        date_of_birth = customer.DateOfBirth?.ToString("yyyy-MM-dd"),
+                        id_expiry_date = customer.IdExpiryDate?.ToString("yyyy-MM-dd"),
                         building_no = customer.BuildingNo,
                         street = customer.Street,
                         district = customer.District,
@@ -74,11 +75,11 @@ namespace NayifatAPI.Controllers
                         employer = customer.Employer,
                         registration_date = customer.RegistrationDate.ToString("yyyy-MM-dd HH:mm:ss"),
                         consent = customer.Consent,
-                        consent_date = customer.ConsentDate.HasValue ? customer.ConsentDate.Value.ToString("yyyy-MM-dd HH:mm:ss") : null,
+                        consent_date = customer.ConsentDate?.ToString("yyyy-MM-dd HH:mm:ss"),
                         nafath_status = customer.NafathStatus,
-                        nafath_timestamp = customer.NafathTimestamp.HasValue ? customer.NafathTimestamp.Value.ToString("yyyy-MM-dd HH:mm:ss") : null
+                        nafath_timestamp = customer.NafathTimestamp?.ToString("yyyy-MM-dd HH:mm:ss")
                     },
-                    devices = devices
+                    devices = deviceList
                 });
             }
             catch (Exception ex)

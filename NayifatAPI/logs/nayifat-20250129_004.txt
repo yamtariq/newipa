@@ -203,3 +203,285 @@ SELECT 1
 2025-01-29 22:07:26.624 +03:00 [INF] Hosting environment: Development
 2025-01-29 22:07:26.625 +03:00 [INF] Content root path: C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI
 2025-01-29 22:12:39.369 +03:00 [INF] Application is shutting down...
+2025-01-29 22:19:46.292 +03:00 [INF] Executed DbCommand (16ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1
+2025-01-29 22:19:46.441 +03:00 [INF] Executed DbCommand (89ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT OBJECT_ID(N'[__EFMigrationsHistory]');
+2025-01-29 22:19:46.449 +03:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1
+2025-01-29 22:19:46.452 +03:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT OBJECT_ID(N'[__EFMigrationsHistory]');
+2025-01-29 22:19:46.474 +03:00 [INF] Executed DbCommand (6ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [MigrationId], [ProductVersion]
+FROM [__EFMigrationsHistory]
+ORDER BY [MigrationId];
+2025-01-29 22:19:46.493 +03:00 [INF] Applying migration '20250129191919_CreateNayifatSchema'.
+2025-01-29 22:19:46.592 +03:00 [INF] Executed DbCommand (21ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DROP INDEX [IX_User_Notifications_NationalId] ON [User_Notifications];
+2025-01-29 22:19:46.598 +03:00 [INF] Executed DbCommand (3ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DROP INDEX [IX_OTP_Codes_national_id] ON [OTP_Codes];
+2025-01-29 22:19:46.602 +03:00 [INF] Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DROP INDEX [IX_Customer_Devices_NationalId] ON [Customer_Devices];
+2025-01-29 22:19:46.618 +03:00 [INF] Executed DbCommand (14ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+ALTER TABLE [MasterConfigs] DROP CONSTRAINT [PK_MasterConfigs];
+2025-01-29 22:19:46.709 +03:00 [INF] Executed DbCommand (90ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DECLARE @var0 sysname;
+SELECT @var0 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[MasterConfigs]') AND [c].[name] = N'LastUpdated');
+IF @var0 IS NOT NULL EXEC(N'ALTER TABLE [MasterConfigs] DROP CONSTRAINT [' + @var0 + '];');
+ALTER TABLE [MasterConfigs] DROP COLUMN [LastUpdated];
+2025-01-29 22:19:47.360 +03:00 [INF] Executed DbCommand (647ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+EXEC sp_rename N'[MasterConfigs]', N'master_config';
+2025-01-29 22:19:47.365 +03:00 [INF] Executed DbCommand (3ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+EXEC sp_rename N'[master_config].[IX_MasterConfigs_Page]', N'IX_master_config_Page', N'INDEX';
+2025-01-29 22:19:47.422 +03:00 [INF] Executed DbCommand (55ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DECLARE @var1 sysname;
+SELECT @var1 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[User_Notifications]') AND [c].[name] = N'NotificationId');
+IF @var1 IS NOT NULL EXEC(N'ALTER TABLE [User_Notifications] DROP CONSTRAINT [' + @var1 + '];');
+ALTER TABLE [User_Notifications] ALTER COLUMN [NotificationId] nvarchar(450) NOT NULL;
+2025-01-29 22:19:47.457 +03:00 [INF] Executed DbCommand (32ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DECLARE @var2 sysname;
+SELECT @var2 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[User_Notifications]') AND [c].[name] = N'CreatedAt');
+IF @var2 IS NOT NULL EXEC(N'ALTER TABLE [User_Notifications] DROP CONSTRAINT [' + @var2 + '];');
+2025-01-29 22:19:47.499 +03:00 [INF] Executed DbCommand (37ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DECLARE @var3 sysname;
+SELECT @var3 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[OTP_Codes]') AND [c].[name] = N'type');
+IF @var3 IS NOT NULL EXEC(N'ALTER TABLE [OTP_Codes] DROP CONSTRAINT [' + @var3 + '];');
+ALTER TABLE [OTP_Codes] ALTER COLUMN [type] nvarchar(450) NOT NULL;
+2025-01-29 22:19:47.537 +03:00 [INF] Executed DbCommand (34ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DECLARE @var4 sysname;
+SELECT @var4 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[OTP_Codes]') AND [c].[name] = N'created_at');
+IF @var4 IS NOT NULL EXEC(N'ALTER TABLE [OTP_Codes] DROP CONSTRAINT [' + @var4 + '];');
+2025-01-29 22:19:47.580 +03:00 [INF] Executed DbCommand (41ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DECLARE @var5 sysname;
+SELECT @var5 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Customers]') AND [c].[name] = N'Zipcode');
+IF @var5 IS NOT NULL EXEC(N'ALTER TABLE [Customers] DROP CONSTRAINT [' + @var5 + '];');
+ALTER TABLE [Customers] ALTER COLUMN [Zipcode] nvarchar(max) NULL;
+2025-01-29 22:19:47.620 +03:00 [INF] Executed DbCommand (37ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DECLARE @var6 sysname;
+SELECT @var6 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Customers]') AND [c].[name] = N'Street');
+IF @var6 IS NOT NULL EXEC(N'ALTER TABLE [Customers] DROP CONSTRAINT [' + @var6 + '];');
+ALTER TABLE [Customers] ALTER COLUMN [Street] nvarchar(max) NULL;
+2025-01-29 22:19:47.661 +03:00 [INF] Executed DbCommand (38ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DECLARE @var7 sysname;
+SELECT @var7 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Customers]') AND [c].[name] = N'Sector');
+IF @var7 IS NOT NULL EXEC(N'ALTER TABLE [Customers] DROP CONSTRAINT [' + @var7 + '];');
+ALTER TABLE [Customers] ALTER COLUMN [Sector] nvarchar(max) NULL;
+2025-01-29 22:19:47.702 +03:00 [INF] Executed DbCommand (38ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DECLARE @var8 sysname;
+SELECT @var8 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Customers]') AND [c].[name] = N'RegistrationDate');
+IF @var8 IS NOT NULL EXEC(N'ALTER TABLE [Customers] DROP CONSTRAINT [' + @var8 + '];');
+2025-01-29 22:19:47.741 +03:00 [INF] Executed DbCommand (36ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DECLARE @var9 sysname;
+SELECT @var9 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Customers]') AND [c].[name] = N'NafathStatus');
+IF @var9 IS NOT NULL EXEC(N'ALTER TABLE [Customers] DROP CONSTRAINT [' + @var9 + '];');
+ALTER TABLE [Customers] ALTER COLUMN [NafathStatus] nvarchar(max) NULL;
+2025-01-29 22:19:47.778 +03:00 [INF] Executed DbCommand (31ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DECLARE @var10 sysname;
+SELECT @var10 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Customers]') AND [c].[name] = N'IdExpiryDate');
+IF @var10 IS NOT NULL EXEC(N'ALTER TABLE [Customers] DROP CONSTRAINT [' + @var10 + '];');
+ALTER TABLE [Customers] ALTER COLUMN [IdExpiryDate] datetime2 NULL;
+2025-01-29 22:19:47.813 +03:00 [INF] Executed DbCommand (32ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DECLARE @var11 sysname;
+SELECT @var11 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Customers]') AND [c].[name] = N'Iban');
+IF @var11 IS NOT NULL EXEC(N'ALTER TABLE [Customers] DROP CONSTRAINT [' + @var11 + '];');
+ALTER TABLE [Customers] ALTER COLUMN [Iban] nvarchar(max) NULL;
+2025-01-29 22:19:47.850 +03:00 [INF] Executed DbCommand (35ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DECLARE @var12 sysname;
+SELECT @var12 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Customers]') AND [c].[name] = N'Employer');
+IF @var12 IS NOT NULL EXEC(N'ALTER TABLE [Customers] DROP CONSTRAINT [' + @var12 + '];');
+ALTER TABLE [Customers] ALTER COLUMN [Employer] nvarchar(max) NULL;
+2025-01-29 22:19:47.886 +03:00 [INF] Executed DbCommand (34ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DECLARE @var13 sysname;
+SELECT @var13 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Customers]') AND [c].[name] = N'District');
+IF @var13 IS NOT NULL EXEC(N'ALTER TABLE [Customers] DROP CONSTRAINT [' + @var13 + '];');
+ALTER TABLE [Customers] ALTER COLUMN [District] nvarchar(max) NULL;
+2025-01-29 22:19:47.921 +03:00 [INF] Executed DbCommand (32ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DECLARE @var14 sysname;
+SELECT @var14 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Customers]') AND [c].[name] = N'DateOfBirth');
+IF @var14 IS NOT NULL EXEC(N'ALTER TABLE [Customers] DROP CONSTRAINT [' + @var14 + '];');
+ALTER TABLE [Customers] ALTER COLUMN [DateOfBirth] datetime2 NULL;
+2025-01-29 22:19:47.958 +03:00 [INF] Executed DbCommand (35ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DECLARE @var15 sysname;
+SELECT @var15 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Customers]') AND [c].[name] = N'City');
+IF @var15 IS NOT NULL EXEC(N'ALTER TABLE [Customers] DROP CONSTRAINT [' + @var15 + '];');
+ALTER TABLE [Customers] ALTER COLUMN [City] nvarchar(max) NULL;
+2025-01-29 22:19:47.995 +03:00 [INF] Executed DbCommand (31ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DECLARE @var16 sysname;
+SELECT @var16 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Customers]') AND [c].[name] = N'BuildingNo');
+IF @var16 IS NOT NULL EXEC(N'ALTER TABLE [Customers] DROP CONSTRAINT [' + @var16 + '];');
+ALTER TABLE [Customers] ALTER COLUMN [BuildingNo] nvarchar(max) NULL;
+2025-01-29 22:19:48.031 +03:00 [INF] Executed DbCommand (34ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DECLARE @var17 sysname;
+SELECT @var17 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Customers]') AND [c].[name] = N'AddNo');
+IF @var17 IS NOT NULL EXEC(N'ALTER TABLE [Customers] DROP CONSTRAINT [' + @var17 + '];');
+ALTER TABLE [Customers] ALTER COLUMN [AddNo] nvarchar(max) NULL;
+2025-01-29 22:19:48.035 +03:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+ALTER TABLE [Customers] ADD [Mpin] nvarchar(max) NULL;
+2025-01-29 22:19:48.038 +03:00 [INF] Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+ALTER TABLE [Customers] ADD [MpinEnabled] bit NOT NULL DEFAULT CAST(0 AS bit);
+2025-01-29 22:19:48.072 +03:00 [INF] Executed DbCommand (32ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DECLARE @var18 sysname;
+SELECT @var18 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Customer_Devices]') AND [c].[name] = N'CreatedAt');
+IF @var18 IS NOT NULL EXEC(N'ALTER TABLE [Customer_Devices] DROP CONSTRAINT [' + @var18 + '];');
+2025-01-29 22:19:48.113 +03:00 [INF] Executed DbCommand (39ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DECLARE @var19 sysname;
+SELECT @var19 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[AuthLogs]') AND [c].[name] = N'NationalId');
+IF @var19 IS NOT NULL EXEC(N'ALTER TABLE [AuthLogs] DROP CONSTRAINT [' + @var19 + '];');
+ALTER TABLE [AuthLogs] ALTER COLUMN [NationalId] nvarchar(450) NOT NULL;
+2025-01-29 22:19:48.143 +03:00 [INF] Executed DbCommand (28ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DECLARE @var20 sysname;
+SELECT @var20 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[AuthLogs]') AND [c].[name] = N'CreatedAt');
+IF @var20 IS NOT NULL EXEC(N'ALTER TABLE [AuthLogs] DROP CONSTRAINT [' + @var20 + '];');
+2025-01-29 22:19:48.191 +03:00 [INF] Executed DbCommand (45ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+DECLARE @var21 sysname;
+SELECT @var21 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[master_config]') AND [c].[name] = N'KeyName');
+IF @var21 IS NOT NULL EXEC(N'ALTER TABLE [master_config] DROP CONSTRAINT [' + @var21 + '];');
+ALTER TABLE [master_config] ALTER COLUMN [KeyName] nvarchar(450) NOT NULL;
+2025-01-29 22:19:48.197 +03:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+ALTER TABLE [master_config] ADD [UpdatedAt] datetime2 NULL;
+2025-01-29 22:19:48.204 +03:00 [INF] Executed DbCommand (5ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+ALTER TABLE [master_config] ADD CONSTRAINT [PK_master_config] PRIMARY KEY ([Id]);
+2025-01-29 22:19:48.207 +03:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE INDEX [IX_User_Notifications_NationalId_IsRead] ON [User_Notifications] ([NationalId], [IsRead]);
+2025-01-29 22:19:48.210 +03:00 [INF] Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE INDEX [IX_User_Notifications_NotificationId] ON [User_Notifications] ([NotificationId]);
+2025-01-29 22:19:48.214 +03:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE INDEX [IX_OTP_Codes_expires_at] ON [OTP_Codes] ([expires_at]);
+2025-01-29 22:19:48.217 +03:00 [INF] Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE INDEX [IX_OTP_Codes_national_id_type_is_used] ON [OTP_Codes] ([national_id], [type], [is_used]);
+2025-01-29 22:19:48.220 +03:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE UNIQUE INDEX [IX_Customer_Devices_NationalId_DeviceId] ON [Customer_Devices] ([NationalId], [DeviceId]);
+2025-01-29 22:19:48.223 +03:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE INDEX [IX_AuthLogs_NationalId_CreatedAt] ON [AuthLogs] ([NationalId], [CreatedAt]);
+2025-01-29 22:19:48.227 +03:00 [INF] Executed DbCommand (3ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+CREATE UNIQUE INDEX [IX_master_config_Page_KeyName] ON [master_config] ([Page], [KeyName]);
+2025-01-29 22:19:48.231 +03:00 [INF] Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+ALTER TABLE [AuthLogs] ADD CONSTRAINT [FK_AuthLogs_Customers_NationalId] FOREIGN KEY ([NationalId]) REFERENCES [Customers] ([NationalId]) ON DELETE CASCADE;
+2025-01-29 22:19:48.234 +03:00 [INF] Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20250129191919_CreateNayifatSchema', N'8.0.1');
+2025-01-29 22:20:43.462 +03:00 [INF] Starting web application
+2025-01-29 22:20:44.366 +03:00 [INF] Now listening on: http://localhost:5264
+2025-01-29 22:20:44.858 +03:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-01-29 22:20:45.186 +03:00 [INF] Hosting environment: Development
+2025-01-29 22:20:45.187 +03:00 [INF] Content root path: C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI
+2025-01-29 22:22:22.463 +03:00 [INF] Request starting HTTP/1.1 POST http://localhost:5264/api/config - application/json 76
+2025-01-29 22:22:22.517 +03:00 [WRN] Failed to determine the https port for redirect.
+2025-01-29 22:22:22.522 +03:00 [INF] Executing endpoint 'NayifatAPI.Controllers.ConfigController.SetConfig (NayifatAPI)'
+2025-01-29 22:22:22.548 +03:00 [INF] Route matched with {action = "SetConfig", controller = "Config"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] SetConfig(NayifatAPI.Controllers.SetConfigRequest) on controller NayifatAPI.Controllers.ConfigController (NayifatAPI).
+2025-01-29 22:22:24.357 +03:00 [INF] Executed DbCommand (536ms) [Parameters=[@__request_Page_0='?' (Size = 450), @__request_KeyName_1='?' (Size = 450)], CommandType='"Text"', CommandTimeout='30']
+SELECT TOP(1) [m].[Id], [m].[CreatedAt], [m].[IsActive], [m].[KeyName], [m].[Page], [m].[UpdatedAt], [m].[Value]
+FROM [master_config] AS [m]
+WHERE [m].[Page] = @__request_Page_0 AND [m].[KeyName] = @__request_KeyName_1
+2025-01-29 22:22:24.533 +03:00 [INF] Executed DbCommand (16ms) [Parameters=[@p0='?' (DbType = DateTime2), @p1='?' (DbType = Boolean), @p2='?' (Size = 450), @p3='?' (Size = 450), @p4='?' (DbType = DateTime2), @p5='?' (Size = 4000)], CommandType='"Text"', CommandTimeout='30']
+SET IMPLICIT_TRANSACTIONS OFF;
+SET NOCOUNT ON;
+INSERT INTO [master_config] ([CreatedAt], [IsActive], [KeyName], [Page], [UpdatedAt], [Value])
+OUTPUT INSERTED.[Id]
+VALUES (@p0, @p1, @p2, @p3, @p4, @p5);
+2025-01-29 22:22:24.562 +03:00 [INF] Executing OkObjectResult, writing value of type '<>f__AnonymousType11`2[[System.Boolean, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Object, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2025-01-29 22:22:24.598 +03:00 [INF] Executed action NayifatAPI.Controllers.ConfigController.SetConfig (NayifatAPI) in 2045.1796ms
+2025-01-29 22:22:24.601 +03:00 [INF] Executed endpoint 'NayifatAPI.Controllers.ConfigController.SetConfig (NayifatAPI)'
+2025-01-29 22:22:24.611 +03:00 [INF] Request finished HTTP/1.1 POST http://localhost:5264/api/config - 200 null application/json; charset=utf-8 2149.8793ms
+2025-01-29 22:22:37.269 +03:00 [INF] Request starting HTTP/1.1 GET http://localhost:5264/api/config/page/app - application/json null
+2025-01-29 22:22:37.281 +03:00 [INF] Executing endpoint 'NayifatAPI.Controllers.ConfigController.GetPageConfig (NayifatAPI)'
+2025-01-29 22:22:37.291 +03:00 [INF] Route matched with {action = "GetPageConfig", controller = "Config"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetPageConfig(System.String) on controller NayifatAPI.Controllers.ConfigController (NayifatAPI).
+2025-01-29 22:22:37.412 +03:00 [INF] Executed DbCommand (86ms) [Parameters=[@__page_0='?' (Size = 450)], CommandType='"Text"', CommandTimeout='30']
+SELECT [m].[Id], [m].[CreatedAt], [m].[IsActive], [m].[KeyName], [m].[Page], [m].[UpdatedAt], [m].[Value]
+FROM [master_config] AS [m]
+WHERE [m].[Page] = @__page_0 AND [m].[IsActive] = CAST(1 AS bit)
+2025-01-29 22:22:37.445 +03:00 [INF] Executing OkObjectResult, writing value of type '<>f__AnonymousType11`2[[System.Boolean, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Object, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2025-01-29 22:22:37.462 +03:00 [INF] Executed action NayifatAPI.Controllers.ConfigController.GetPageConfig (NayifatAPI) in 168.8795ms
+2025-01-29 22:22:37.463 +03:00 [INF] Executed endpoint 'NayifatAPI.Controllers.ConfigController.GetPageConfig (NayifatAPI)'
+2025-01-29 22:22:37.465 +03:00 [INF] Request finished HTTP/1.1 GET http://localhost:5264/api/config/page/app - 200 null application/json; charset=utf-8 195.1126ms
+2025-01-29 22:23:02.594 +03:00 [INF] Request starting HTTP/1.1 GET http://localhost:5264/api/config/page/app - null null
+2025-01-29 22:23:02.927 +03:00 [INF] Executing endpoint 'NayifatAPI.Controllers.ConfigController.GetPageConfig (NayifatAPI)'
+2025-01-29 22:23:02.928 +03:00 [INF] Route matched with {action = "GetPageConfig", controller = "Config"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GetPageConfig(System.String) on controller NayifatAPI.Controllers.ConfigController (NayifatAPI).
+2025-01-29 22:23:03.163 +03:00 [INF] Executed DbCommand (21ms) [Parameters=[@__page_0='?' (Size = 450)], CommandType='"Text"', CommandTimeout='30']
+SELECT [m].[Id], [m].[CreatedAt], [m].[IsActive], [m].[KeyName], [m].[Page], [m].[UpdatedAt], [m].[Value]
+FROM [master_config] AS [m]
+WHERE [m].[Page] = @__page_0 AND [m].[IsActive] = CAST(1 AS bit)
+2025-01-29 22:23:03.195 +03:00 [INF] Executing OkObjectResult, writing value of type '<>f__AnonymousType11`2[[System.Boolean, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Object, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2025-01-29 22:23:03.293 +03:00 [INF] Executed action NayifatAPI.Controllers.ConfigController.GetPageConfig (NayifatAPI) in 301.0796ms
+2025-01-29 22:23:03.295 +03:00 [INF] Executed endpoint 'NayifatAPI.Controllers.ConfigController.GetPageConfig (NayifatAPI)'
+2025-01-29 22:23:03.300 +03:00 [INF] Request finished HTTP/1.1 GET http://localhost:5264/api/config/page/app - 200 null application/json; charset=utf-8 705.405ms
+2025-01-29 22:23:32.920 +03:00 [INF] Request starting HTTP/1.1 POST http://localhost:5264/api/registration/register - application/json 643
+2025-01-29 22:23:32.924 +03:00 [INF] Request finished HTTP/1.1 POST http://localhost:5264/api/registration/register - 404 0 null 3.6463ms
+2025-01-29 22:23:32.927 +03:00 [INF] Request reached the end of the middleware pipeline without being handled by application code. Request path: POST http://localhost:5264/api/registration/register, Response status code: 404
+2025-01-29 22:24:12.122 +03:00 [INF] Request starting HTTP/1.1 GET http://localhost:5264/swagger/index.html - null null
+2025-01-29 22:24:12.280 +03:00 [INF] Request finished HTTP/1.1 GET http://localhost:5264/swagger/index.html - 200 null text/html;charset=utf-8 157.8242ms
+2025-01-29 22:24:12.536 +03:00 [INF] Request starting HTTP/1.1 GET http://localhost:5264/swagger/v1/swagger.json - null null
+2025-01-29 22:24:12.679 +03:00 [INF] Request finished HTTP/1.1 GET http://localhost:5264/swagger/v1/swagger.json - 200 null application/json;charset=utf-8 142.3974ms
+2025-01-29 22:24:46.364 +03:00 [INF] Request starting HTTP/1.1 POST http://localhost:5264/api/auth/otp/generate - application/json 47
+2025-01-29 22:24:46.366 +03:00 [INF] Executing endpoint 'NayifatAPI.Controllers.AuthController.GenerateOtp (NayifatAPI)'
+2025-01-29 22:24:46.372 +03:00 [INF] Route matched with {action = "GenerateOtp", controller = "Auth"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] GenerateOtp(NayifatAPI.Controllers.OtpGenerateRequest) on controller NayifatAPI.Controllers.AuthController (NayifatAPI).
+2025-01-29 22:24:46.386 +03:00 [INF] Executing ObjectResult, writing value of type '<>f__AnonymousType0`3[[System.String, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.String, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Object, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2025-01-29 22:24:46.393 +03:00 [INF] Executed action NayifatAPI.Controllers.AuthController.GenerateOtp (NayifatAPI) in 18.414ms
+2025-01-29 22:24:46.395 +03:00 [INF] Executed endpoint 'NayifatAPI.Controllers.AuthController.GenerateOtp (NayifatAPI)'
+2025-01-29 22:24:46.396 +03:00 [INF] Request finished HTTP/1.1 POST http://localhost:5264/api/auth/otp/generate - 401 null application/json; charset=utf-8 32.1453ms

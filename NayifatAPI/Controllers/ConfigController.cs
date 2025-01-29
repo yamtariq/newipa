@@ -72,10 +72,15 @@ namespace NayifatAPI.Controllers
                         KeyName = request.KeyName,
                         Value = request.Value,
                         CreatedAt = DateTime.UtcNow,
-                        LastUpdated = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow,
                         IsActive = true
                     };
                     _context.MasterConfigs.Add(config);
+                }
+                else
+                {
+                    config.Value = request.Value;
+                    config.UpdatedAt = DateTime.UtcNow;
                 }
 
                 await _context.SaveChangesAsync();
@@ -103,7 +108,7 @@ namespace NayifatAPI.Controllers
                 }
 
                 config.IsActive = false;
-                config.LastUpdated = DateTime.UtcNow;
+                config.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
 
                 return Success();

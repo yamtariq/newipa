@@ -149,8 +149,8 @@ namespace NayifatAPI.Controllers
                             family_name_en = customer.FamilyNameEn,
                             email = customer.Email,
                             phone = customer.Phone,
-                            date_of_birth = customer.DateOfBirth.ToString("yyyy-MM-dd"),
-                            id_expiry_date = customer.IdExpiryDate.ToString("yyyy-MM-dd")
+                            date_of_birth = customer.DateOfBirth?.ToString("yyyy-MM-dd"),
+                            id_expiry_date = customer.IdExpiryDate?.ToString("yyyy-MM-dd")
                         }
                     };
 
