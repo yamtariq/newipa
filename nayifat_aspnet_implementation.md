@@ -18,36 +18,194 @@
    dotnet add package Microsoft.AspNetCore.Authentication.JwtBearer
    dotnet add package Microsoft.EntityFrameworkCore.SqlServer
    dotnet add package Serilog.AspNetCore
+   dotnet add package BCrypt.Net-Next
    ```
 
 ## Project Structure
 ```
 NayifatAPI/
 ├── Controllers/
-│   ├── AuthController.cs        # Authentication & Registration
-│   ├── ContentController.cs     # Content management
-│   └── NotificationController.cs # Notifications
+│   ├── ApiBaseController.cs     # Base controller with common functionality
+│   ├── AuthController.cs        # Authentication endpoints
+│   ├── UserController.cs        # User management
+│   ├── RegistrationController.cs # User registration
+│   └── NotificationsController.cs # Notifications management
 ├── Models/
-│   ├── Auth/
-│   │   ├── SignInRequest.cs
-│   │   ├── RegisterRequest.cs
-│   │   ├── UserDetailsRequest.cs
-│   │   ├── MpinSetupRequest.cs
-│   │   ├── BiometricsRequest.cs
-│   │   ├── OtpRequest.cs
-│   │   └── DeviceInfo.cs
-│   ├── Content/
-│   │   └── DynamicContent.cs
-│   └── Notifications/
-│       ├── Notification.cs
-│       └── NotificationTemplate.cs
-├── Services/
-│   ├── AuthService.cs
-│   ├── ContentService.cs
-│   └── NotificationService.cs
+│   ├── Customer.cs              # Main user model
+│   ├── CustomerDevice.cs        # Device management
+│   ├── UserNotification.cs      # User notifications
+│   ├── AuthLog.cs              # Authentication logging
+│   └── OtpCode.cs              # OTP management
+├── Data/
+│   └── ApplicationDbContext.cs  # EF Core context
 └── Middleware/
-    └── ApiKeyMiddleware.cs
+    └── ApiKeyMiddleware.cs      # API key validation
 ```
+
+## Model Implementations
+
+### UserNotification Model
+```csharp
+public class UserNotification
+{
+    [Key]
+    public int Id { get; set; }
+    
+    public required string NotificationId { get; set; }
+    
+    public required string NationalId { get; set; }
+    
+    public required string Title { get; set; }
+    
+    public required string Message { get; set; }
+    
+    public string? Data { get; set; }
+    
+    public required string NotificationType { get; set; }
+    
+    public required DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    
+    public required DateTime LastUpdated { get; set; } = DateTime.UtcNow;
+    
+    public DateTime? ReadAt { get; set; }
+    
+    public required bool IsRead { get; set; }
+}
+```
+
+### AuthLog Model
+```csharp
+public class AuthLog
+{
+    public required string NationalId { get; set; }
+    
+    public string? DeviceId { get; set; }
+    
+    public required string AuthType { get; set; }
+    
+    public required string Status { get; set; }
+    
+    public string? FailureReason { get; set; }
+    
+    public string? IpAddress { get; set; }
+    
+    public string? UserAgent { get; set; }
+    
+    public required DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+```
+
+### OtpCode Model
+```csharp
+public class OtpCode
+{
+    public required string NationalId { get; set; }
+    
+    public required string Code { get; set; }
+    
+    public required string Type { get; set; } = "auth";
+    
+    public required bool IsUsed { get; set; }
+    
+    public required DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    
+    public required DateTime ExpiresAt { get; set; }
+    
+    public DateTime? UsedAt { get; set; }
+}
+```
+
+### CustomerDevice Model
+```csharp
+public class CustomerDevice
+{
+    [Key]
+    public int Id { get; set; }
+    
+    public required string NationalId { get; set; }
+    
+    public required string DeviceId { get; set; }
+    
+    public required string Platform { get; set; }
+    
+    public required string Model { get; set; }
+    
+    public required string Manufacturer { get; set; }
+    
+    public string? OsVersion { get; set; }
+    
+    public required bool BiometricEnabled { get; set; }
+    
+    public required string Status { get; set; } = "active";
+    
+    public required DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    
+    public DateTime? LastUsedAt { get; set; }
+    
+    public string? BiometricToken { get; set; }
+    
+    public bool IsActive => Status == "active";
+    
+    public string DeviceName => $"{Manufacturer} {Model}";
+    
+    public bool IsBiometricEnabled => BiometricEnabled;
+    
+    public DateTime RegisteredAt => CreatedAt;
+}
+```
+
+## Controller Implementations
+
+### NotificationsController
+Handles user notifications with features:
+- Pagination support
+- Read/unread filtering
+- Automatic read status updates
+- Push notification capability
+
+### UserController
+Manages user profile with features:
+- Detailed user information retrieval
+- Active device listing
+- Proper null handling for dates
+- Formatted name concatenation
+
+### RegistrationController
+Handles user registration with:
+- ID availability checking
+- Full profile creation
+- Device registration
+- Transaction support
+- Audit logging
+
+## Key Features
+- Null safety with required properties
+- Default values for timestamps
+- Computed properties for derived data
+- Proper date formatting
+- Transaction support for complex operations
+- Comprehensive error logging
+- API key validation
+- Feature-based access control
+
+## Recent Updates
+1. Improved null safety across all models using required modifier
+2. Enhanced date handling and formatting
+3. Added computed properties for better encapsulation
+4. Implemented proper error handling and logging
+5. Added transaction support for registration
+6. Enhanced device management
+7. Improved notification system with proper state management
+
+## Best Practices
+1. Use UTC for all timestamps
+2. Implement proper null checking
+3. Use transactions for multi-table operations
+4. Log all authentication attempts
+5. Validate API keys for all requests
+6. Format dates consistently
+7. Handle device management properly
+8. Implement proper error responses
 
 ## Database Tables Used
 
@@ -157,18 +315,15 @@ CREATE INDEX IX_notification_templates_expiry ON notification_templates(expiry_a
 ## Feature Implementation
 
 ### 1. Authentication & Registration
-```csharp
-// Models/Auth/RegisterRequest.cs
-public class RegisterRequest
-{
-    public string NationalId { get; set; }
-    public string Password { get; set; }
-    public DeviceInfo DeviceInfo { get; set; }
-}
 
-// Models/Auth/UserDetailsRequest.cs
-public class UserDetailsRequest
+#### Registration Endpoint (`user_registration.php`)
+The registration process is handled through a single endpoint that supports both ID availability checks and full user registration with device management.
+
+```csharp
+// Models/Auth/UserRegistrationRequest.cs
+public class UserRegistrationRequest
 {
+    public bool CheckOnly { get; set; }                // For ID availability check
     public string NationalId { get; set; }
     public string FirstNameEn { get; set; }
     public string SecondNameEn { get; set; }
@@ -178,211 +333,292 @@ public class UserDetailsRequest
     public string SecondNameAr { get; set; }
     public string ThirdNameAr { get; set; }
     public string FamilyNameAr { get; set; }
-    public DateTime DateOfBirth { get; set; }
     public string Email { get; set; }
+    public string Password { get; set; }
     public string Phone { get; set; }
+    public DateTime? DateOfBirth { get; set; }
+    public DateTime? IdExpiryDate { get; set; }
+    // Address Information
+    public string BuildingNo { get; set; }
+    public string Street { get; set; }
+    public string District { get; set; }
+    public string City { get; set; }
+    public string Zipcode { get; set; }
+    public string AddNo { get; set; }
+    // Financial Information
+    public string Iban { get; set; }
+    public int? Dependents { get; set; }
+    public decimal? SalaryDakhli { get; set; }
+    public decimal? SalaryCustomer { get; set; }
+    public int? Los { get; set; }
+    // Employment Information
+    public string Sector { get; set; }
+    public string Employer { get; set; }
+    // Additional Information
+    public bool Consent { get; set; }
+    public string NafathStatus { get; set; }
+    public DeviceInfo DeviceInfo { get; set; }
 }
 
-// Models/Auth/MpinSetupRequest.cs
-public class MpinSetupRequest
+public class DeviceInfo
 {
-    public string NationalId { get; set; }
-    public string Mpin { get; set; }
-    public string CurrentPassword { get; set; }
-}
-
-// Models/Auth/BiometricsRequest.cs
-public class BiometricsRequest
-{
-    public string NationalId { get; set; }
     public string DeviceId { get; set; }
-    public bool EnableBiometrics { get; set; }
-    public string BiometricToken { get; set; }
+    public string Platform { get; set; }
+    public string Model { get; set; }
+    public string Manufacturer { get; set; }
 }
 
-// Controllers/AuthController.cs
-[Route("api/auth")]
-public class AuthController : ControllerBase
+// Controllers/RegistrationController.cs
+[Route("api")]
+public class RegistrationController : ApiBaseController
 {
-    [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+    [HttpPost("user_registration.php")]
+    public async Task<IActionResult> Register([FromBody] UserRegistrationRequest request)
     {
-        // Validate national ID
-        // Generate OTP
-        // Create initial user record
-    }
-
-    [HttpPost("user-details")]
-    public async Task<IActionResult> SetUserDetails([FromBody] UserDetailsRequest request)
-    {
-        // Validate user details
-        // Update user information
-        // Handle Arabic text properly
-    }
-
-    [HttpPost("setup-mpin")]
-    public async Task<IActionResult> SetupMpin([FromBody] MpinSetupRequest request)
-    {
-        // Validate current password
-        // Hash and store MPIN
-        // Update MPIN status
-    }
-
-    [HttpPost("biometrics")]
-    public async Task<IActionResult> SetupBiometrics([FromBody] BiometricsRequest request)
-    {
-        // Validate device registration
-        // Store biometric token
-        // Update biometrics status
-    }
-
-    [HttpPost("signin")]
-    public async Task<IActionResult> SignIn([FromBody] SignInRequest request)
-    {
-        // Support multiple auth methods:
-        // 1. Password
-        // 2. MPIN
-        // 3. Biometrics
-        // Generate JWT token
-        // Log sign-in
-    }
-
-    [HttpPost("otp/verify")]
-    public async Task<IActionResult> VerifyOTP([FromBody] OtpRequest request)
-    {
-        // Verify OTP code
-        // Update verification status
-    }
-}
-
-// Services/AuthService.cs
-public interface IAuthService
-{
-    Task<bool> RegisterUser(RegisterRequest request);
-    Task<bool> SetUserDetails(UserDetailsRequest request);
-    Task<bool> SetupMpin(string nationalId, string mpin);
-    Task<bool> SetupBiometrics(BiometricsRequest request);
-    Task<AuthResult> SignIn(SignInRequest request);
-    Task<bool> VerifyOTP(string nationalId, string otp);
-}
-
-// Services/AuthService Implementation
-public class AuthService : IAuthService
-{
-    private readonly NayifatDbContext _context;
-    private readonly IConfiguration _configuration;
-
-    public async Task<bool> SetupMpin(string nationalId, string mpin)
-    {
-        // Hash MPIN before storing
-        var hashedMpin = HashMpin(mpin);
-        
-        var user = await _context.Customers
-            .FirstOrDefaultAsync(c => c.NationalId == nationalId);
-        
-        if (user == null) return false;
-        
-        user.Mpin = hashedMpin;
-        user.MpinEnabled = true;
-        
-        await _context.SaveChangesAsync();
-        return true;
-    }
-
-    public async Task<bool> SetupBiometrics(BiometricsRequest request)
-    {
-        var device = await _context.CustomerDevices
-            .FirstOrDefaultAsync(d => 
-                d.NationalId == request.NationalId && 
-                d.DeviceId == request.DeviceId);
-        
-        if (device == null) return false;
-        
-        device.BiometricEnabled = request.EnableBiometrics;
-        device.BiometricToken = request.BiometricToken;
-        
-        await _context.SaveChangesAsync();
-        return true;
+        // Key Features:
+        // 1. ID Availability Check
+        // 2. Full User Registration
+        // 3. Device Registration
+        // 4. Transaction Support
+        // 5. Audit Logging
     }
 }
 ```
 
-### 2. Content Management
-```csharp
-// Controllers/ContentController.cs
-[Route("api/content")]
-public class ContentController : ControllerBase
-{
-    [HttpGet("master-fetch")]
-    public async Task<IActionResult> GetContent(
-        [FromQuery] string page,
-        [FromQuery] string keyName)
-    {
-        // Fetch dynamic content
-        // Handle localization
-        // Return formatted content
-    }
-}
+#### Registration Flow
+1. **ID Availability Check**
+   - Endpoint accepts `CheckOnly` flag
+   - Returns immediate response for ID availability
+   - No data modification during check
 
-// Services/ContentService.cs
-public interface IContentService
-{
-    Task<dynamic> GetContent(string page, string keyName);
-}
-```
+2. **Full Registration**
+   - Transactional processing
+   - Comprehensive user data collection
+   - Automatic timestamps for registration and consent
+   - Nafath status tracking
 
-### 3. Notification System
-```csharp
-// Controllers/NotificationController.cs
-[Route("api/notifications")]
-public class NotificationController : ControllerBase
-{
-    [HttpGet]
-    public async Task<IActionResult> GetNotifications(
-        [FromQuery] string nationalId)
-    {
-        // Get user notifications
-        // Filter by status
-        // Handle pagination
-    }
+3. **Device Management**
+   - Automatic deactivation of existing devices
+   - New device registration with biometric capability
+   - Device audit logging
+   - Platform and manufacturer tracking
 
-    [HttpPost("send")]
-    public async Task<IActionResult> SendNotification(
-        [FromBody] NotificationRequest request)
-    {
-        // Validate request
-        // Send notification
-        // Store in database
-    }
-}
-
-// Services/NotificationService.cs
-public interface INotificationService
+4. **Response Format**
+```json
 {
-    Task<List<Notification>> GetUserNotifications(string nationalId);
-    Task<bool> SendNotification(NotificationRequest request);
+    "status": "success",
+    "message": "Registration successful",
+    "government_data": {
+        "national_id": "1234567890",
+        "first_name_en": "John",
+        "family_name_en": "Doe",
+        "email": "john@example.com",
+        "phone": "+966501234567",
+        "date_of_birth": "1990-01-01",
+        "id_expiry_date": "2025-01-01"
+    },
+    "device_registered": true,
+    "biometric_enabled": true
 }
 ```
 
-## Security Implementation
+5. **Security Features**
+   - API key validation
+   - Password hashing using BCrypt
+   - Transaction rollback on failures
+   - Comprehensive error logging
+   - Device registration audit trail
+
+6. **Error Handling**
+   - Duplicate ID detection
+   - Transaction management
+   - Device registration failures
+   - Detailed error logging with context
+
+### 2. Notifications System (`NotificationsController`)
+The notifications system handles user notifications with automatic read status tracking.
 
 ```csharp
-// Middleware/ApiKeyMiddleware.cs
-public class ApiKeyMiddleware
+[Route("api")]
+public class NotificationsController : ApiBaseController
 {
-    private const string API_KEY_HEADER = "api-key";
-    private const string EXPECTED_API_KEY = "7ca7427b418bdbd0b3b23d7debf69bf7";
-
-    public async Task InvokeAsync(HttpContext context, RequestDelegate next)
+    [HttpPost("get_notifications.php")]
+    public async Task<IActionResult> GetNotifications([FromBody] GetNotificationsRequest request)
     {
-        if (!context.Request.Headers.TryGetValue(API_KEY_HEADER, out var apiKey) || 
-            apiKey != EXPECTED_API_KEY)
+        // Features:
+        // 1. Retrieves user notifications
+        // 2. Optional automatic marking as read
+        // 3. Pagination support
+        // 4. Read status tracking
+    }
+}
+```
+
+#### Key Features
+- Automatic read status tracking
+- Pagination with customizable page size
+- Transaction support for status updates
+- Comprehensive error logging
+
+#### Response Format
+```json
+{
+    "status": "success",
+    "notifications": [
         {
-            context.Response.StatusCode = 401;
-            return;
+            "notification_id": "123",
+            "title": "Notification Title",
+            "message": "Notification Message",
+            "created_at": "2024-03-20T10:00:00Z",
+            "read_at": "2024-03-20T10:01:00Z",
+            "type": "general"
         }
-        await next(context);
+    ],
+    "pagination": {
+        "current_page": 1,
+        "total_pages": 5,
+        "total_records": 50
     }
+}
+```
+
+### 3. Nafath Integration (`NafathController`)
+Handles Nafath authentication and verification requests.
+
+```csharp
+[Route("api")]
+public class NafathController : ApiBaseController
+{
+    [HttpPost("create_request.php")]
+    public async Task<IActionResult> CreateRequest([FromBody] NafathCreateRequest request)
+    {
+        // Features:
+        // 1. Creates Nafath authentication request
+        // 2. Validates customer existence
+        // 3. Handles API communication
+        // 4. Status tracking
+    }
+
+    [HttpPost("get_request_status.php")]
+    public async Task<IActionResult> GetRequestStatus([FromBody] NafathStatusRequest request)
+    {
+        // Features:
+        // 1. Checks Nafath request status
+        // 2. Updates customer verification status
+        // 3. Handles timeouts and errors
+    }
+}
+```
+
+#### Nafath Flow
+1. **Request Creation**
+   - Generate Nafath request
+   - Store request details
+   - Handle API communication
+
+2. **Status Checking**
+   - Poll Nafath status
+   - Update customer verification
+   - Handle timeout scenarios
+
+3. **Response Format**
+```json
+{
+    "status": "success",
+    "nafath_status": "COMPLETED",
+    "transaction_id": "123456",
+    "random_number": "12345",
+    "timestamp": "2024-03-20T10:00:00Z"
+}
+```
+
+### 4. User Management (`UserController`)
+Handles user information retrieval and management.
+
+```csharp
+[Route("api")]
+public class UserController : ApiBaseController
+{
+    [HttpPost("get_user.php")]
+    public async Task<IActionResult> GetUser([FromBody] GetUserRequest request)
+    {
+        // Features:
+        // 1. Retrieves user details
+        // 2. Includes active devices
+        // 3. Handles security validation
+    }
+}
+```
+
+#### Features
+- Comprehensive user data retrieval
+- Active device tracking
+- Security validation
+- Error handling with detailed messages
+
+#### Response Format
+```json
+{
+    "status": "success",
+    "user": {
+        "national_id": "1234567890",
+        "name": {
+            "first_name_en": "John",
+            "family_name_en": "Doe",
+            "first_name_ar": "جون",
+            "family_name_ar": "دو"
+        },
+        "contact": {
+            "email": "john@example.com",
+            "phone": "+966501234567"
+        },
+        "active_devices": [
+            {
+                "device_id": "device123",
+                "platform": "iOS",
+                "last_used": "2024-03-20T10:00:00Z",
+                "biometric_enabled": true
+            }
+        ]
+    }
+}
+```
+
+### Security Implementation
+All controllers implement:
+1. **API Key Validation**
+   - Required for all endpoints
+   - Configurable key validation
+   - Rate limiting support
+
+2. **Error Handling**
+   - Standardized error responses
+   - Detailed logging
+   - Transaction management
+
+3. **Audit Logging**
+   - Authentication attempts
+   - Device registration
+   - Notification reads
+   - Nafath requests
+
+4. **Data Protection**
+   - Password hashing with BCrypt
+   - Secure device tracking
+   - Transaction integrity
+   - Input validation
+
+### Common Response Format
+All endpoints follow a standardized response format:
+```json
+{
+    "status": "success|error",
+    "message": "Operation result message",
+    "data": {
+        // Endpoint-specific data
+    },
+    "error_code": "ERROR_CODE",  // Only in error responses
+    "timestamp": "2024-03-20T10:00:00Z"
 }
 ```
 
@@ -763,8 +999,8 @@ public interface IAuthService
 public class AuthService : IAuthService
 {
     private readonly NayifatDbContext _context;
-    private readonly IPasswordHasher _passwordHasher;
-    
+    private readonly IConfiguration _configuration;
+
     public async Task<AuthResult> Authenticate(SignInRequest request)
     {
         var user = await _context.Customers
@@ -872,3 +1108,56 @@ public class TokenResult
    - INVALID_BIOMETRIC_TOKEN
    - ACCOUNT_LOCKED
    - INTERNAL_ERROR
+```
+
+### Device Registration
+```csharp
+// Models/Auth/RegisterDeviceRequest.cs
+public class RegisterDeviceRequest
+{
+    public string NationalId { get; set; }
+    public string DeviceId { get; set; }
+    public string Platform { get; set; }
+    public string Model { get; set; }
+    public string Manufacturer { get; set; }
+    public string OsVersion { get; set; }
+}
+
+// Controllers/DeviceController.cs
+public class DeviceController : ApiBaseController
+{
+    [HttpPost("register_device.php")]
+    public async Task<IActionResult> RegisterDevice([FromBody] RegisterDeviceRequest request)
+    {
+        // 1. Validate API key
+        // 2. Check if customer exists
+        // 3. Disable existing devices for the user
+        // 4. Register new device with:
+        //    - Device identification (ID, name, platform)
+        //    - Hardware details (manufacturer, model, OS)
+        //    - Biometric settings
+        //    - Timestamps
+        // 5. Log registration attempt
+        // 6. Return success with device ID or error
+    }
+}
+```
+
+Key Features:
+- Automatic deactivation of existing devices
+- Device information tracking
+- Biometric capability flags
+- Audit logging for all registration attempts
+- Error handling with detailed logging
+- Standardized API responses
+
+Database Operations:
+- Updates to `customer_devices` table
+- Logging to `auth_logs` table
+- Transaction handling for data consistency
+
+Security:
+- API key validation
+- Customer existence verification
+- Device status tracking
+- Audit trail maintenance

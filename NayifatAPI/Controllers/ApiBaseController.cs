@@ -3,10 +3,10 @@ using Microsoft.AspNetCore.Mvc;
 namespace NayifatAPI.Controllers
 {
     [ApiController]
-    [Route("/")]  // Root level routing to match PHP endpoints
+    [Route("[controller]")]  // This will use the controller name as the route
     public abstract class ApiBaseController : ControllerBase
     {
-        protected IActionResult ApiResponse(bool success, object data = null, string message = null, int statusCode = 200)
+        protected IActionResult ApiResponse(bool success, object? data = null, string? message = null, int statusCode = 200)
         {
             var response = new
             {
@@ -18,14 +18,34 @@ namespace NayifatAPI.Controllers
             return StatusCode(statusCode, response);
         }
 
-        protected IActionResult Success(object data = null, string message = null)
+        protected IActionResult Success(object? data = null, string? message = null)
         {
-            return ApiResponse(true, data, message);
+            return Ok(new
+            {
+                status = "success",
+                message,
+                data
+            });
         }
 
-        protected IActionResult Error(string message, int statusCode = 400, object data = null)
+        protected IActionResult Error(string message, int statusCode = 400, object? data = null)
         {
-            return ApiResponse(false, data, message, statusCode);
+            return StatusCode(statusCode, new
+            {
+                status = "error",
+                message,
+                data
+            });
+        }
+
+        protected IActionResult ValidationError(string message, object? errors = null)
+        {
+            return BadRequest(new
+            {
+                status = "error",
+                message,
+                errors
+            });
         }
 
         protected bool ValidateApiKey()

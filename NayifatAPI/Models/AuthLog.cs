@@ -6,13 +6,24 @@ namespace NayifatAPI.Models
     {
         [Key]
         public long Id { get; set; }
-        public string NationalId { get; set; }
-        public string DeviceId { get; set; }
-        public string AuthType { get; set; }
-        public bool IsSuccessful { get; set; }
-        public string ErrorMessage { get; set; }
-        public string IpAddress { get; set; }
-        public string UserAgent { get; set; }
-        public DateTime CreatedAt { get; set; }
+        
+        [Required]
+        public required string NationalId { get; set; }
+        
+        public string? DeviceId { get; set; }
+        
+        [Required]
+        public required string AuthType { get; set; }
+        
+        [Required]
+        public required string Status { get; set; }
+        
+        public string? FailureReason { get; set; }
+        
+        public string? IpAddress { get; set; }
+        
+        public string? UserAgent { get; set; }
+        
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 } 

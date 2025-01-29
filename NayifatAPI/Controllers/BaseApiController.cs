@@ -11,7 +11,7 @@ namespace NayifatAPI.Controllers
             return StatusCode(500, new { error = "An internal server error occurred.", details = ex.Message });
         }
 
-        protected IActionResult Success(object data = null)
+        protected IActionResult Success(object? data = null)
         {
             return Ok(new { success = true, data });
         }

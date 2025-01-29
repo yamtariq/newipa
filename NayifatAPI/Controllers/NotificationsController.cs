@@ -26,27 +26,31 @@ namespace NayifatAPI.Controllers
 
             try
             {
-                var query = _context.UserNotifications
+                IQueryable<UserNotification> query = _context.UserNotifications
                     .Where(n => n.NationalId == request.NationalId);
 
-                if (request.UnreadOnly)
+                if (!request.IncludeRead)
                 {
                     query = query.Where(n => !n.IsRead);
                 }
 
+                // Apply ordering after all filters
+                query = query.OrderByDescending(n => n.CreatedAt);
+
                 var notifications = await query
-                    .OrderByDescending(n => n.CreatedAt)
-                    .Take(50)
+                    .Skip((request.Page - 1) * request.PageSize)
+                    .Take(request.PageSize)
                     .Select(n => new
                     {
-                        id = n.Id,
+                        notification_id = n.Id,
                         title = n.Title,
                         message = n.Message,
                         data = n.Data,
                         is_read = n.IsRead,
                         created_at = n.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
-                        read_at = n.ReadAt?.ToString("yyyy-MM-dd HH:mm:ss"),
-                        notification_type = n.NotificationType
+                        read_at = n.ReadAt.HasValue ? n.ReadAt.Value.ToString("yyyy-MM-dd HH:mm:ss") : null,
+                        notification_type = n.NotificationType,
+                        last_updated = n.LastUpdated.ToString("yyyy-MM-dd HH:mm:ss")
                     })
                     .ToListAsync();
 
@@ -55,7 +59,7 @@ namespace NayifatAPI.Controllers
                 {
                     var notificationIds = notifications
                         .Where(n => !n.is_read)
-                        .Select(n => n.id)
+                        .Select(n => n.notification_id)
                         .ToList();
 
                     if (notificationIds.Any())
@@ -66,6 +70,7 @@ namespace NayifatAPI.Controllers
                             {
                                 n.IsRead = true;
                                 n.ReadAt = DateTime.UtcNow;
+                                n.LastUpdated = DateTime.UtcNow;
                             });
 
                         await _context.SaveChangesAsync();
@@ -99,12 +104,14 @@ namespace NayifatAPI.Controllers
 
                 var notification = new UserNotification
                 {
+                    NotificationId = Guid.NewGuid().ToString("N"),
                     NationalId = request.NationalId,
                     Title = request.Title,
                     Message = request.Message,
                     Data = request.Data ?? "{}",
                     NotificationType = request.NotificationType,
                     CreatedAt = DateTime.UtcNow,
+                    LastUpdated = DateTime.UtcNow,
                     IsRead = false
                 };
 
@@ -114,7 +121,7 @@ namespace NayifatAPI.Controllers
                 if (request.SendPush)
                 {
                     var devices = await _context.CustomerDevices
-                        .Where(d => d.NationalId == request.NationalId && d.IsActive)
+                        .Where(d => d.NationalId == request.NationalId && d.Status == "active")
                         .ToListAsync();
 
                     foreach (var device in devices)
@@ -130,7 +137,7 @@ namespace NayifatAPI.Controllers
                 {
                     notification_id = notification.Id,
                     devices_notified = request.SendPush ? await _context.CustomerDevices
-                        .CountAsync(d => d.NationalId == request.NationalId && d.IsActive) : 0
+                        .CountAsync(d => d.NationalId == request.NationalId && d.Status == "active") : 0
                 });
             }
             catch (Exception ex)
@@ -143,18 +150,21 @@ namespace NayifatAPI.Controllers
 
     public class GetNotificationsRequest
     {
-        public string NationalId { get; set; }
+        public required string NationalId { get; set; }
         public bool UnreadOnly { get; set; }
         public bool MarkAsRead { get; set; }
+        public bool IncludeRead { get; set; }
+        public int Page { get; set; }
+        public int PageSize { get; set; }
     }
 
     public class SendNotificationRequest
     {
-        public string NationalId { get; set; }
-        public string Title { get; set; }
-        public string Message { get; set; }
-        public string Data { get; set; }
-        public string NotificationType { get; set; }
+        public required string NationalId { get; set; }
+        public required string Title { get; set; }
+        public required string Message { get; set; }
+        public string? Data { get; set; }
+        public required string NotificationType { get; set; }
         public bool SendPush { get; set; }
     }
 } 

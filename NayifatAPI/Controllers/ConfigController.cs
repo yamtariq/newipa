@@ -70,14 +70,13 @@ namespace NayifatAPI.Controllers
                     {
                         Page = request.Page,
                         KeyName = request.KeyName,
-                        CreatedAt = DateTime.UtcNow
+                        Value = request.Value,
+                        CreatedAt = DateTime.UtcNow,
+                        LastUpdated = DateTime.UtcNow,
+                        IsActive = true
                     };
                     _context.MasterConfigs.Add(config);
                 }
-
-                config.Value = request.Value;
-                config.LastUpdated = DateTime.UtcNow;
-                config.IsActive = true;
 
                 await _context.SaveChangesAsync();
 
@@ -119,8 +118,8 @@ namespace NayifatAPI.Controllers
 
     public class SetConfigRequest
     {
-        public string Page { get; set; }
-        public string KeyName { get; set; }
-        public string Value { get; set; }
+        public required string Page { get; set; }
+        public required string KeyName { get; set; }
+        public required string Value { get; set; }
     }
 } 

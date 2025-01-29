@@ -44,7 +44,7 @@ namespace NayifatAPI.Controllers
                         os_version = d.OsVersion,
                         is_biometric_enabled = d.IsBiometricEnabled,
                         registered_at = d.RegisteredAt.ToString("yyyy-MM-dd HH:mm:ss"),
-                        last_used_at = d.LastUsedAt?.ToString("yyyy-MM-dd HH:mm:ss")
+                        last_used_at = d.LastUsedAt.HasValue ? d.LastUsedAt.Value.ToString("yyyy-MM-dd HH:mm:ss") : null
                     })
                     .ToListAsync();
 
@@ -74,9 +74,9 @@ namespace NayifatAPI.Controllers
                         employer = customer.Employer,
                         registration_date = customer.RegistrationDate.ToString("yyyy-MM-dd HH:mm:ss"),
                         consent = customer.Consent,
-                        consent_date = customer.ConsentDate?.ToString("yyyy-MM-dd HH:mm:ss"),
+                        consent_date = customer.ConsentDate.HasValue ? customer.ConsentDate.Value.ToString("yyyy-MM-dd HH:mm:ss") : null,
                         nafath_status = customer.NafathStatus,
-                        nafath_timestamp = customer.NafathTimestamp?.ToString("yyyy-MM-dd HH:mm:ss")
+                        nafath_timestamp = customer.NafathTimestamp.HasValue ? customer.NafathTimestamp.Value.ToString("yyyy-MM-dd HH:mm:ss") : null
                     },
                     devices = devices
                 });
@@ -91,6 +91,6 @@ namespace NayifatAPI.Controllers
 
     public class GetUserRequest
     {
-        public string NationalId { get; set; }
+        public required string NationalId { get; set; }
     }
 } 

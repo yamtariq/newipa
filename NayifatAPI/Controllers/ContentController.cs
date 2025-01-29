@@ -16,7 +16,7 @@ namespace NayifatAPI.Controllers
             _logger = logger;
         }
 
-        [HttpPost("master_fetch.php")]
+        [HttpPost("fetch")]
         public async Task<IActionResult> MasterFetch([FromBody] MasterFetchRequest request)
         {
             if (!ValidateApiKey())
@@ -93,7 +93,7 @@ namespace NayifatAPI.Controllers
 
     public class MasterFetchRequest
     {
-        public string Page { get; set; }
-        public string KeyName { get; set; }
+        public required string Page { get; set; }
+        public required string KeyName { get; set; }
     }
 } 

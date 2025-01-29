@@ -128,25 +128,50 @@ namespace NayifatAPI.Controllers
 
     public class NafathCreateRequest
     {
-        public string NationalId { get; set; }
-        public string ServiceId { get; set; }
+        public required string NationalId { get; set; }
+        public required string ServiceId { get; set; }
     }
 
     public class NafathStatusRequest
     {
-        public string NationalId { get; set; }
-        public string TransId { get; set; }
+        public required string NationalId { get; set; }
+        public required string TransId { get; set; }
     }
 
     public class NafathCreateResponse
     {
-        public string TransId { get; set; }
-        public string Random { get; set; }
+        public required string TransId { get; set; }
+        public required string Random { get; set; }
     }
 
     public class NafathStatusResponse
     {
-        public string Status { get; set; }
-        public string Message { get; set; }
+        public required string Status { get; set; }
+        public required string Message { get; set; }
+    }
+
+    public class StartAuthRequest
+    {
+        public required string NationalId { get; set; }
+        public required string ServiceId { get; set; }
+    }
+
+    public class CheckAuthRequest
+    {
+        public required string NationalId { get; set; }
+        public required string TransId { get; set; }
+    }
+
+    public class GenerateRandomRequest
+    {
+        public required string TransId { get; set; }
+        public required string Random { get; set; }
+    }
+
+    public class NafathResponse
+    {
+        public required string Status { get; set; }
+        public required string Message { get; set; }
+        public object? Data { get; set; }
     }
 } 

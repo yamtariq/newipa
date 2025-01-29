@@ -181,3 +181,4 @@ C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Debug\net8.0\t
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Debug\net8.0\zh-Hans\Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.resources.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Debug\net8.0\zh-Hant\Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.resources.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Debug\net8.0\runtimes\browser\lib\net8.0\System.Text.Encodings.Web.dll
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Debug\net8.0\BCrypt.Net-Next.dll

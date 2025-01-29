@@ -7,12 +7,20 @@ namespace NayifatAPI.Models
     {
         [Key]
         public int Id { get; set; }
-        public string Page { get; set; }
-        public string KeyName { get; set; }
-        [Column(TypeName = "nvarchar(max)")]
-        public string Value { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime LastUpdated { get; set; }
+        
+        [Required]
+        public required string Page { get; set; }
+        
+        [Required]
+        public required string KeyName { get; set; }
+        
+        [Required]
+        public required string Value { get; set; }
+        
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        
+        public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
+        
         public bool IsActive { get; set; }
     }
 } 
