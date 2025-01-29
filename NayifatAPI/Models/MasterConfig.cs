@@ -1,8 +1,11 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 
 namespace NayifatAPI.Models
 {
+    [Table("master_config")]
+    [Index(nameof(Page), nameof(KeyName), IsUnique = true)]
     public class MasterConfig
     {
         [Key]
@@ -15,12 +18,16 @@ namespace NayifatAPI.Models
         public required string KeyName { get; set; }
         
         [Required]
+        [Column(TypeName = "nvarchar(max)")]
         public required string Value { get; set; }
         
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public required bool IsActive { get; set; } = true;
         
-        public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
+        public required DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         
-        public bool IsActive { get; set; }
+        public DateTime? UpdatedAt { get; set; }
+        
+        [NotMapped]
+        public bool IsValid => !string.IsNullOrEmpty(Value) && IsActive;
     }
 } 

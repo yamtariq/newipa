@@ -4,11 +4,12 @@ using Microsoft.EntityFrameworkCore;
 using NayifatAPI.Data;
 using System;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace NayifatAPI.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("[controller]")]
     public class TestController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
@@ -18,7 +19,7 @@ namespace NayifatAPI.Controllers
         {
             _context = context;
             _logger = logger;
-            _logger.LogInformation("TestController constructed");
+            _logger.LogInformation("TestController constructed with route pattern: [controller]");
         }
 
         [HttpGet]
@@ -40,8 +41,7 @@ namespace NayifatAPI.Controllers
             });
         }
 
-        [HttpGet]
-        [Route("db-connection")]
+        [HttpGet("db-connection")]
         public async Task<IActionResult> TestConnection()
         {
             _logger.LogInformation("TestConnection endpoint called");
@@ -106,8 +106,7 @@ namespace NayifatAPI.Controllers
             }
         }
 
-        [HttpGet]
-        [Route("db-tables")]
+        [HttpGet("db-tables")]
         public async Task<IActionResult> TestTables()
         {
             _logger.LogInformation("TestTables endpoint called");
@@ -137,6 +136,103 @@ namespace NayifatAPI.Controllers
                     status = "error",
                     message = "Error retrieving tables",
                     details = ex.Message
+                });
+            }
+        }
+
+        [HttpGet("sql-info")]
+        public async Task<IActionResult> GetSqlServerInfo()
+        {
+            _logger.LogInformation("Getting SQL Server information");
+            try
+            {
+                var connection = _context.Database.GetDbConnection();
+                var info = new List<object>();
+
+                // Basic Connection Info
+                info.Add(new
+                {
+                    section = "Connection Details",
+                    details = new
+                    {
+                        serverName = connection.DataSource,
+                        databaseName = connection.Database,
+                        connectionState = connection.State.ToString(),
+                        serverVersion = await _context.Database.SqlQuery<string>($"SELECT @@VERSION").FirstOrDefaultAsync()
+                    }
+                });
+
+                if (await _context.Database.CanConnectAsync())
+                {
+                    // Server Configuration
+                    var config = await _context.Database
+                        .SqlQuery<dynamic>(@"
+                            SELECT 
+                                SERVERPROPERTY('Edition') as Edition,
+                                SERVERPROPERTY('ProductVersion') as ProductVersion,
+                                SERVERPROPERTY('ProductLevel') as ProductLevel,
+                                SERVERPROPERTY('MachineName') as MachineName,
+                                SERVERPROPERTY('InstanceName') as InstanceName,
+                                SERVERPROPERTY('Collation') as Collation,
+                                SERVERPROPERTY('IsIntegratedSecurityOnly') as IsIntegratedSecurityOnly
+                        ").FirstOrDefaultAsync();
+                    info.Add(new { section = "Server Configuration", details = config });
+
+                    // Database Information
+                    var dbInfo = await _context.Database
+                        .SqlQuery<dynamic>(@"
+                            SELECT 
+                                d.name as DatabaseName,
+                                d.state_desc as State,
+                                d.recovery_model_desc as RecoveryModel,
+                                d.compatibility_level as CompatibilityLevel,
+                                d.collation_name as Collation,
+                                CONVERT(VARCHAR, d.create_date, 120) as CreateDate,
+                                CONVERT(DECIMAL(10,2), SUM(CAST(mf.size AS BIGINT)) * 8.0 / 1024) as SizeMB
+                            FROM sys.databases d
+                            JOIN sys.master_files mf ON d.database_id = mf.database_id
+                            WHERE d.name = DB_NAME()
+                            GROUP BY d.name, d.state_desc, d.recovery_model_desc, 
+                                     d.compatibility_level, d.collation_name, d.create_date
+                        ").FirstOrDefaultAsync();
+                    info.Add(new { section = "Database Information", details = dbInfo });
+
+                    // Table Count
+                    var tableCount = await _context.Database
+                        .SqlQuery<int>(@"
+                            SELECT COUNT(*) 
+                            FROM INFORMATION_SCHEMA.TABLES 
+                            WHERE TABLE_TYPE = 'BASE TABLE'
+                        ").FirstOrDefaultAsync();
+                    info.Add(new { section = "Schema Information", details = new { totalTables = tableCount } });
+
+                    return Ok(new
+                    {
+                        status = "success",
+                        message = "SQL Server information retrieved successfully",
+                        timestamp = DateTime.UtcNow,
+                        information = info
+                    });
+                }
+                else
+                {
+                    return BadRequest(new
+                    {
+                        status = "error",
+                        message = "Could not connect to database",
+                        timestamp = DateTime.UtcNow
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting SQL Server information");
+                return StatusCode(500, new
+                {
+                    status = "error",
+                    message = "Error retrieving SQL Server information",
+                    details = ex.Message,
+                    timestamp = DateTime.UtcNow
                 });
             }
         }

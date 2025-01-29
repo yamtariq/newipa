@@ -1161,3 +1161,142 @@ Security:
 - Customer existence verification
 - Device status tracking
 - Audit trail maintenance
+```
+
+## SQL Server Connection Management
+
+### Connection String Best Practices
+```json
+{
+    "ConnectionStrings": {
+        "DefaultConnection": "Server=.;Database=NayifatApp;User Id=nayifat_app;Password=your_password;TrustServerCertificate=True;MultipleActiveResultSets=true"
+    }
+}
+```
+
+### Connection Handling Implementation
+```csharp
+[ApiController]
+[Route("[controller]")]
+public class TestController : ControllerBase
+{
+    private readonly ApplicationDbContext _context;
+    private readonly ILogger<TestController> _logger;
+
+    public TestController(ApplicationDbContext context, ILogger<TestController> logger)
+    {
+        _context = context;
+        _logger = logger;
+    }
+
+    [HttpGet("sql-info")]
+    public async Task<IActionResult> GetSqlInfo()
+    {
+        try
+        {
+            var connection = _context.Database.GetDbConnection();
+            
+            // Ensure connection is open
+            if (connection.State != System.Data.ConnectionState.Open)
+            {
+                await connection.OpenAsync();
+            }
+            
+            var connectionString = connection.ConnectionString;
+            
+            // Mask sensitive information by removing password
+            var maskedConnectionString = string.Join(";",
+                connectionString.Split(';')
+                    .Where(part => !part.StartsWith("Password=", StringComparison.OrdinalIgnoreCase))
+            );
+            
+            var serverInfo = new
+            {
+                DatabaseName = connection.Database,
+                ServerVersion = connection is SqlConnection sqlConnection ? sqlConnection.ServerVersion : "Unknown",
+                State = connection.State.ToString(),
+                ConnectionString = maskedConnectionString,
+                CanConnect = await _context.Database.CanConnectAsync()
+            };
+
+            return Ok(new { 
+                status = "success",
+                data = serverInfo,
+                message = "SQL Server information retrieved successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting SQL Server information");
+            return StatusCode(500, new { 
+                status = "error",
+                message = ex.Message,
+                details = ex.ToString()
+            });
+        }
+        finally
+        {
+            // Always ensure connection is closed
+            if (_context.Database.GetDbConnection().State == System.Data.ConnectionState.Open)
+            {
+                await _context.Database.GetDbConnection().CloseAsync();
+            }
+        }
+    }
+}
+```
+
+### Connection Management Best Practices
+1. **Explicit Connection Management**
+   - Always open connections explicitly when needed
+   - Use `async/await` for connection operations
+   - Ensure connections are closed in a `finally` block
+   - Use `using` statements where appropriate
+
+2. **Security**
+   - Never expose connection strings in responses
+   - Mask sensitive information like passwords
+   - Use minimum required permissions for the database user
+   - Enable TLS/SSL with `TrustServerCertificate`
+
+3. **Performance**
+   - Use connection pooling (enabled by default)
+   - Keep connections open only as long as needed
+   - Use `MultipleActiveResultSets` for concurrent operations
+   - Monitor connection usage and timeouts
+
+4. **Error Handling**
+   - Catch and log specific SQL exceptions
+   - Provide meaningful error messages
+   - Include proper error context
+   - Implement retry logic for transient failures
+
+5. **Monitoring**
+   - Log connection states
+   - Track connection open/close times
+   - Monitor connection pool usage
+   - Log connection string changes
+
+### Testing SQL Connection
+```csharp
+public async Task<bool> TestConnection()
+{
+    try
+    {
+        return await _context.Database.CanConnectAsync();
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Database connection test failed");
+        return false;
+    }
+}
+```
+
+### Connection String Parameters
+- `Server=.` - Local SQL Server instance
+- `Database=NayifatApp` - Target database
+- `User Id=nayifat_app` - SQL authentication username
+- `Password=your_password` - SQL authentication password
+- `TrustServerCertificate=True` - Trust the SQL Server certificate
+- `MultipleActiveResultSets=true` - Allow multiple active result sets

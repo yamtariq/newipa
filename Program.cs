@@ -10,34 +10,58 @@ using Microsoft.AspNetCore.Mvc.Controllers;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Basic logging
-builder.Services.AddLogging(logging =>
-{
-    logging.ClearProviders();
-    logging.AddConsole();
-    logging.SetMinimumLevel(LogLevel.Debug);
-});
+// Configure Serilog
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Debug()
+    .WriteTo.Console()
+    .CreateLogger();
 
-// Add ONLY controller services
+builder.Host.UseSerilog();
+
+// Add controller services
 builder.Services.AddControllers();
+
+// Add DbContext
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        sqlServerOptionsAction: sqlOptions =>
+        {
+            sqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 5,
+                maxRetryDelay: TimeSpan.FromSeconds(30),
+                errorNumbersToAdd: null);
+        }
+    ));
 
 var app = builder.Build();
 
-// Log all controllers at startup
-var controllerTypes = app.Services.GetServices<IEnumerable<EndpointDataSource>>()
-    .SelectMany(ds => ds.Endpoints)
-    .OfType<RouteEndpoint>()
-    .Select(e => e.DisplayName)
-    .ToList();
-
-Console.WriteLine("Found controllers:");
-foreach (var controller in controllerTypes)
+// Basic request logging
+app.Use(async (context, next) =>
 {
-    Console.WriteLine($"- {controller}");
-}
+    Log.Information("Request: {Method} {Path}", context.Request.Method, context.Request.Path);
+    await next();
+    Log.Information("Response: {StatusCode}", context.Response.StatusCode);
+});
 
 // Basic pipeline
 app.UseRouting();
 app.MapControllers();
 
-app.Run("http://localhost:5000"); 
+// Log all registered endpoints
+var endpointDataSources = app.Services.GetServices<EndpointDataSource>();
+foreach (var dataSource in endpointDataSources)
+{
+    foreach (var endpoint in dataSource.Endpoints)
+    {
+        if (endpoint is RouteEndpoint routeEndpoint)
+        {
+            Log.Information(
+                "Route registered: {Pattern} -> {DisplayName}",
+                routeEndpoint.RoutePattern.RawText,
+                routeEndpoint.DisplayName);
+        }
+    }
+}
+
+app.Run("http://localhost:7000"); 
