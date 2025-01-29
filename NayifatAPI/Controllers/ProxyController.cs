@@ -51,23 +51,23 @@ namespace NayifatAPI.Controllers
                 if (request.Data != null && method != HttpMethod.Get)
                 {
                     string contentType = request.ContentType ?? "application/json";
-                    string content;
+                    string requestBody;
 
                     if (contentType == "application/x-www-form-urlencoded")
                     {
                         // Handle form data
                         var formData = request.Data as Dictionary<string, string>;
-                        content = formData != null 
+                        requestBody = formData != null 
                             ? string.Join("&", formData.Select(kvp => $"{Uri.EscapeDataString(kvp.Key)}={Uri.EscapeDataString(kvp.Value)}"))
                             : "";
                     }
                     else
                     {
                         // Default to JSON
-                        content = JsonSerializer.Serialize(request.Data);
+                        requestBody = JsonSerializer.Serialize(request.Data);
                     }
 
-                    httpRequest.Content = new StringContent(content, Encoding.UTF8, contentType);
+                    httpRequest.Content = new StringContent(requestBody, Encoding.UTF8, contentType);
                 }
 
                 // Forward headers
@@ -94,7 +94,7 @@ namespace NayifatAPI.Controllers
                 var response = await client.SendAsync(httpRequest);
                 
                 // Read the response content
-                var content = await response.Content.ReadAsStringAsync();
+                var responseBody = await response.Content.ReadAsStringAsync();
 
                 // Get response content type
                 var responseContentType = response.Content.Headers.ContentType?.MediaType;
@@ -102,27 +102,27 @@ namespace NayifatAPI.Controllers
                 try
                 {
                     if (responseContentType?.Contains("json") == true || 
-                        (string.IsNullOrEmpty(responseContentType) && IsValidJson(content)))
+                        (string.IsNullOrEmpty(responseContentType) && IsValidJson(responseBody)))
                     {
                         // Parse JSON response
-                        var jsonResponse = JsonSerializer.Deserialize<object>(content);
+                        var jsonResponse = JsonSerializer.Deserialize<object>(responseBody);
                         return StatusCode((int)response.StatusCode, jsonResponse);
                     }
                     else if (responseContentType?.Contains("xml") == true)
                     {
                         // Return XML as is with correct content type
-                        return Content(content, "application/xml", Encoding.UTF8);
+                        return Content(responseBody, "application/xml", Encoding.UTF8);
                     }
                     else
                     {
                         // Return other content types as is
-                        return Content(content, responseContentType ?? "text/plain", Encoding.UTF8);
+                        return Content(responseBody, responseContentType ?? "text/plain", Encoding.UTF8);
                     }
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Error parsing response content. Returning as plain text.");
-                    return Content(content, "text/plain", Encoding.UTF8);
+                    return Content(responseBody, "text/plain", Encoding.UTF8);
                 }
             }
             catch (Exception ex)

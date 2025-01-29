@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("NayifatAPI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+799671abe7f0de0ccb9244da8da82d33165bd19c")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f71654aa0b6b5151626c3c0a9b5968c210cdf74d")]
 [assembly: System.Reflection.AssemblyProductAttribute("NayifatAPI")]
 [assembly: System.Reflection.AssemblyTitleAttribute("NayifatAPI")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
