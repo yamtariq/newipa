@@ -18,11 +18,33 @@ namespace NayifatAPI.Controllers
         {
             _context = context;
             _logger = logger;
+            _logger.LogInformation("TestController constructed");
         }
 
-        [HttpGet("db-connection")]
+        [HttpGet]
+        public IActionResult Index()
+        {
+            _logger.LogInformation("Index endpoint called");
+            return Ok(new { message = "Test controller is working" });
+        }
+
+        [HttpGet("health")]
+        public IActionResult HealthCheck()
+        {
+            _logger.LogInformation("Health check endpoint called at: {Path}", 
+                HttpContext?.Request?.Path.Value ?? "unknown");
+            return Ok(new { 
+                status = "healthy", 
+                timestamp = DateTime.UtcNow,
+                path = HttpContext?.Request?.Path.Value
+            });
+        }
+
+        [HttpGet]
+        [Route("db-connection")]
         public async Task<IActionResult> TestConnection()
         {
+            _logger.LogInformation("TestConnection endpoint called");
             try
             {
                 _logger.LogInformation("Testing database connection...");
@@ -41,21 +63,25 @@ namespace NayifatAPI.Controllers
                         .SqlQuery<string>($"SELECT @@VERSION")
                         .FirstOrDefaultAsync();
 
-                    return Ok(new { 
+                    var result = new { 
                         status = "success", 
                         message = "Successfully connected to database",
                         databaseName = connection.Database,
                         serverVersion = version,
                         serverName = connection.DataSource
-                    });
+                    };
+                    _logger.LogInformation("Connection successful: {@Result}", result);
+                    return Ok(result);
                 }
                 else
                 {
-                    return BadRequest(new { 
+                    var result = new { 
                         status = "error", 
                         message = "Could not connect to database",
                         details = "Database connection test failed"
-                    });
+                    };
+                    _logger.LogWarning("Connection failed: {@Result}", result);
+                    return BadRequest(result);
                 }
             }
             catch (SqlException sqlEx)
@@ -80,9 +106,11 @@ namespace NayifatAPI.Controllers
             }
         }
 
-        [HttpGet("db-tables")]
+        [HttpGet]
+        [Route("db-tables")]
         public async Task<IActionResult> TestTables()
         {
+            _logger.LogInformation("TestTables endpoint called");
             try
             {
                 var tables = await _context.Database
@@ -92,12 +120,14 @@ namespace NayifatAPI.Controllers
                         WHERE TABLE_TYPE = 'BASE TABLE'")
                     .ToListAsync();
 
-                return Ok(new
+                var result = new
                 {
                     status = "success",
                     message = "Successfully retrieved tables",
                     tables = tables
-                });
+                };
+                _logger.LogInformation("Tables retrieved: {@Result}", result);
+                return Ok(result);
             }
             catch (Exception ex)
             {

@@ -3,13 +3,14 @@ workflows:
     name: iOS Debug Workflow
     environment:
       flutter: stable
-      xcode: latest
+      xcode: "15.0"
       cocoapods: 1.15.2
       vars:
         COCOAPODS_DISABLE_STATS: true
         SWIFT_VERSION: "5.0"
         ENABLE_BITCODE: "NO"
         DEFINES_MODULE: "YES"
+        IPHONEOS_DEPLOYMENT_TARGET: "14.0"
     scripts:
       - flutter clean
       - flutter pub get
@@ -17,3 +18,12 @@ workflows:
       - cd ios && pod repo update
       - cd ios && pod install --repo-update --verbose
       - flutter build ios --debug --no-codesign
+    xcode:
+      project: ios/Runner.xcodeproj
+      scheme: Runner
+      configuration: Debug
+      build_settings:
+        ENABLE_BITCODE: NO
+        SWIFT_VERSION: 5.0
+        IPHONEOS_DEPLOYMENT_TARGET: "14.0"
+        BUILD_LIBRARIES_FOR_DISTRIBUTION: NO

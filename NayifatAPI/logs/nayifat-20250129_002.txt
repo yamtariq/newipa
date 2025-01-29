@@ -884,3 +884,21 @@ SELECT @result
 2025-01-29 20:45:48.355 +03:00 [WRN] Failed to determine the https port for redirect.
 2025-01-29 20:45:48.633 +03:00 [INF] Request finished HTTP/1.1 GET http://localhost:5264/api/test/db-connection - 404 0 null 455.4693ms
 2025-01-29 20:45:51.147 +03:00 [INF] Request reached the end of the middleware pipeline without being handled by application code. Request path: GET http://localhost:5264/api/test/db-connection, Response status code: 404
+2025-01-29 20:50:36.595 +03:00 [INF] Starting web application
+2025-01-29 20:50:36.714 +03:00 [INF] Now listening on: http://localhost:5264
+2025-01-29 20:50:36.719 +03:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-01-29 20:50:36.721 +03:00 [INF] Hosting environment: Development
+2025-01-29 20:50:36.721 +03:00 [INF] Content root path: C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI
+2025-01-29 20:51:26.760 +03:00 [INF] Request starting HTTP/1.1 GET http://localhost:5264/api/test/db-connection - null null
+2025-01-29 20:51:26.796 +03:00 [WRN] Failed to determine the https port for redirect.
+2025-01-29 20:51:26.802 +03:00 [INF] Request finished HTTP/1.1 GET http://localhost:5264/api/test/db-connection - 404 0 null 45.1398ms
+2025-01-29 20:51:26.815 +03:00 [INF] Request reached the end of the middleware pipeline without being handled by application code. Request path: GET http://localhost:5264/api/test/db-connection, Response status code: 404
+2025-01-29 20:51:29.206 +03:00 [INF] Request starting HTTP/1.1 GET http://localhost:5264/api/test/db-connection - null null
+2025-01-29 20:51:29.215 +03:00 [INF] Request finished HTTP/1.1 GET http://localhost:5264/api/test/db-connection - 404 0 null 8.8729ms
+2025-01-29 20:51:29.220 +03:00 [INF] Request reached the end of the middleware pipeline without being handled by application code. Request path: GET http://localhost:5264/api/test/db-connection, Response status code: 404
+2025-01-29 20:51:29.931 +03:00 [INF] Request starting HTTP/1.1 GET http://localhost:5264/api/test/db-connection - null null
+2025-01-29 20:51:29.937 +03:00 [INF] Request finished HTTP/1.1 GET http://localhost:5264/api/test/db-connection - 404 0 null 6.4305ms
+2025-01-29 20:51:29.943 +03:00 [INF] Request reached the end of the middleware pipeline without being handled by application code. Request path: GET http://localhost:5264/api/test/db-connection, Response status code: 404
+2025-01-29 20:51:41.285 +03:00 [INF] Request starting HTTP/1.1 GET http://localhost:5264/api/test/db-tables - null null
+2025-01-29 20:51:41.290 +03:00 [INF] Request finished HTTP/1.1 GET http://localhost:5264/api/test/db-tables - 404 0 null 4.1858ms
+2025-01-29 20:51:41.293 +03:00 [INF] Request reached the end of the middleware pipeline without being handled by application code. Request path: GET http://localhost:5264/api/test/db-tables, Response status code: 404

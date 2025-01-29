@@ -1,0 +1,94 @@
+2025-01-29 20:58:46.223 +03:00 [INF] Starting web application
+2025-01-29 20:58:46.353 +03:00 [ERR] Hosting failed to start
+System.IO.IOException: Failed to bind to address http://127.0.0.1:5264: address already in use.
+ ---> Microsoft.AspNetCore.Connections.AddressInUseException: Only one usage of each socket address (protocol/network address/port) is normally permitted.
+ ---> System.Net.Sockets.SocketException (10048): Only one usage of each socket address (protocol/network address/port) is normally permitted.
+   at System.Net.Sockets.Socket.UpdateStatusAfterSocketErrorAndThrowException(SocketError error, Boolean disconnectOnFailure, String callerName)
+   at System.Net.Sockets.Socket.DoBind(EndPoint endPointSnapshot, SocketAddress socketAddress)
+   at System.Net.Sockets.Socket.Bind(EndPoint localEP)
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketTransportOptions.CreateDefaultBoundListenSocket(EndPoint endpoint)
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketConnectionListener.Bind()
+   --- End of inner exception stack trace ---
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketConnectionListener.Bind()
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketTransportFactory.BindAsync(EndPoint endpoint, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure.TransportManager.BindAsync(EndPoint endPoint, ConnectionDelegate connectionDelegate, EndpointConfig endpointConfig, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerImpl.<>c__DisplayClass28_0`1.<<StartAsync>g__OnBind|0>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.BindEndpointAsync(ListenOptions endpoint, AddressBindContext context, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.BindEndpointAsync(ListenOptions endpoint, AddressBindContext context, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.LocalhostListenOptions.BindAsync(AddressBindContext context, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.AddressesStrategy.BindAsync(AddressBindContext context, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.BindAsync(ListenOptions[] listenOptions, AddressBindContext context, Func`2 useHttps, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerImpl.BindAsync(CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerImpl.StartAsync[TContext](IHttpApplication`1 application, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Hosting.GenericWebHostService.StartAsync(CancellationToken cancellationToken)
+   at Microsoft.Extensions.Hosting.Internal.Host.<StartAsync>b__15_1(IHostedService service, CancellationToken token)
+   at Microsoft.Extensions.Hosting.Internal.Host.ForeachService[T](IEnumerable`1 services, CancellationToken token, Boolean concurrent, Boolean abortOnFirstException, List`1 exceptions, Func`3 operation)
+2025-01-29 20:58:46.377 +03:00 [FTL] Application terminated unexpectedly
+System.IO.IOException: Failed to bind to address http://127.0.0.1:5264: address already in use.
+ ---> Microsoft.AspNetCore.Connections.AddressInUseException: Only one usage of each socket address (protocol/network address/port) is normally permitted.
+ ---> System.Net.Sockets.SocketException (10048): Only one usage of each socket address (protocol/network address/port) is normally permitted.
+   at System.Net.Sockets.Socket.UpdateStatusAfterSocketErrorAndThrowException(SocketError error, Boolean disconnectOnFailure, String callerName)
+   at System.Net.Sockets.Socket.DoBind(EndPoint endPointSnapshot, SocketAddress socketAddress)
+   at System.Net.Sockets.Socket.Bind(EndPoint localEP)
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketTransportOptions.CreateDefaultBoundListenSocket(EndPoint endpoint)
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketConnectionListener.Bind()
+   --- End of inner exception stack trace ---
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketConnectionListener.Bind()
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketTransportFactory.BindAsync(EndPoint endpoint, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure.TransportManager.BindAsync(EndPoint endPoint, ConnectionDelegate connectionDelegate, EndpointConfig endpointConfig, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerImpl.<>c__DisplayClass28_0`1.<<StartAsync>g__OnBind|0>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.BindEndpointAsync(ListenOptions endpoint, AddressBindContext context, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.BindEndpointAsync(ListenOptions endpoint, AddressBindContext context, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.LocalhostListenOptions.BindAsync(AddressBindContext context, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.AddressesStrategy.BindAsync(AddressBindContext context, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.BindAsync(ListenOptions[] listenOptions, AddressBindContext context, Func`2 useHttps, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerImpl.BindAsync(CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerImpl.StartAsync[TContext](IHttpApplication`1 application, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Hosting.GenericWebHostService.StartAsync(CancellationToken cancellationToken)
+   at Microsoft.Extensions.Hosting.Internal.Host.<StartAsync>b__15_1(IHostedService service, CancellationToken token)
+   at Microsoft.Extensions.Hosting.Internal.Host.ForeachService[T](IEnumerable`1 services, CancellationToken token, Boolean concurrent, Boolean abortOnFirstException, List`1 exceptions, Func`3 operation)
+   at Microsoft.Extensions.Hosting.Internal.Host.StartAsync(CancellationToken cancellationToken)
+   at Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.RunAsync(IHost host, CancellationToken token)
+   at Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.RunAsync(IHost host, CancellationToken token)
+   at Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.Run(IHost host)
+   at Program.<Main>$(String[] args) in C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\Program.cs:line 59
+2025-01-29 20:59:00.702 +03:00 [INF] Starting web application
+2025-01-29 20:59:00.847 +03:00 [INF] Now listening on: http://localhost:5000
+2025-01-29 20:59:00.854 +03:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-01-29 20:59:00.855 +03:00 [INF] Hosting environment: Development
+2025-01-29 20:59:00.856 +03:00 [INF] Content root path: C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI
+2025-01-29 20:59:59.347 +03:00 [INF] Request starting HTTP/1.1 GET http://localhost:5000/api/test - null null
+2025-01-29 20:59:59.390 +03:00 [WRN] Failed to determine the https port for redirect.
+2025-01-29 20:59:59.395 +03:00 [INF] Request finished HTTP/1.1 GET http://localhost:5000/api/test - 404 0 null 51.1833ms
+2025-01-29 20:59:59.406 +03:00 [INF] Request reached the end of the middleware pipeline without being handled by application code. Request path: GET http://localhost:5000/api/test, Response status code: 404
+2025-01-29 21:00:20.898 +03:00 [INF] Request starting HTTP/1.1 GET http://localhost:5000/api/test/health - null null
+2025-01-29 21:00:20.905 +03:00 [INF] Request finished HTTP/1.1 GET http://localhost:5000/api/test/health - 404 0 null 7.0725ms
+2025-01-29 21:00:20.920 +03:00 [INF] Request reached the end of the middleware pipeline without being handled by application code. Request path: GET http://localhost:5000/api/test/health, Response status code: 404
+2025-01-29 21:05:09.342 +03:00 [INF] Application is shutting down...
+2025-01-29 21:06:51.506 +03:00 [INF] Starting web application
+2025-01-29 21:06:51.596 +03:00 [INF] Now listening on: http://localhost:7000
+2025-01-29 21:06:51.599 +03:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-01-29 21:06:51.600 +03:00 [INF] Hosting environment: Development
+2025-01-29 21:06:51.600 +03:00 [INF] Content root path: C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI
+2025-01-29 21:07:15.741 +03:00 [INF] Request starting HTTP/1.1 GET http://localhost:7000/minimaltest - null null
+2025-01-29 21:07:15.778 +03:00 [WRN] Failed to determine the https port for redirect.
+2025-01-29 21:07:15.784 +03:00 [INF] Executing endpoint 'NayifatAPI.Controllers.MinimalTestController.Get (NayifatAPI)'
+2025-01-29 21:07:15.803 +03:00 [INF] Route matched with {action = "Get", controller = "MinimalTest"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult Get() on controller NayifatAPI.Controllers.MinimalTestController (NayifatAPI).
+2025-01-29 21:07:15.826 +03:00 [INF] Executing OkObjectResult, writing value of type '<>f__AnonymousType8`1[[System.String, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2025-01-29 21:07:15.859 +03:00 [INF] Executed action NayifatAPI.Controllers.MinimalTestController.Get (NayifatAPI) in 51.1816ms
+2025-01-29 21:07:15.866 +03:00 [INF] Executed endpoint 'NayifatAPI.Controllers.MinimalTestController.Get (NayifatAPI)'
+2025-01-29 21:07:15.869 +03:00 [INF] Request finished HTTP/1.1 GET http://localhost:7000/minimaltest - 200 null application/json; charset=utf-8 129.1408ms
+2025-01-29 21:07:16.036 +03:00 [INF] Request starting HTTP/1.1 GET http://localhost:7000/favicon.ico - null null
+2025-01-29 21:07:16.043 +03:00 [INF] Request finished HTTP/1.1 GET http://localhost:7000/favicon.ico - 404 0 null 6.8935ms
+2025-01-29 21:07:16.048 +03:00 [INF] Request reached the end of the middleware pipeline without being handled by application code. Request path: GET http://localhost:7000/favicon.ico, Response status code: 404
+2025-01-29 21:08:05.270 +03:00 [INF] Request starting HTTP/1.1 GET http://localhost:7000/minimaltest/ping - null null
+2025-01-29 21:08:05.277 +03:00 [INF] Executing endpoint 'NayifatAPI.Controllers.MinimalTestController.Ping (NayifatAPI)'
+2025-01-29 21:08:05.281 +03:00 [INF] Route matched with {action = "Ping", controller = "MinimalTest"}. Executing controller action with signature Microsoft.AspNetCore.Mvc.IActionResult Ping() on controller NayifatAPI.Controllers.MinimalTestController (NayifatAPI).
+2025-01-29 21:08:05.283 +03:00 [INF] Executing OkObjectResult, writing value of type '<>f__AnonymousType8`1[[System.String, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.
+2025-01-29 21:08:05.286 +03:00 [INF] Executed action NayifatAPI.Controllers.MinimalTestController.Ping (NayifatAPI) in 3.3724ms
+2025-01-29 21:08:05.290 +03:00 [INF] Executed endpoint 'NayifatAPI.Controllers.MinimalTestController.Ping (NayifatAPI)'
+2025-01-29 21:08:05.293 +03:00 [INF] Request finished HTTP/1.1 GET http://localhost:7000/minimaltest/ping - 200 null application/json; charset=utf-8 22.8593ms
