@@ -57,5 +57,11 @@ namespace NayifatAPI.Controllers
                 });
             }
         }
+
+        [HttpGet]
+        public IActionResult Get()
+        {
+            return Ok(new { status = "healthy" });
+        }
     }
 } 

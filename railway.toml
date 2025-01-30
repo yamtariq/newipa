@@ -1,0 +1,8 @@
+[build]
+builder = "nixpacks"
+buildCommand = "cd NayifatAPI && dotnet publish -c Release -o out"
+
+[deploy]
+startCommand = "cd NayifatAPI/out && dotnet NayifatAPI.dll"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 100 

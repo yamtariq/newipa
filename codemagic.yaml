@@ -4,6 +4,8 @@ workflows:
     environment:
       flutter: stable
       xcode: "15.0"
+      # Using CocoaPods 1.11.x or 1.16.x typically works;
+      # if you see gem errors, try 1.11.3 or 1.16.0
       cocoapods: 1.11.3
       ruby: 3.0.4
       vars:
@@ -18,9 +20,11 @@ workflows:
     scripts:
       - flutter clean
       - flutter pub get
-      - cd ios && rm -rf ~/Library/Caches/CocoaPods Pods Podfile.lock
-      - cd ios && pod repo update
-      - cd ios && pod install --repo-update --verbose
+      - |
+        cd ios
+        rm -rf ~/Library/Caches/CocoaPods Pods Podfile.lock
+        pod repo update
+        pod install --repo-update --verbose
       - |
         cd ios
         xcodebuild clean -workspace Runner.xcworkspace -scheme Runner -configuration Debug
