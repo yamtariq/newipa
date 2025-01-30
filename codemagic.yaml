@@ -21,7 +21,7 @@ workflows:
       - cd ios
       - rm -rf ~/Library/Caches/CocoaPods Pods Podfile.lock
       - pod repo update
-      - pod install --repo-update --verbose
+      # - pod install --repo-update --verbose
       - xcodebuild clean -workspace Runner.xcworkspace -scheme Runner -configuration Debug
       - cd ..
       - echo "Updating CocoaPods"
