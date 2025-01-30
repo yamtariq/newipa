@@ -18,15 +18,12 @@ workflows:
     scripts:
       - flutter clean
       - flutter pub get
-      - |
-        cd ios
-        rm -rf ~/Library/Caches/CocoaPods Pods Podfile.lock
-        pod repo update
-        pod install --repo-update --verbose
-      - |
-        
-        xcodebuild clean -workspace Runner.xcworkspace -scheme Runner -configuration Debug
-        cd ..
+      - cd ios
+      - rm -rf ~/Library/Caches/CocoaPods Pods Podfile.lock
+      - pod repo update
+      - pod install --repo-update --verbose
+      - xcodebuild clean -workspace Runner.xcworkspace -scheme Runner -configuration Debug
+      - cd ..
       - echo "Updating CocoaPods"
       - sudo gem install cocoapods -v 1.13.0
       - echo "Cleaning Flutter project"
