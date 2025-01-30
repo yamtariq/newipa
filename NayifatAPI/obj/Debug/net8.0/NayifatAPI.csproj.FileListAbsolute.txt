@@ -150,3 +150,10 @@ C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\obj\Debug\net8.0\r
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\obj\Debug\net8.0\NayifatAPI.pdb
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\obj\Debug\net8.0\NayifatAPI.genruntimeconfig.cache
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\obj\Debug\net8.0\ref\NayifatAPI.dll
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\bin\Debug\net8.0\publish\web.config
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\bin\Debug\net8.0\web.config
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\bin\Debug\net8.0\publish\appsettings.Development.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\bin\Debug\net8.0\publish\appsettings.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\bin\Debug\net8.0\publish\NayifatAPI.deps.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\bin\Debug\net8.0\publish\NayifatAPI.runtimeconfig.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\bin\Debug\net8.0\publish\NayifatAPI.staticwebassets.endpoints.json

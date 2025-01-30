@@ -16,3 +16,13 @@
 2025-01-30 08:40:01.725 +03:00 [INF] Application started. Press Ctrl+C to shut down.
 2025-01-30 08:40:01.726 +03:00 [INF] Hosting environment: Development
 2025-01-30 08:40:01.727 +03:00 [INF] Content root path: C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi
+2025-01-30 08:59:58.849 +03:00 [INF] Application is shutting down...
+2025-01-30 09:05:49.540 +03:00 [INF] Starting web application
+2025-01-30 09:05:49.662 +03:00 [INF] Now listening on: http://localhost:5264
+2025-01-30 09:05:49.666 +03:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-01-30 09:05:49.667 +03:00 [INF] Hosting environment: Development
+2025-01-30 09:05:49.668 +03:00 [INF] Content root path: C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi
+2025-01-30 09:06:08.509 +03:00 [INF] Request starting HTTP/1.1 GET http://localhost:5264/api/health - null null
+2025-01-30 09:06:08.565 +03:00 [WRN] Failed to determine the https port for redirect.
+2025-01-30 09:06:08.576 +03:00 [INF] Request finished HTTP/1.1 GET http://localhost:5264/api/health - 404 0 null 70.7217ms
+2025-01-30 09:06:08.587 +03:00 [INF] Request reached the end of the middleware pipeline without being handled by application code. Request path: GET http://localhost:5264/api/health, Response status code: 404
