@@ -26,18 +26,18 @@ namespace NayifatAPI.Services
             // _context = context;
         }
 
-        public async Task<AuthResult> RegisterUser(RegisterRequest request)
+        public Task<AuthResult> RegisterUser(RegisterRequest request)
         {
             try
             {
                 // TODO: Implement actual registration logic with database
-                // For now, return a mock success response
-                return new AuthResult
+                return Task.FromResult(new AuthResult
                 {
                     Success = true,
                     Message = "Registration initiated successfully",
-                    Data = new { requiresOtp = true }
-                };
+                    Data = new { requiresOtp = true },
+                    ErrorCode = string.Empty
+                });
             }
             catch (Exception ex)
             {
@@ -46,16 +46,18 @@ namespace NayifatAPI.Services
             }
         }
 
-        public async Task<AuthResult> SetUserDetails(UserDetailsRequest request)
+        public Task<AuthResult> SetUserDetails(UserDetailsRequest request)
         {
             try
             {
                 // TODO: Implement actual user details update logic
-                return new AuthResult
+                return Task.FromResult(new AuthResult
                 {
                     Success = true,
-                    Message = "User details updated successfully"
-                };
+                    Message = "User details updated successfully",
+                    ErrorCode = string.Empty,
+                    Data = new { }
+                });
             }
             catch (Exception ex)
             {
@@ -64,16 +66,18 @@ namespace NayifatAPI.Services
             }
         }
 
-        public async Task<AuthResult> SetupMpin(MpinSetupRequest request)
+        public Task<AuthResult> SetupMpin(MpinSetupRequest request)
         {
             try
             {
                 // TODO: Implement actual MPIN setup logic
-                return new AuthResult
+                return Task.FromResult(new AuthResult
                 {
                     Success = true,
-                    Message = "MPIN setup successfully"
-                };
+                    Message = "MPIN setup successfully",
+                    ErrorCode = string.Empty,
+                    Data = new { }
+                });
             }
             catch (Exception ex)
             {
@@ -82,16 +86,18 @@ namespace NayifatAPI.Services
             }
         }
 
-        public async Task<AuthResult> SetupBiometrics(BiometricsRequest request)
+        public Task<AuthResult> SetupBiometrics(BiometricsRequest request)
         {
             try
             {
                 // TODO: Implement actual biometrics setup logic
-                return new AuthResult
+                return Task.FromResult(new AuthResult
                 {
                     Success = true,
-                    Message = "Biometrics setup successfully"
-                };
+                    Message = "Biometrics setup successfully",
+                    ErrorCode = string.Empty,
+                    Data = new { }
+                });
             }
             catch (Exception ex)
             {
@@ -100,7 +106,7 @@ namespace NayifatAPI.Services
             }
         }
 
-        public async Task<SignInResult> SignIn(SignInRequest request)
+        public Task<SignInResult> SignIn(SignInRequest request)
         {
             try
             {
@@ -126,14 +132,14 @@ namespace NayifatAPI.Services
                     LastLoginDate = DateTime.UtcNow
                 };
 
-                return new SignInResult
+                return Task.FromResult(new SignInResult
                 {
                     Success = true,
                     AccessToken = GenerateJwtToken(request.NationalId),
                     RefreshToken = GenerateRefreshToken(),
                     UserProfile = userProfile,
                     DeviceStatus = deviceStatus
-                };
+                });
             }
             catch (Exception ex)
             {
@@ -142,17 +148,17 @@ namespace NayifatAPI.Services
             }
         }
 
-        public async Task<OtpResponse> VerifyOTP(OtpRequest request)
+        public Task<OtpResponse> VerifyOTP(OtpRequest request)
         {
             try
             {
                 // TODO: Implement actual OTP verification logic
-                return new OtpResponse
+                return Task.FromResult(new OtpResponse
                 {
                     Success = true,
                     Message = "OTP verified successfully",
                     Status = "VERIFIED"
-                };
+                });
             }
             catch (Exception ex)
             {
@@ -161,18 +167,18 @@ namespace NayifatAPI.Services
             }
         }
 
-        public async Task<OtpResponse> ResendOTP(OtpRequest request)
+        public Task<OtpResponse> ResendOTP(OtpRequest request)
         {
             try
             {
                 // TODO: Implement actual OTP resend logic
-                return new OtpResponse
+                return Task.FromResult(new OtpResponse
                 {
                     Success = true,
                     Message = "OTP resent successfully",
                     Status = "SENT",
                     ExpiryTime = DateTime.UtcNow.AddMinutes(5)
-                };
+                });
             }
             catch (Exception ex)
             {

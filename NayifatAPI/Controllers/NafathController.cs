@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using NayifatAPI.Data;
 using NayifatAPI.Models;
 using System.Net.Http;
@@ -11,7 +12,6 @@ namespace NayifatAPI.Controllers
     [Route("api/[controller]")]
     public class NafathController : ApiBaseController
     {
-        private readonly ApplicationDbContext _context;
         private readonly ILogger<NafathController> _logger;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly string _nafathBaseUrl = "https://api.nayifat.com/nafath/api/Nafath";
@@ -19,9 +19,9 @@ namespace NayifatAPI.Controllers
         public NafathController(
             ApplicationDbContext context,
             ILogger<NafathController> logger,
-            IHttpClientFactory httpClientFactory)
+            IHttpClientFactory httpClientFactory,
+            IConfiguration configuration) : base(context, configuration)
         {
-            _context = context;
             _logger = logger;
             _httpClientFactory = httpClientFactory;
         }

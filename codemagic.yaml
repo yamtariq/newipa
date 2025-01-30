@@ -1,31 +1,12 @@
-workflows:
-  ios-workflow:
-    name: iOS Debug Workflow
-    environment:
-      flutter: stable
-      xcode: "15.0"
-      # If 1.11.3 gives issues, you can try 1.16.x or whichever works.
-      cocoapods: 1.11.3
-      ruby: 3.0.4
-      vars:
-        COCOAPODS_DISABLE_STATS: true
-        SWIFT_VERSION: "5.0"
-        ENABLE_BITCODE: "NO"
-        DEFINES_MODULE: "YES"
-        IPHONEOS_DEPLOYMENT_TARGET: "14.0"
-        BUILD_LIBRARIES_FOR_DISTRIBUTION: "NO"
-        SWIFT_INSTALL_OBJC_HEADER: "NO"
-        CLANG_ENABLE_MODULES: "YES"
+wworkflows:
+  ios-build:
+    name: iOS Build
     scripts:
+      - echo "Updating CocoaPods"
+      - sudo gem install cocoapods -v 1.13.0
+      - echo "Cleaning Flutter project"
       - flutter clean
-      - flutter pub get
-      - |
-        cd ios
-        rm -rf ~/Library/Caches/CocoaPods Pods Podfile.lock
-        pod repo update
-        pod install --repo-update --verbose
-      - |
-        cd ios
-        xcodebuild clean -workspace Runner.xcworkspace -scheme Runner -configuration Debug
-        cd ..
+      - echo "Installing pods"
+      - cd ios && pod install && cd ..
+      - echo "Building iOS app"
       - flutter build ios --debug --no-codesign

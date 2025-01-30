@@ -2,6 +2,10 @@ using System.Net.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
+using Microsoft.EntityFrameworkCore;
+using NayifatAPI.Data;
+using NayifatAPI.Models;
 
 namespace NayifatAPI.Controllers
 {
@@ -9,18 +13,17 @@ namespace NayifatAPI.Controllers
     [Route("api/[controller]")]
     public class ProxyController : ApiBaseController
     {
-        private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILogger<ProxyController> _logger;
-        private readonly IConfiguration _configuration;
+        private readonly IHttpClientFactory _httpClientFactory;
 
         public ProxyController(
-            IHttpClientFactory httpClientFactory,
+            ApplicationDbContext context,
             ILogger<ProxyController> logger,
-            IConfiguration configuration)
+            IHttpClientFactory httpClientFactory,
+            IConfiguration configuration) : base(context, configuration)
         {
-            _httpClientFactory = httpClientFactory;
             _logger = logger;
-            _configuration = configuration;
+            _httpClientFactory = httpClientFactory;
         }
 
         [HttpPost("forward")]

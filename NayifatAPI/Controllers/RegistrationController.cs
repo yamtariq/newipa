@@ -1,19 +1,34 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using NayifatAPI.Data;
 using NayifatAPI.Models;
 
 namespace NayifatAPI.Controllers
 {
+    [ApiController]
+    [Route("api/[controller]")]
     public class RegistrationController : ApiBaseController
     {
-        private readonly ApplicationDbContext _context;
         private readonly ILogger<RegistrationController> _logger;
 
-        public RegistrationController(ApplicationDbContext context, ILogger<RegistrationController> logger)
+        public RegistrationController(
+            ApplicationDbContext context,
+            ILogger<RegistrationController> logger,
+            IConfiguration configuration) : base(context, configuration)
         {
-            _context = context;
             _logger = logger;
+        }
+
+        [HttpGet("health")]
+        public IActionResult Health()
+        {
+            if (!ValidateApiKey())
+            {
+                return Error("Invalid API key", 401);
+            }
+
+            return Success(new { status = "healthy" }, "API is working");
         }
 
         [HttpPost("register")]

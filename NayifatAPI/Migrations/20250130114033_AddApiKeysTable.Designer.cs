@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NayifatAPI.Data;
 
@@ -11,9 +12,11 @@ using NayifatAPI.Data;
 namespace NayifatAPI.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250130114033_AddApiKeysTable")]
+    partial class AddApiKeysTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -95,59 +98,6 @@ namespace NayifatAPI.Migrations
                     b.HasIndex("NationalId", "CreatedAt");
 
                     b.ToTable("AuthLogs");
-                });
-
-            modelBuilder.Entity("NayifatAPI.Models.CitizenAddressListItem", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("AdditionalNumber")
-                        .HasColumnType("int");
-
-                    b.Property<int>("BuildingNumber")
-                        .HasColumnType("int");
-
-                    b.Property<string>("City")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("District")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<bool>("IsPrimaryAddress")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("LocationCoordinates")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<int>("PostCode")
-                        .HasColumnType("int");
-
-                    b.Property<string>("StreetName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<int>("UnitNumber")
-                        .HasColumnType("int");
-
-                    b.Property<int>("YakeenCitizenAddressId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("YakeenCitizenAddressId");
-
-                    b.ToTable("CitizenAddressListItem");
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.Customer", b =>
@@ -467,167 +417,6 @@ namespace NayifatAPI.Migrations
                     b.ToTable("User_Notifications");
                 });
 
-            modelBuilder.Entity("NayifatAPI.Models.YakeenCitizenAddress", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("AddressLanguage")
-                        .IsRequired()
-                        .HasMaxLength(2)
-                        .HasColumnType("nvarchar(2)");
-
-                    b.Property<string>("DateOfBirthHijri")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("IqamaNumber")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<int>("LogId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("IqamaNumber");
-
-                    b.ToTable("YakeenCitizenAddress");
-                });
-
-            modelBuilder.Entity("NayifatAPI.Models.YakeenCitizenInfo", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("DateOfBirth")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("DateOfBirthHijri")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("EnglishFirstName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("EnglishLastName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("EnglishSecondName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("EnglishThirdName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("FamilyName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("FatherName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("FirstName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<int>("Gender")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("GenderFieldSpecified")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("GrandFatherName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("HifizaIssuePlace")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("HifizaNumber")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("IdExpiryDate")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("IdIssueDate")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("IdIssuePlace")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<int>("IdVersionNumber")
-                        .HasColumnType("int");
-
-                    b.Property<string>("IqamaNumber")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<int>("LogIdField")
-                        .HasColumnType("int");
-
-                    b.Property<int>("NumberOfVehiclesReg")
-                        .HasColumnType("int");
-
-                    b.Property<string>("OccupationCode")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<string>("SocialStatusDetailedDesc")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SubtribeName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<int>("TotalNumberOfCurrentDependents")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("IqamaNumber");
-
-                    b.ToTable("YakeenCitizenInfo");
-                });
-
             modelBuilder.Entity("NayifatAPI.Models.AuthLog", b =>
                 {
                     b.HasOne("NayifatAPI.Models.Customer", null)
@@ -635,17 +424,6 @@ namespace NayifatAPI.Migrations
                         .HasForeignKey("NationalId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("NayifatAPI.Models.CitizenAddressListItem", b =>
-                {
-                    b.HasOne("NayifatAPI.Models.YakeenCitizenAddress", "YakeenCitizenAddress")
-                        .WithMany("CitizenAddressLists")
-                        .HasForeignKey("YakeenCitizenAddressId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("YakeenCitizenAddress");
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.CustomerDevice", b =>
@@ -686,11 +464,6 @@ namespace NayifatAPI.Migrations
                     b.Navigation("Notifications");
 
                     b.Navigation("OtpCodes");
-                });
-
-            modelBuilder.Entity("NayifatAPI.Models.YakeenCitizenAddress", b =>
-                {
-                    b.Navigation("CitizenAddressLists");
                 });
 #pragma warning restore 612, 618
         }

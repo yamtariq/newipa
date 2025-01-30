@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using NayifatAPI.Data;
 using Serilog;
 using Serilog.Events;
+using NayifatAPI.Controllers;
 
 var builder = WebApplication.CreateBuilder(args);
 

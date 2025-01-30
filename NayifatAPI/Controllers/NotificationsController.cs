@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using NayifatAPI.Data;
 using NayifatAPI.Models;
 
@@ -9,12 +10,13 @@ namespace NayifatAPI.Controllers
     [Route("api/[controller]")]
     public class NotificationsController : ApiBaseController
     {
-        private readonly ApplicationDbContext _context;
         private readonly ILogger<NotificationsController> _logger;
 
-        public NotificationsController(ApplicationDbContext context, ILogger<NotificationsController> logger)
+        public NotificationsController(
+            ApplicationDbContext context,
+            ILogger<NotificationsController> logger,
+            IConfiguration configuration) : base(context, configuration)
         {
-            _context = context;
             _logger = logger;
         }
 

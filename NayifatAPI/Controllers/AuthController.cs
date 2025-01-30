@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using NayifatAPI.Data;
 using NayifatAPI.Models;
 using System.Security.Cryptography;
@@ -11,12 +12,13 @@ namespace NayifatAPI.Controllers
     [Route("api/[controller]")]
     public class AuthController : ApiBaseController
     {
-        private readonly ApplicationDbContext _context;
         private readonly ILogger<AuthController> _logger;
 
-        public AuthController(ApplicationDbContext context, ILogger<AuthController> logger)
+        public AuthController(
+            ApplicationDbContext context,
+            ILogger<AuthController> logger,
+            IConfiguration configuration) : base(context, configuration)
         {
-            _context = context;
             _logger = logger;
         }
 
@@ -309,6 +311,46 @@ namespace NayifatAPI.Controllers
             }
         }
 
+        [HttpPost("validate-otp")]
+        public async Task<IActionResult> ValidateOtp([FromBody] ValidateOtpRequest request)
+        {
+            if (!ValidateApiKey())
+            {
+                return Error("Unauthorized", 401);
+            }
+
+            try
+            {
+                var otpRecord = await _context.OtpCodes
+                    .FirstOrDefaultAsync(o => 
+                        o.NationalId == request.NationalId && 
+                        o.Type == request.Type &&
+                        !o.IsUsed &&
+                        o.ExpiresAt > DateTime.UtcNow);
+
+                if (otpRecord == null)
+                {
+                    return Error("Invalid or expired OTP", 400, new { code = "INVALID_OTP" });
+                }
+
+                if (!VerifyOtp(request.OtpCode, otpRecord.Code))
+                {
+                    return Error("Invalid OTP code", 400, new { code = "INVALID_OTP" });
+                }
+
+                // Mark OTP as used
+                otpRecord.IsUsed = true;
+                await _context.SaveChangesAsync();
+
+                return Success(new { message = "OTP validated successfully" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error validating OTP for National ID: {NationalId}", request.NationalId);
+                return Error("Internal server error", 500, new { code = "SERVER_ERROR" });
+            }
+        }
+
         private async Task LogAuthAttempt(string nationalId, string deviceId, string status, string? failureReason)
         {
             var log = new AuthLog
@@ -378,6 +420,11 @@ namespace NayifatAPI.Controllers
             // TODO: Implement proper session token validation
             return !string.IsNullOrEmpty(token);
         }
+
+        private bool VerifyOtp(string providedOtp, string storedOtp)
+        {
+            return providedOtp == storedOtp;
+        }
     }
 
     public class SignInRequest
@@ -417,5 +464,12 @@ namespace NayifatAPI.Controllers
         public required string NationalId { get; set; }
         public required string Code { get; set; }
         public required string Type { get; set; }
+    }
+
+    public class ValidateOtpRequest
+    {
+        public required string NationalId { get; set; }
+        public required string Type { get; set; }
+        public required string OtpCode { get; set; }
     }
 } 

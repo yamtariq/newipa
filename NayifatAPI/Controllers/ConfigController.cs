@@ -1,18 +1,20 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using NayifatAPI.Data;
 using NayifatAPI.Models;
 
 namespace NayifatAPI.Controllers
 {
-    public class ConfigController : BaseApiController
+    public class ConfigController : ApiBaseController
     {
-        private readonly ApplicationDbContext _context;
         private readonly ILogger<ConfigController> _logger;
 
-        public ConfigController(ApplicationDbContext context, ILogger<ConfigController> logger)
+        public ConfigController(
+            ApplicationDbContext context,
+            ILogger<ConfigController> logger,
+            IConfiguration configuration) : base(context, configuration)
         {
-            _context = context;
             _logger = logger;
         }
 
