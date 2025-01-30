@@ -4,7 +4,7 @@ workflows:
     environment:
       flutter: stable
       xcode: "15.0"
-      cocoapods: 1.13.0
+      cocoapods: 1.16.2
       ruby: 3.0.4
       vars:
         COCOAPODS_DISABLE_STATS: true
@@ -18,7 +18,7 @@ workflows:
     scripts:
       - flutter clean
       - flutter pub get
-      - cd ios && rm -rf ~/Library/Caches/CocoaPods Pods/ Podfile.lock
+      - cd ios && rm -rf ~/Library/Caches/CocoaPods Pods Podfile.lock
       - cd ios && pod cache clean --all
       - cd ios && pod repo update
       - cd ios && pod install --repo-update --verbose

@@ -309,21 +309,21 @@ namespace NayifatAPI.Controllers
             }
         }
 
-        private async Task LogAuthAttempt(string nationalId, string deviceId, string status, string failureReason)
+        private async Task LogAuthAttempt(string nationalId, string deviceId, string status, string? failureReason)
         {
-            var authLog = new AuthLog
+            var log = new AuthLog
             {
                 NationalId = nationalId,
                 DeviceId = deviceId,
-                AuthType = "password",
                 Status = status,
-                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
-                UserAgent = HttpContext.Request.Headers["User-Agent"].ToString(),
                 FailureReason = failureReason,
-                CreatedAt = DateTime.UtcNow
+                IpAddress = HttpContext?.Connection?.RemoteIpAddress?.ToString(),
+                UserAgent = HttpContext?.Request?.Headers["User-Agent"].ToString(),
+                CreatedAt = DateTime.UtcNow,
+                AuthType = "password"
             };
 
-            _context.AuthLogs.Add(authLog);
+            _context.AuthLogs.Add(log);
             await _context.SaveChangesAsync();
         }
 

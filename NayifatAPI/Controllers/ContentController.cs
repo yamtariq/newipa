@@ -82,7 +82,7 @@ namespace NayifatAPI.Controllers
         {
             try
             {
-                return System.Text.Json.JsonSerializer.Deserialize<object>(json);
+                return System.Text.Json.JsonSerializer.Deserialize<object>(json) ?? json;
             }
             catch
             {

@@ -5,3 +5,14 @@
 2025-01-30 00:23:09.409 +03:00 [INF] Hosting environment: Development
 2025-01-30 00:23:09.410 +03:00 [INF] Content root path: C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI
 2025-01-30 06:56:21.614 +03:00 [INF] Application is shutting down...
+2025-01-30 08:26:57.918 +03:00 [INF] Starting web application
+2025-01-30 08:26:58.034 +03:00 [INF] Now listening on: http://localhost:5264
+2025-01-30 08:26:58.046 +03:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-01-30 08:26:58.050 +03:00 [INF] Hosting environment: Development
+2025-01-30 08:26:58.053 +03:00 [INF] Content root path: C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi
+2025-01-30 08:30:43.624 +03:00 [INF] Application is shutting down...
+2025-01-30 08:40:01.586 +03:00 [INF] Starting web application
+2025-01-30 08:40:01.719 +03:00 [INF] Now listening on: http://localhost:5264
+2025-01-30 08:40:01.725 +03:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-01-30 08:40:01.726 +03:00 [INF] Hosting environment: Development
+2025-01-30 08:40:01.727 +03:00 [INF] Content root path: C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi
