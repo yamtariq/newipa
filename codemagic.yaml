@@ -4,8 +4,7 @@ workflows:
     environment:
       flutter: stable
       xcode: "15.0"
-      # Using CocoaPods 1.11.x or 1.16.x typically works;
-      # if you see gem errors, try 1.11.3 or 1.16.0
+      # If 1.11.3 gives issues, you can try 1.16.x or whichever works.
       cocoapods: 1.11.3
       ruby: 3.0.4
       vars:

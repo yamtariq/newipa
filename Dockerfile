@@ -1,16 +1,21 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-WORKDIR /app
+WORKDIR /source
 
-# Copy csproj and restore dependencies
-COPY NayifatAPI/*.csproj ./NayifatAPI/
-RUN dotnet restore NayifatAPI/*.csproj
+# Copy everything
+COPY . .
 
-# Copy everything else and build
-COPY . ./
-RUN dotnet publish NayifatAPI -c Release -o out
+# Restore & publish
+RUN dotnet restore "./NayifatAPI/NayifatAPI.csproj"
+RUN dotnet publish "./NayifatAPI/NayifatAPI.csproj" -c Release -o /app
 
 # Build runtime image
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
-COPY --from=build /app/out .
+COPY --from=build /app .
+
+# Make port 80 available
+ENV ASPNETCORE_URLS=http://+:80
+EXPOSE 80
+
+# Start the app
 ENTRYPOINT ["dotnet", "NayifatAPI.dll"] 

@@ -26,3 +26,4 @@
 2025-01-30 09:06:08.565 +03:00 [WRN] Failed to determine the https port for redirect.
 2025-01-30 09:06:08.576 +03:00 [INF] Request finished HTTP/1.1 GET http://localhost:5264/api/health - 404 0 null 70.7217ms
 2025-01-30 09:06:08.587 +03:00 [INF] Request reached the end of the middleware pipeline without being handled by application code. Request path: GET http://localhost:5264/api/health, Response status code: 404
+2025-01-30 09:36:44.246 +03:00 [INF] Application is shutting down...

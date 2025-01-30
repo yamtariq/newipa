@@ -34,11 +34,11 @@ target 'Runner' do
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 
-  # Keep PhoneNumberKit if you need it:
-  pod 'PhoneNumberKit', '~> 3.3.4', :modular_headers => true
+  # Example: if your code needs PhoneNumberKit, you can keep it:
+  # pod 'PhoneNumberKit', '~> 3.3.4', :modular_headers => true
+  # Otherwise remove or adjust as needed.
 
-  # Remove any direct DKImagePickerController references here.
-  # Let the file_picker plugin handle it automatically.
+  # NOTE: Do NOT include any DKImagePickerController pods here.
 end
 
 post_install do |installer|
