@@ -24,7 +24,7 @@ workflows:
         pod repo update
         pod install --repo-update --verbose
       - |
-        cd ios
+        
         xcodebuild clean -workspace Runner.xcworkspace -scheme Runner -configuration Debug
         cd ..
       - echo "Updating CocoaPods"
