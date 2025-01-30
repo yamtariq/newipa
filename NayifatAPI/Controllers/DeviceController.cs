@@ -5,6 +5,8 @@ using NayifatAPI.Models;
 
 namespace NayifatAPI.Controllers
 {
+    [ApiController]
+    [Route("api/[controller]")]
     public class DeviceController : ApiBaseController
     {
         private readonly ApplicationDbContext _context;
@@ -16,7 +18,7 @@ namespace NayifatAPI.Controllers
             _logger = logger;
         }
 
-        [HttpPost("register")]
+        [HttpPost]
         public async Task<IActionResult> RegisterDevice([FromBody] RegisterDeviceRequest request)
         {
             if (!ValidateApiKey())

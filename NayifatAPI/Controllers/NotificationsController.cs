@@ -5,6 +5,8 @@ using NayifatAPI.Models;
 
 namespace NayifatAPI.Controllers
 {
+    [ApiController]
+    [Route("api/[controller]")]
     public class NotificationsController : ApiBaseController
     {
         private readonly ApplicationDbContext _context;
@@ -16,8 +18,8 @@ namespace NayifatAPI.Controllers
             _logger = logger;
         }
 
-        [HttpPost("get_notifications.php")]
-        public async Task<IActionResult> GetNotifications([FromBody] GetNotificationsRequest request)
+        [HttpGet]
+        public async Task<IActionResult> GetNotifications([FromQuery] GetNotificationsRequest request)
         {
             if (!ValidateApiKey())
             {
@@ -86,7 +88,7 @@ namespace NayifatAPI.Controllers
             }
         }
 
-        [HttpPost("send_notification.php")]
+        [HttpPost]
         public async Task<IActionResult> SendNotification([FromBody] SendNotificationRequest request)
         {
             if (!ValidateApiKey())

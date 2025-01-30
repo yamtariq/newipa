@@ -5,6 +5,8 @@ using NayifatAPI.Models;
 
 namespace NayifatAPI.Controllers
 {
+    [ApiController]
+    [Route("api/[controller]")]
     public class UserController : ApiBaseController
     {
         private readonly ApplicationDbContext _context;
@@ -16,7 +18,7 @@ namespace NayifatAPI.Controllers
             _logger = logger;
         }
 
-        [HttpPost("get_user.php")]
+        [HttpGet("profile")]
         public async Task<IActionResult> GetUser([FromBody] GetUserRequest request)
         {
             if (!ValidateApiKey() || !ValidateFeatureHeader("user"))

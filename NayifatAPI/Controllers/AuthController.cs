@@ -8,7 +8,7 @@ using System.Text;
 namespace NayifatAPI.Controllers
 {
     [ApiController]
-    [Route("api/auth")]
+    [Route("api/[controller]")]
     public class AuthController : ApiBaseController
     {
         private readonly ApplicationDbContext _context;
@@ -105,7 +105,7 @@ namespace NayifatAPI.Controllers
             }
         }
 
-        [HttpPost("refresh-token")]
+        [HttpPost("refresh")]
         public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
         {
             if (!ValidateApiKey() || !ValidateFeatureHeader("auth"))
@@ -229,7 +229,7 @@ namespace NayifatAPI.Controllers
             }
         }
 
-        [HttpPost("password/change")]
+        [HttpPost("password")]
         public async Task<IActionResult> ChangePassword([FromBody] PasswordChangeRequest request)
         {
             if (!ValidateApiKey() || !ValidateFeatureHeader("auth"))

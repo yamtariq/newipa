@@ -7,6 +7,8 @@ using System.Text.Json;
 
 namespace NayifatAPI.Controllers
 {
+    [ApiController]
+    [Route("api/[controller]")]
     public class NafathController : ApiBaseController
     {
         private readonly ApplicationDbContext _context;
@@ -24,7 +26,7 @@ namespace NayifatAPI.Controllers
             _httpClientFactory = httpClientFactory;
         }
 
-        [HttpPost("CreateRequest")]
+        [HttpPost("request")]
         public async Task<IActionResult> CreateRequest([FromBody] NafathCreateRequest request)
         {
             if (!ValidateApiKey())
@@ -75,7 +77,7 @@ namespace NayifatAPI.Controllers
             }
         }
 
-        [HttpPost("RequestStatus")]
+        [HttpGet("status")]
         public async Task<IActionResult> GetRequestStatus([FromBody] NafathStatusRequest request)
         {
             if (!ValidateApiKey())
