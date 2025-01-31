@@ -1,0 +1,5 @@
+2025-01-31 10:47:06.236 +03:00 [INF] Starting web application
+2025-01-31 10:47:06.345 +03:00 [INF] Now listening on: http://localhost:5264
+2025-01-31 10:47:06.351 +03:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-01-31 10:47:06.353 +03:00 [INF] Hosting environment: Development
+2025-01-31 10:47:06.354 +03:00 [INF] Content root path: C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi
