@@ -1,34 +1,26 @@
 workflows:
   ios-workflow:
-    name: iOS Debug Workflow
+    name: iOS Workflow
     environment:
       flutter: stable
-      xcode: "15.0"
-      
-      ruby: 3.0.4
+      xcode: latest
+      cocoapods: 1.13.0
       vars:
-        COCOAPODS_DISABLE_STATS: true
-        SWIFT_VERSION: "5.0"
-        ENABLE_BITCODE: "NO"
-        DEFINES_MODULE: "YES"
-        IPHONEOS_DEPLOYMENT_TARGET: "14.0"
-        BUILD_LIBRARIES_FOR_DISTRIBUTION: "NO"
-        SWIFT_INSTALL_OBJC_HEADER: "NO"
-        CLANG_ENABLE_MODULES: "YES"
+        BUNDLE_ID: "com.nayifat.app2025"
     scripts:
-      - flutter clean
-      - flutter pub get
-      - cd ios
-      - rm -rf ~/Library/Caches/CocoaPods Pods Podfile.lock
-      - pod repo update
-      # - pod install --repo-update --verbose
-      - xcodebuild clean -workspace Runner.xcworkspace -scheme Runner -configuration Debug
-      - cd ..
-      - echo "Updating CocoaPods"
-      - sudo gem install cocoapods -v 1.13.0
-      - echo "Cleaning Flutter project"
-      - flutter clean
-      - echo "Installing pods"
-      - cd ios && pod install && cd ..
-      - echo "Building iOS app"
-      - flutter build ios --debug --no-codesign
+      - name: Get Flutter packages
+        script: |
+          flutter clean
+          flutter pub get
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios
+          pod cache clean --all
+          pod install
+      - name: Build iOS
+        script: |
+          flutter build ios --release --no-codesign
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - flutter_drive.log
