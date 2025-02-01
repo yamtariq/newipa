@@ -2,7 +2,7 @@ class Constants {
   // API Base URLs
   static const bool useNewApi = true;  // Feature flag for easy switching
   static String get apiBaseUrl => 
-      useNewApi ? 'https://8f9f-51-252-155-185.ngrok-free.app/api' : 'https://icreditdept.com/api';
+      useNewApi ? 'https://187e-51-252-155-185.ngrok-free.app/api' : 'https://icreditdept.com/api';
   static String get authBaseUrl => '$apiBaseUrl/auth';
   static const String masterFetchUrl = '/content/fetch';
   // Used in: ContentUpdateService (content_update_service.dart) - For fetching all dynamic content:

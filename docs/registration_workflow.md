@@ -367,8 +367,8 @@ final formattedPhone = mobileNo != null
 
 ### API Endpoints
 ```
-Generate OTP: https://8f9f-51-252-155-185.ngrok-free.app/api/proxy/forward?url=https://icreditdept.com/api/testasp/test_local_generate_otp.php
-Verify OTP: https://8f9f-51-252-155-185.ngrok-free.app/api/proxy/forward?url=https://icreditdept.com/api/testasp/test_local_verify_otp.php
+Generate OTP: https://187e-51-252-155-185.ngrok-free.app/api/proxy/forward?url=https://icreditdept.com/api/testasp/test_local_generate_otp.php
+Verify OTP: https://187e-51-252-155-185.ngrok-free.app/api/proxy/forward?url=https://icreditdept.com/api/testasp/test_local_verify_otp.php
 ```
 
 ### Request/Response Format
