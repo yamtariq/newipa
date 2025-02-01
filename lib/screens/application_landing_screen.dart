@@ -206,19 +206,13 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
           };
 
           print('\n=== LOAN APPLICATION API CALL ===');
-          print('URL: ${Constants.apiBaseUrl}/update_loan_application.php');
-          print('Headers: ${jsonEncode({
-            'Content-Type': 'application/json',
-            'api-key': Constants.apiKey,
-          })}');
+          print('URL: ${Constants.apiBaseUrl}${Constants.endpointUpdateLoanApplication}');
+          print('Headers: ${jsonEncode(Constants.defaultHeaders)}');
           print('Payload: ${jsonEncode(loanData)}');
 
           final response = await http.post(
             Uri.parse('${Constants.apiBaseUrl}${Constants.endpointUpdateLoanApplication}'),
-            headers: {
-              'Content-Type': 'application/json',
-              'api-key': Constants.apiKey,
-            },
+            headers: Constants.defaultHeaders,
             body: jsonEncode(loanData),
           );
 
@@ -244,19 +238,13 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
           };
 
           print('\n=== CARD APPLICATION API CALL ===');
-          print('URL: ${Constants.apiBaseUrl}/update_cards_application.php');
-          print('Headers: ${jsonEncode({
-            'Content-Type': 'application/json',
-            'api-key': Constants.apiKey,
-          })}');
+          print('URL: ${Constants.apiBaseUrl}${Constants.endpointUpdateCardApplication}');
+          print('Headers: ${jsonEncode(Constants.defaultHeaders)}');
           print('Payload: ${jsonEncode(cardData)}');
 
           final response = await http.post(
             Uri.parse('${Constants.apiBaseUrl}${Constants.endpointUpdateCardApplication}'),
-            headers: {
-              'Content-Type': 'application/json',
-              'api-key': Constants.apiKey,
-            },
+            headers: Constants.defaultHeaders,
             body: jsonEncode(cardData),
           );
 

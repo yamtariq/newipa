@@ -7,6 +7,10 @@ class NafathService {
 
   Future<Map<String, dynamic>> createRequest(String nationalId) async {
     try {
+      print('\n=== NAFATH CREATE REQUEST ===');
+      print('National ID: $nationalId');
+      print('URL: $baseUrl/CreateRequest');
+      
       final response = await http.post(
         Uri.parse('$baseUrl/CreateRequest'),
         headers: {
@@ -18,12 +22,16 @@ class NafathService {
         }),
       );
 
+      print('Response Status: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        throw Exception('Failed to create Nafath request');
+        throw Exception('Failed to create Nafath request: ${response.body}');
       }
     } catch (e) {
+      print('Error creating Nafath request: $e');
       throw Exception('Error creating Nafath request: $e');
     }
   }
@@ -34,6 +42,12 @@ class NafathService {
     String random,
   ) async {
     try {
+      print('\n=== NAFATH STATUS CHECK ===');
+      print('National ID: $nationalId');
+      print('Transaction ID: $transId');
+      print('Random: $random');
+      print('URL: $baseUrl/RequestStatus');
+
       final response = await http.post(
         Uri.parse('$baseUrl/RequestStatus'),
         headers: {
@@ -47,12 +61,16 @@ class NafathService {
         }),
       );
 
+      print('Response Status: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        throw Exception('Failed to check Nafath status');
+        throw Exception('Failed to check Nafath status: ${response.body}');
       }
     } catch (e) {
+      print('Error checking Nafath status: $e');
       throw Exception('Error checking Nafath status: $e');
     }
   }

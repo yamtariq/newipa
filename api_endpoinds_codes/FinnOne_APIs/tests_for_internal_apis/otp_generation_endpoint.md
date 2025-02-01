@@ -1,11 +1,13 @@
-# OTP Verification Endpoint
+# OTP Generation Endpoint
 
 ## Method
 **POST**
 
 ## URL
 ```
-https://172.22.226.203:6445/api/otp/GetVerifyOtp
+<!-- https://172.22.226.203:6445/api/otp/GetOtpt --> change to this in production
+
+https://icreditdept.com/api/testasp/test_local_generate_otp.php // this is for testing only now, the otp code will be within the response body
 ```
 
 ## Headers
@@ -20,7 +22,8 @@ https://172.22.226.203:6445/api/otp/GetVerifyOtp
 ```json
 {
   "nationalId": "1081643650",
-  "otp": "620563",
+  "mobileNo": "966569801861",
+  "purpose": "Login",
   "userId": "1"
 }
 ```
@@ -29,7 +32,8 @@ https://172.22.226.203:6445/api/otp/GetVerifyOtp
 | Parameter  | Type   | Mandatory | Description |
 |------------|--------|-----------|-------------|
 | nationalId | number | Yes       | 10-digit national ID (e.g., 1000000123, 2111112223) |
-| otp        | string | Yes       | 6-digit OTP (e.g., "456123", "024563") |
+| mobileNo   | string | Yes       | 12-digit mobile number (e.g., 966596065248) |
+| purpose    | string | Yes       | Purpose for OTP (e.g., "Login", "Acceptance", "Verification") |
 | userId     | string | Yes       | Send `"1"` indicating the request source |
 
 ## Sample Response (Success)
@@ -40,8 +44,8 @@ https://172.22.226.203:6445/api/otp/GetVerifyOtp
     "result": {
         "nationalId": "1081643650",
         "otp": "620563",
-        "verifiedFlag": true,
-        "successMsg": "Verified successfully.",
+        "expiryDate": "2023-03-19T12:20:59.4541355+03:00",
+        "successMsg": "Success",
         "errCode": 0,
         "errMsg": null
     },

@@ -206,29 +206,18 @@ Response:
 
 ### Registration Controller
 
-#### POST /api/registration/register
-Registers a new user with device information.
+#### POST /api/Registration/register
+Registers a new user with device information or checks if an ID is already registered.
 
 Request:
 ```http
-POST /api/registration/register
+POST /api/Registration/register
 Headers:
   x-api-key: your-api-key
 Content-Type: application/json
 {
+  "checkOnly": true,  // Set to true to only check ID availability
   "nationalId": "1234567890",
-  "firstNameEn": "John",
-  "secondNameEn": "Michael",
-  "thirdNameEn": "David",
-  "familyNameEn": "Smith",
-  "firstNameAr": "جون",
-  "secondNameAr": "مايكل",
-  "thirdNameAr": "ديفيد",
-  "familyNameAr": "سميث",
-  "email": "john@example.com",
-  "password": "Test123!@#",
-  "phone": "+966501234567",
-  "consent": true,
   "deviceInfo": {
     "deviceId": "test-device-1",
     "platform": "Android",
@@ -243,19 +232,57 @@ Response:
 {
   "success": true,
   "data": {
-    "status": "success",
-    "message": "Registration successful",
-    "government_data": {
-      "national_id": "1234567890",
-      "first_name_en": "John",
-      "family_name_en": "Smith",
-      "email": "john@example.com",
-      "phone": "+966501234567",
-      "date_of_birth": null,
-      "id_expiry_date": null
-    },
-    "device_registered": true,
-    "biometric_enabled": true
+    "message": "ID available"
+  }
+}
+```
+
+#### POST /api/Registration/generate-otp
+Generates an OTP for the given National ID.
+
+Request:
+```http
+POST /api/Registration/generate-otp
+Headers:
+  x-api-key: your-api-key
+Content-Type: application/json
+{
+  "nationalId": "1234567890"
+}
+```
+
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "otpCode": "123456",
+    "expiryDate": "2024-03-20T10:30:00Z"
+  }
+}
+```
+
+#### POST /api/Registration/verify-otp
+Verifies the OTP for the given National ID.
+
+Request:
+```http
+POST /api/Registration/verify-otp
+Headers:
+  x-api-key: your-api-key
+Content-Type: application/json
+{
+  "nationalId": "1234567890",
+  "otpCode": "123456"
+}
+```
+
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "message": "OTP verified successfully"
   }
 }
 ```
@@ -657,6 +684,27 @@ CREATE INDEX IX_notification_templates_expiry ON notification_templates(expiry_a
 
 ### 1. Authentication & Registration
 
+Example Sign In Request:
+```http
+POST /api/auth/signin
+Headers:
+  x-api-key: your-api-key
+  Content-Type: application/json
+  X-Feature: auth
+
+Body:
+{
+    "nationalId": "1012345678",
+    "password": "pass123",
+    "deviceId": "test_device_123",
+    "request": {
+        "platform": "Android",
+        "model": "Test Model",
+        "manufacturer": "Test Manufacturer"
+    }
+}
+```
+
 #### Registration Endpoint (`user_registration.php`)
 The registration process is handled through a single endpoint that supports both ID availability checks and full user registration with device management.
 
@@ -776,52 +824,242 @@ public class RegistrationController : ApiBaseController
    - Device registration failures
    - Detailed error logging with context
 
-### 2. Notifications System (`NotificationsController`)
-The notifications system handles user notifications with automatic read status tracking.
+### 2. Notifications System
 
+#### Models
 ```csharp
-[Route("api")]
-public class NotificationsController : ApiBaseController
+// Models/Notifications/NotificationTemplate.cs
+public class NotificationTemplate
 {
-    [HttpPost("get_notifications.php")]
-    public async Task<IActionResult> GetNotifications([FromBody] GetNotificationsRequest request)
-    {
-        // Features:
-        // 1. Retrieves user notifications
-        // 2. Optional automatic marking as read
-        // 3. Pagination support
-        // 4. Read status tracking
+    public int Id { get; set; }
+    public string? Title { get; set; }
+    public string? Body { get; set; }
+    public string? TitleEn { get; set; }
+    public string? BodyEn { get; set; }
+    public string? TitleAr { get; set; }
+    public string? BodyAr { get; set; }
+    public string? Route { get; set; }
+    public string? AdditionalData { get; set; }
+    public string? TargetCriteria { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? ExpiryAt { get; set; }
+}
+
+// Models/Notifications/UserNotification.cs
+public class UserNotification
+{
+    public required string NationalId { get; set; }
+    public string? Notifications { get; set; }
+    public DateTime LastUpdated { get; set; }
+}
+
+// Models/Notifications/GetNotificationsRequest.cs
+public class GetNotificationsRequest
+{
+    public required string NationalId { get; set; }
+    public bool MarkAsRead { get; set; }
+}
+
+// Models/Notifications/SendNotificationRequest.cs
+public class SendNotificationRequest
+{
+    // Single language
+    public string? Title { get; set; }
+    public string? Body { get; set; }
+
+    // Multi-language
+    [JsonPropertyName("title_en")]
+    public string? TitleEn { get; set; }
+    
+    [JsonPropertyName("body_en")]
+    public string? BodyEn { get; set; }
+    
+    [JsonPropertyName("title_ar")]
+    public string? TitleAr { get; set; }
+    
+    [JsonPropertyName("body_ar")]
+    public string? BodyAr { get; set; }
+
+    // Target users (one will be used)
+    [JsonPropertyName("national_id")]
+    public string? NationalId { get; set; }
+    
+    [JsonPropertyName("national_ids")]
+    public List<string>? NationalIds { get; set; }
+    
+    public Dictionary<string, object>? Filters { get; set; }
+
+    // Optional data
+    public string? Route { get; set; }
+    
+    [JsonPropertyName("additional_data")]
+    public object? AdditionalData { get; set; }
+    
+    [JsonPropertyName("expiry_at")]
+    public DateTime? ExpiryAt { get; set; }
+}
+```
+
+#### Database Schema
+```sql
+CREATE TABLE notification_templates (
+    id int IDENTITY(1,1) PRIMARY KEY,
+    title nvarchar(255),
+    body nvarchar(max),
+    title_en nvarchar(255),
+    body_en nvarchar(max),
+    title_ar nvarchar(255),
+    body_ar nvarchar(max),
+    route nvarchar(255),
+    additional_data nvarchar(max),
+    target_criteria nvarchar(max),
+    created_at datetime2 NOT NULL DEFAULT GETDATE(),
+    expiry_at datetime2
+);
+
+CREATE TABLE user_notifications (
+    national_id nvarchar(20) PRIMARY KEY,
+    notifications nvarchar(max),
+    last_updated datetime2 NOT NULL DEFAULT GETDATE(),
+    FOREIGN KEY (national_id) REFERENCES Customers(national_id)
+);
+
+CREATE INDEX IX_notification_templates_expiry ON notification_templates(expiry_at);
+CREATE INDEX IX_user_notifications_last_updated ON user_notifications(last_updated);
+```
+
+#### Features
+1. **Multi-language Support**
+   - Arabic and English content
+   - Proper nvarchar storage for Arabic text
+   - Language-specific title and body
+
+2. **Notification Management**
+   - Automatic expiry handling
+   - Read status tracking
+   - Maximum 50 notifications per user
+   - Automatic cleanup of old notifications
+
+3. **Targeting Options**
+   - Single user by National ID
+   - Multiple users by National IDs list
+   - Advanced filtering:
+     - Table-based filtering (e.g. Customers.City)
+     - BETWEEN operator for ranges
+     - Multiple filter conditions
+     - AND/OR operations
+
+4. **Additional Features**
+   - Deep linking via route parameter
+   - Additional data support (JSON)
+   - Audit logging
+   - Transaction support
+   - Error handling
+
+#### Implementation Details
+
+1. **Get Notifications**
+```http
+POST /api/notifications/list
+Headers:
+  Content-Type: application/json
+  X-APP-ID: NAYIFAT_APP
+  X-API-KEY: 7ca7427b418bdbd0b3b23d7debf69bf7
+  X-Organization-No: 1
+
+Request:
+{
+    "nationalId": "1234567890",
+    "markAsRead": true
+}
+
+Response:
+{
+    "success": true,
+    "data": {
+        "notifications": [
+            {
+                "id": 123,
+                "title": "Notification Title",
+                "body": "Notification Content",
+                "title_en": "Notification Title",
+                "body_en": "Notification Content",
+                "title_ar": "عنوان الإشعار",
+                "body_ar": "محتوى الإشعار",
+                "route": "home",
+                "additional_data": {},
+                "created_at": "2024-03-20T10:00:00Z",
+                "expires_at": "2024-04-19T10:00:00Z",
+                "status": "unread"
+            }
+        ]
     }
 }
 ```
 
-#### Key Features
-- Automatic read status tracking
-- Pagination with customizable page size
-- Transaction support for status updates
-- Comprehensive error logging
+2. **Send Notification**
+```http
+POST /api/notifications/send
+Headers:
+  Content-Type: application/json
+  X-APP-ID: NAYIFAT_APP
+  X-API-KEY: 7ca7427b418bdbd0b3b23d7debf69bf7
+  X-Organization-No: 1
 
-#### Response Format
-```json
+Request:
 {
-    "status": "success",
-    "notifications": [
+    "title_ar": "عنوان الإشعار",
+    "title_en": "Notification Title",
+    "body_ar": "محتوى الإشعار",
+    "body_en": "Notification Content",
+    "type": "general",
+    "filters": [
         {
-            "notification_id": "123",
-            "title": "Notification Title",
-            "message": "Notification Message",
-            "created_at": "2024-03-20T10:00:00Z",
-            "read_at": "2024-03-20T10:01:00Z",
-            "type": "general"
+            "key": "Customers.City",
+            "operator": "=",
+            "value": "Riyadh"
+        },
+        {
+            "key": "Customers.SalaryDakhli",
+            "operator": "BETWEEN",
+            "value": [5000, 10000]
         }
     ],
-    "pagination": {
-        "current_page": 1,
-        "total_pages": 5,
-        "total_records": 50
+    "route": "home",
+    "additional_data": {
+        "key": "value"
+    },
+    "expiry_at": "2024-04-19T10:00:00Z"
+}
+
+Response:
+{
+    "success": true,
+    "data": {
+        "status": "success",
+        "message": "Successfully sent notifications to 100 users",
+        "total_recipients": 100,
+        "successful_sends": 100
     }
 }
 ```
+
+#### Error Handling
+```json
+{
+    "success": false,
+    "error": {
+        "code": "ERROR_CODE",
+        "message": "Error description"
+    }
+}
+```
+
+Common error codes:
+- `INVALID_API_KEY`: Invalid or missing API key
+- `INVALID_REQUEST`: Missing required fields
+- `NO_RECIPIENTS`: No users match the filter criteria
+- `INTERNAL_ERROR`: Server error during processing
 
 ### 3. Nafath Integration (`NafathController`)
 Handles Nafath authentication and verification requests.
@@ -1868,3 +2106,265 @@ In `appsettings.json`:
    - 404: Endpoint not found
    - 400: Bad request
    - 500: Internal server error
+```
+
+## Nayifat ASP.NET Implementation Details
+
+### Time Zone Implementation
+
+#### Overview
+Implementation of Saudi Arabia Time (Arab Standard Time) in the Notifications System
+
+#### Technical Details
+
+1. **Time Conversion Method**
+```csharp
+TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Arab Standard Time"))
+```
+
+2. **Modified Components in NotificationsController**
+
+- **Current Time Calculation**
+  ```csharp
+  var currentTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, 
+      TimeZoneInfo.FindSystemTimeZoneById("Arab Standard Time"));
+  ```
+
+- **Notification Status Updates**
+  ```csharp
+  notif["read_at"] = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, 
+      TimeZoneInfo.FindSystemTimeZoneById("Arab Standard Time"));
+  ```
+
+- **Database Operations**
+  ```csharp
+  // Update operations
+  "UPDATE user_notifications SET notifications = {0}, last_updated = {1} WHERE national_id = {2}"
+  
+  // Insert operations
+  "INSERT INTO user_notifications (national_id, notifications, last_updated) VALUES ({0}, {1}, {2})"
+  ```
+
+#### Key Implementation Points
+
+1. **Consistency**
+   - All datetime operations now use Saudi Arabia Time
+   - Uniform time zone handling across the controller
+
+2. **Database Interactions**
+   - Direct SQL queries updated to use Saudi time
+   - Notification template timestamps converted
+   - User notification records standardized to Saudi time
+
+3. **Notification Processing**
+   - Template creation times
+   - Expiry calculations
+   - Read status tracking
+   - Delivery timestamps
+
+4. **Performance Considerations**
+   - Time zone conversions handled at application level
+   - No additional database overhead
+   - Minimal impact on response times
+
+#### Testing Guidelines
+
+1. **Timestamp Verification**
+   - Verify all timestamps show in Saudi time (UTC+3)
+   - Check expiry calculations
+   - Validate notification delivery times
+
+2. **Database Operations**
+   - Confirm correct timestamp storage
+   - Verify time consistency in queries
+   - Check notification template times
+
+3. **User Experience**
+   - Ensure correct time display in UI
+   - Verify notification sorting
+   - Check expiry behavior
+```
+
+## OTP System Implementation
+
+### 1. OTP Generation Endpoint
+**Endpoint**: `/api/proxy/forward?url=https://icreditdept.com/api/testasp/test_local_generate_otp.php`
+
+#### Request Format
+```json
+{
+    "nationalId": "string",     // Customer's national ID
+    "mobileNo": "string",       // Mobile number with 966 prefix
+    "purpose": "REGISTRATION",  // Purpose of OTP
+    "userId": 1                 // Default user ID for registration
+}
+```
+
+#### Response Format
+```json
+{
+    "success": true,
+    "errors": [],
+    "result": {
+        "nationalId": "string",
+        "otp": number,
+        "expiryDate": "datetime",
+        "successMsg": "string",
+        "errCode": number,
+        "errMsg": string | null
+    },
+    "type": "N"
+}
+```
+
+#### Implementation Details
+- **Headers Required**:
+  ```
+  Content-Type: application/json
+  x-api-key: 7ca7427b418bdbd0b3b23d7debf69bf7
+  ```
+- **Phone Number Formatting**:
+  - Remove any existing '+' or '966' prefix
+  - Add '966' prefix to the number
+- **Validation**:
+  - National ID must be valid format
+  - Mobile number must be valid Saudi format
+  - Purpose must be "REGISTRATION"
+- **Error Handling**:
+  - Invalid phone format
+  - Invalid national ID
+  - System errors
+  - Network issues
+
+### 2. OTP Verification Endpoint
+**Endpoint**: `/api/proxy/forward?url=https://icreditdept.com/api/testasp/test_local_verify_otp.php`
+
+#### Request Format
+```json
+{
+    "nationalId": "string",  // Customer's national ID (trimmed)
+    "otp": "string",        // OTP code (trimmed)
+    "userId": 1             // Default user ID for registration
+}
+```
+
+#### Response Format
+```json
+{
+    "success": true,
+    "errors": [],
+    "result": {
+        "nationalId": "string",
+        "verified": boolean,
+        "successMsg": "string",
+        "errCode": number,
+        "errMsg": string | null
+    },
+    "type": "N"
+}
+```
+
+#### Implementation Details
+- **Headers Required**:
+  ```
+  Content-Type: application/json
+  x-api-key: 7ca7427b418bdbd0b3b23d7debf69bf7
+  ```
+- **Validation**:
+  - OTP code format
+  - OTP expiration check
+  - National ID match
+- **Error Handling**:
+  - Invalid OTP
+  - Expired OTP
+  - System errors
+  - Network issues
+
+### 3. Security Considerations
+1. **Rate Limiting**:
+   - Maximum 3 OTP requests per number per hour
+   - Maximum 5 verification attempts per OTP
+
+2. **OTP Expiration**:
+   - OTPs expire after 5 minutes
+   - Expired OTPs cannot be verified
+
+3. **Data Protection**:
+   - All requests must include valid API key
+   - National IDs and phone numbers are validated
+   - Response data is sanitized
+
+4. **Logging**:
+   - All OTP generations are logged
+   - Failed verification attempts are logged
+   - System errors are logged with stack traces
+
+### 4. Error Codes and Messages
+```json
+{
+    "1001": "Invalid phone number format",
+    "1002": "Invalid national ID format",
+    "1003": "OTP generation limit exceeded",
+    "1004": "Invalid OTP code",
+    "1005": "OTP expired",
+    "1006": "Verification attempts exceeded",
+    "2001": "System error",
+    "2002": "Network error"
+}
+```
+
+### 5. Testing Guidelines
+1. **OTP Generation Testing**:
+   - Test with valid/invalid phone numbers
+   - Test with valid/invalid national IDs
+   - Verify rate limiting
+   - Check response format
+   - Verify OTP format
+
+2. **OTP Verification Testing**:
+   - Test with valid/invalid OTPs
+   - Test with expired OTPs
+   - Test with wrong national ID
+   - Verify attempt limiting
+   - Check response format
+
+3. **Error Handling Testing**:
+   - Test all error scenarios
+   - Verify error messages
+   - Check error codes
+   - Test system errors
+   - Test network issues
+
+### 6. Integration Notes
+1. **Mobile App Integration**:
+   - Use centralized constants
+   - Implement proper error handling
+   - Show appropriate loading states
+   - Format phone numbers correctly
+   - Handle network timeouts
+
+2. **Backend Integration**:
+   - Validate all inputs
+   - Sanitize all outputs
+   - Log all operations
+   - Handle all errors
+   - Maintain security
+
+### 7. Monitoring and Maintenance
+1. **Performance Monitoring**:
+   - Track response times
+   - Monitor error rates
+   - Check rate limiting
+   - Watch system resources
+
+2. **Security Monitoring**:
+   - Track failed attempts
+   - Monitor API key usage
+   - Check for abuse patterns
+   - Review security logs
+
+3. **Maintenance Tasks**:
+   - Regular log rotation
+   - Database cleanup
+   - Performance optimization
+   - Security updates

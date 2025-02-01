@@ -1,9 +1,13 @@
+using System;
+using System.IO;
+using System.Linq;
 using System.Net.Http;
-using Microsoft.AspNetCore.Mvc;
 using System.Text;
-using System.Text.Json;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Http;
 using NayifatAPI.Data;
 using NayifatAPI.Models;
 
@@ -13,161 +17,117 @@ namespace NayifatAPI.Controllers
     [Route("api/[controller]")]
     public class ProxyController : ApiBaseController
     {
-        private readonly ILogger<ProxyController> _logger;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly ILogger<ProxyController> _logger;
 
         public ProxyController(
             ApplicationDbContext context,
-            ILogger<ProxyController> logger,
             IHttpClientFactory httpClientFactory,
-            IConfiguration configuration) : base(context, configuration)
+            IConfiguration configuration,
+            ILogger<ProxyController> logger
+        ) : base(context, configuration)
         {
-            _logger = logger;
             _httpClientFactory = httpClientFactory;
+            _logger = logger;
         }
 
         [HttpPost("forward")]
-        public async Task<IActionResult> ForwardRequest([FromBody] ProxyRequest request)
+        [Produces("application/json")]
+        public async Task<IActionResult> ForwardRequest()
         {
             try
             {
-                // Validate API key
+                // 1. Validate API key
                 if (!ValidateApiKey())
+                    return BadRequest(new { success = false, message = "Invalid API key" });
+
+                // 2. Get target URL from ?url= query string
+                var targetUrl = Request.Query["url"].ToString().Trim();
+                if (string.IsNullOrEmpty(targetUrl))
+                    return BadRequest(new { success = false, message = "URL parameter is required" });
+
+                // 3. Read raw JSON body from the incoming request
+                string rawBody;
+                using (var reader = new StreamReader(Request.Body, Encoding.UTF8, leaveOpen: true))
                 {
-                    return Error("Invalid API key", 401);
+                    rawBody = await reader.ReadToEndAsync();
                 }
 
-                // Create HTTP client
-                var client = _httpClientFactory.CreateClient();
-                
-                // Get the local endpoint base URL from configuration
-                var localBaseUrl = _configuration["LocalEndpoint:BaseUrl"] ?? "http://localhost:5000";
-                
-                // Construct the full URL
-                var url = $"{localBaseUrl.TrimEnd('/')}/{request.Endpoint.TrimStart('/')}";
-
-                // Create the request message
-                var method = ParseHttpMethod(request.Method ?? "POST");
-                var httpRequest = new HttpRequestMessage(method, url);
-
-                // Add request body if applicable
-                if (request.Data != null && method != HttpMethod.Get)
+                // 4. Create a new HttpRequestMessage
+                var forwardRequest = new HttpRequestMessage(HttpMethod.Post, targetUrl)
                 {
-                    string contentType = request.ContentType ?? "application/json";
-                    string requestBody;
+                    Content = new StringContent(rawBody, Encoding.UTF8, "application/json")
+                };
 
-                    if (contentType == "application/x-www-form-urlencoded")
-                    {
-                        // Handle form data
-                        var formData = request.Data as Dictionary<string, string>;
-                        requestBody = formData != null 
-                            ? string.Join("&", formData.Select(kvp => $"{Uri.EscapeDataString(kvp.Key)}={Uri.EscapeDataString(kvp.Value)}"))
-                            : "";
-                    }
-                    else
-                    {
-                        // Default to JSON
-                        requestBody = JsonSerializer.Serialize(request.Data);
-                    }
-
-                    httpRequest.Content = new StringContent(requestBody, Encoding.UTF8, contentType);
-                }
-
-                // Forward headers
+                // 5. Copy headers except Host
                 foreach (var header in Request.Headers)
                 {
-                    if (!header.Key.Equals("Host", StringComparison.OrdinalIgnoreCase) &&
-                        !header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase) &&
-                        !header.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
+                    if (!header.Key.Equals("Host", StringComparison.OrdinalIgnoreCase))
                     {
-                        httpRequest.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
+                        forwardRequest.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
                     }
                 }
 
-                // Add custom headers if provided
-                if (request.Headers != null)
-                {
-                    foreach (var header in request.Headers)
-                    {
-                        httpRequest.Headers.TryAddWithoutValidation(header.Key, header.Value);
-                    }
-                }
+                // 6. Send request using the named client with decompression
+                var client = _httpClientFactory.CreateClient("DecompressClient");
+                var httpResponse = await client.SendAsync(forwardRequest);
 
-                // Send the request
-                var response = await client.SendAsync(httpRequest);
+                // Read response as bytes first
+                var responseBytes = await httpResponse.Content.ReadAsByteArrayAsync();
                 
-                // Read the response content
-                var responseBody = await response.Content.ReadAsStringAsync();
+                // Check if response is compressed (look for gzip magic numbers)
+                if (responseBytes.Length >= 2 && responseBytes[0] == 0x1f && responseBytes[1] == 0x8b)
+                {
+                    using var compressedStream = new MemoryStream(responseBytes);
+                    using var gzipStream = new System.IO.Compression.GZipStream(compressedStream, System.IO.Compression.CompressionMode.Decompress);
+                    using var resultStream = new MemoryStream();
+                    await gzipStream.CopyToAsync(resultStream);
+                    responseBytes = resultStream.ToArray();
+                }
 
-                // Get response content type
-                var responseContentType = response.Content.Headers.ContentType?.MediaType;
+                // Convert to string, handling potential encoding issues
+                var responseString = Encoding.UTF8.GetString(responseBytes);
+
+                // Log the raw response for debugging
+                _logger.LogInformation($"Raw response length: {responseBytes.Length}");
+                _logger.LogInformation($"Response content: {responseString}");
+
+                // Get content type from response headers
+                var contentType = httpResponse.Content.Headers.ContentType?.MediaType ?? "application/json";
+
+                // Check if it's JSON and try to validate
+                if (contentType.Contains("json"))
+                {
+                    try
+                    {
+                        // Try to parse as JSON to validate
+                        var jsonObj = System.Text.Json.JsonDocument.Parse(responseString);
+                        return Content(responseString, "application/json");
+                    }
+                    catch (System.Text.Json.JsonException)
+                    {
+                        _logger.LogWarning("Response claimed to be JSON but failed to parse");
+                        // If JSON parsing fails, return raw content
+                        return Content(responseString, contentType);
+                    }
+                }
                 
-                try
-                {
-                    if (responseContentType?.Contains("json") == true || 
-                        (string.IsNullOrEmpty(responseContentType) && IsValidJson(responseBody)))
-                    {
-                        // Parse JSON response
-                        var jsonResponse = JsonSerializer.Deserialize<object>(responseBody);
-                        return StatusCode((int)response.StatusCode, jsonResponse);
-                    }
-                    else if (responseContentType?.Contains("xml") == true)
-                    {
-                        // Return XML as is with correct content type
-                        return Content(responseBody, "application/xml", Encoding.UTF8);
-                    }
-                    else
-                    {
-                        // Return other content types as is
-                        return Content(responseBody, responseContentType ?? "text/plain", Encoding.UTF8);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Error parsing response content. Returning as plain text.");
-                    return Content(responseBody, "text/plain", Encoding.UTF8);
-                }
+                // For non-JSON responses, return as is with original content type
+                return Content(responseString, contentType);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error forwarding request to local endpoint");
-                return Error("Internal server error", 500);
+                _logger.LogError($"Error in proxy: {ex}");
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    new { success = false, message = $"Internal server error: {ex.Message}" });
             }
         }
 
-        private static HttpMethod ParseHttpMethod(string method)
+        protected new bool ValidateApiKey()
         {
-            return method.ToUpper() switch
-            {
-                "GET" => HttpMethod.Get,
-                "POST" => HttpMethod.Post,
-                "PUT" => HttpMethod.Put,
-                "DELETE" => HttpMethod.Delete,
-                "PATCH" => HttpMethod.Patch,
-                _ => HttpMethod.Post
-            };
-        }
-
-        private static bool IsValidJson(string content)
-        {
-            try
-            {
-                JsonDocument.Parse(content);
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
+            // Adjust to your real validation logic
+            var apiKey = Request.Headers["x-api-key"].FirstOrDefault() ?? string.Empty;
+            return !string.IsNullOrEmpty(apiKey) && apiKey == "7ca7427b418bdbd0b3b23d7debf69bf7";
         }
     }
-
-    public class ProxyRequest
-    {
-        public required string Endpoint { get; set; }
-        public object? Data { get; set; }
-        public string? Method { get; set; }
-        public string? ContentType { get; set; }
-        public Dictionary<string, string>? Headers { get; set; }
-    }
-} 
+}

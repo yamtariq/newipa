@@ -13,7 +13,6 @@ import 'loans_page.dart';
 import 'account_page.dart';
 import 'cards_page_ar.dart';
 import 'loans_page_ar.dart';
-import 'account_page_ar.dart';
 import 'main_page.dart';
 import 'map_with_branches.dart';
 import '../utils/constants.dart';

@@ -33,8 +33,7 @@ namespace NayifatAPI.Controllers
                 var config = await _context.MasterConfigs
                     .FirstOrDefaultAsync(c => 
                         c.Page == request.Page && 
-                        c.KeyName == request.KeyName && 
-                        c.IsActive);
+                        c.KeyName == request.KeyName);
 
                 if (config == null)
                 {
@@ -44,6 +43,19 @@ namespace NayifatAPI.Controllers
                 // Special handling for different content types
                 switch (request.Page.ToLower())
                 {
+                    case "home":
+                        switch (request.KeyName)
+                        {
+                            case "slideshow_content":
+                            case "slideshow_content_ar":
+                                return Success(new { slides = ParseJsonContent(config.Value) });
+
+                            case "contact_details":
+                            case "contact_details_ar":
+                                return Success(new { contact = ParseJsonContent(config.Value) });
+                        }
+                        break;
+
                     case "loans":
                         if (request.KeyName == "loan_ad")
                         {
@@ -55,19 +67,6 @@ namespace NayifatAPI.Controllers
                         if (request.KeyName == "card_ad")
                         {
                             return Success(new { ads = ParseJsonContent(config.Value) });
-                        }
-                        break;
-
-                    case "home":
-                        switch (request.KeyName)
-                        {
-                            case "slideshow_content":
-                            case "slideshow_content_ar":
-                                return Success(new { slides = ParseJsonContent(config.Value) });
-
-                            case "contact_details":
-                            case "contact_details_ar":
-                                return Success(new { contact = ParseJsonContent(config.Value) });
                         }
                         break;
                 }

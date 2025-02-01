@@ -50,7 +50,7 @@ namespace NayifatAPI.Migrations
 
                     b.HasKey("Key");
 
-                    b.ToTable("ApiKeys");
+                    b.ToTable("ApiKeys", (string)null);
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.AuthLog", b =>
@@ -94,7 +94,7 @@ namespace NayifatAPI.Migrations
 
                     b.HasIndex("NationalId", "CreatedAt");
 
-                    b.ToTable("AuthLogs");
+                    b.ToTable("AuthLogs", (string)null);
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.CitizenAddressListItem", b =>
@@ -147,7 +147,7 @@ namespace NayifatAPI.Migrations
 
                     b.HasIndex("YakeenCitizenAddressId");
 
-                    b.ToTable("CitizenAddressListItem");
+                    b.ToTable("CitizenAddressListItem", (string)null);
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.Customer", b =>
@@ -267,7 +267,7 @@ namespace NayifatAPI.Migrations
 
                     b.HasKey("NationalId");
 
-                    b.ToTable("Customers");
+                    b.ToTable("Customers", (string)null);
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.CustomerDevice", b =>
@@ -324,7 +324,7 @@ namespace NayifatAPI.Migrations
                     b.HasIndex("NationalId", "DeviceId")
                         .IsUnique();
 
-                    b.ToTable("Customer_Devices");
+                    b.ToTable("Customer_Devices", (string)null);
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.MasterConfig", b =>
@@ -363,7 +363,7 @@ namespace NayifatAPI.Migrations
                     b.HasIndex("Page", "KeyName")
                         .IsUnique();
 
-                    b.ToTable("master_config");
+                    b.ToTable("master_config", (string)null);
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.OtpCode", b =>
@@ -412,7 +412,7 @@ namespace NayifatAPI.Migrations
 
                     b.HasIndex("NationalId", "Type", "IsUsed");
 
-                    b.ToTable("OTP_Codes");
+                    b.ToTable("OTP_Codes", (string)null);
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.UserNotification", b =>
@@ -464,7 +464,7 @@ namespace NayifatAPI.Migrations
 
                     b.HasIndex("NationalId", "IsRead");
 
-                    b.ToTable("User_Notifications");
+                    b.ToTable("User_Notifications", (string)null);
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.YakeenCitizenAddress", b =>
@@ -497,7 +497,7 @@ namespace NayifatAPI.Migrations
 
                     b.HasIndex("IqamaNumber");
 
-                    b.ToTable("YakeenCitizenAddress");
+                    b.ToTable("YakeenCitizenAddress", (string)null);
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.YakeenCitizenInfo", b =>
@@ -625,7 +625,7 @@ namespace NayifatAPI.Migrations
 
                     b.HasIndex("IqamaNumber");
 
-                    b.ToTable("YakeenCitizenInfo");
+                    b.ToTable("YakeenCitizenInfo", (string)null);
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.AuthLog", b =>

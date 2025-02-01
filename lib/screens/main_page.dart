@@ -38,7 +38,6 @@ import 'auth/sign_in_page_ar.dart';
 import 'loan_calculator_page_ar.dart';
 import 'cards_page_ar.dart';
 import 'loans_page_ar.dart';
-import 'account_page_ar.dart';
 import 'application_landing_screen.dart';
 import 'splash_screen.dart';
 

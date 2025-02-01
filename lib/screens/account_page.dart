@@ -13,7 +13,6 @@ import 'loans_page.dart';
 import 'cards_page_ar.dart';
 import 'loans_page_ar.dart';
 import '../screens/main_page.dart';
-import 'account_page_ar.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
@@ -502,11 +501,8 @@ class _AccountPageState extends State<AccountPage> {
 
       // Generate OTP
       final otpResponse = await http.post(
-        Uri.parse('${AuthService.baseUrl}/otp_generate.php'),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'api-key': AuthService.apiKey,
-        },
+        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPGenerate}'),
+        headers: Constants.authHeaders,
         body: {
           'national_id': nationalId,
           'type': 'change_password',
@@ -542,11 +538,8 @@ class _AccountPageState extends State<AccountPage> {
           isArabic: widget.isArabic,
           onResendOTP: () async {
             final response = await http.post(
-              Uri.parse('${AuthService.baseUrl}/otp_generate.php'),
-              headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'api-key': AuthService.apiKey,
-              },
+              Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPGenerate}'),
+              headers: Constants.authHeaders,
               body: {
                 'national_id': nationalId,
                 'type': 'change_password',
@@ -556,11 +549,8 @@ class _AccountPageState extends State<AccountPage> {
           },
           onVerifyOTP: (otp) async {
             final response = await http.post(
-              Uri.parse('${AuthService.baseUrl}/otp_verification.php'),
-              headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'api-key': AuthService.apiKey,
-              },
+              Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPVerification}'),
+              headers: Constants.authHeaders,
               body: {
                 'national_id': nationalId,
                 'otp_code': otp,
@@ -576,11 +566,8 @@ class _AccountPageState extends State<AccountPage> {
 
       // Change password
       final response = await http.post(
-        Uri.parse('${AuthService.baseUrl}/password_change.php'),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'api-key': AuthService.apiKey,
-        },
+        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointPasswordChange}'),
+        headers: Constants.authHeaders,
         body: {
           'national_id': nationalId,
           'new_password': result['newPassword'],

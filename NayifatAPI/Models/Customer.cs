@@ -62,6 +62,16 @@ namespace NayifatAPI.Models
         public string? Sector { get; set; }
         public string? Employer { get; set; }
 
+        // Additional properties for filtering
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal? Salary { get; set; }
+        
+        public string? EmploymentStatus { get; set; }
+        
+        public string? EmployerName { get; set; }
+        
+        public string? Language { get; set; }
+
         // Security
         [Required]
         public required string Password { get; set; }
@@ -88,6 +98,8 @@ namespace NayifatAPI.Models
         public virtual ICollection<UserNotification> Notifications { get; set; } = new List<UserNotification>();
         public virtual ICollection<OtpCode> OtpCodes { get; set; } = new List<OtpCode>();
         public virtual ICollection<AuthLog> AuthLogs { get; set; } = new List<AuthLog>();
+        public virtual ICollection<LoanApplication> LoanApplications { get; set; } = new List<LoanApplication>();
+        public virtual ICollection<CardApplication> CardApplications { get; set; } = new List<CardApplication>();
 
         // Computed Properties
         [NotMapped]

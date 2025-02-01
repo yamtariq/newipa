@@ -1,13 +1,27 @@
 workflows:
   ios-workflow:
     name: iOS Workflow
+    max_build_duration: 120
+    instance_type: mac_mini_m2
     environment:
       flutter: stable
       xcode: latest
       cocoapods: 1.13.0
       vars:
         BUNDLE_ID: "com.nayifat.app2025"
+        XCODE_WORKSPACE: "Runner.xcworkspace"
+        XCODE_SCHEME: "Runner"
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.nayifat.app2025
+    cache:
+      cache_paths:
+        - ~/.pub-cache
+        - vendor/bundle
     scripts:
+      - name: Set up code signing settings
+        script: |
+          xcode-project use-profiles
       - name: Get Flutter packages
         script: |
           flutter clean
@@ -15,12 +29,37 @@ workflows:
       - name: Install CocoaPods dependencies
         script: |
           cd ios
+          pod repo update
           pod cache clean --all
+          rm -rf Pods
+          rm -rf Podfile.lock
           pod install
+      - name: Flutter analyze
+        script: |
+          flutter analyze
+      - name: Flutter unit tests
+        script: |
+          flutter test
       - name: Build iOS
         script: |
-          flutter build ios --release --no-codesign
+          flutter build ios --release
+          cd ios
+          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release clean archive -archivePath build/Runner.xcarchive
+          xcodebuild -exportArchive -archivePath build/Runner.xcarchive -exportOptionsPlist exportOptions.plist -exportPath build/ios/ipa
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
       - flutter_drive.log
+    publishing:
+      email:
+        recipients:
+          - developers@nayifat.com
+        notify:
+          success: true
+          failure: true
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - Nayifat Beta Testers
+        submit_to_app_store: false

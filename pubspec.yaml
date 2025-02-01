@@ -44,6 +44,7 @@ dependencies:
   path_provider: ^2.1.5
   permission_handler: ^11.0.1
   libphonenumber_plugin: ^0.3.3 
+  jhijri: ^1.0.0
 
 dev_dependencies:
   flutter_test:

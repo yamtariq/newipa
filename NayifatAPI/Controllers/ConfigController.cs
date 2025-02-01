@@ -24,7 +24,7 @@ namespace NayifatAPI.Controllers
             try
             {
                 var configs = await _context.MasterConfigs
-                    .Where(c => c.Page == page && c.IsActive)
+                    .Where(c => c.Page == page)
                     .ToDictionaryAsync(c => c.KeyName, c => c.Value);
 
                 return Success(configs);
@@ -42,7 +42,7 @@ namespace NayifatAPI.Controllers
             try
             {
                 var config = await _context.MasterConfigs
-                    .FirstOrDefaultAsync(c => c.Page == page && c.KeyName == keyName && c.IsActive);
+                    .FirstOrDefaultAsync(c => c.Page == page && c.KeyName == keyName);
 
                 if (config == null)
                 {
@@ -73,16 +73,14 @@ namespace NayifatAPI.Controllers
                         Page = request.Page,
                         KeyName = request.KeyName,
                         Value = request.Value,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow,
-                        IsActive = true
+                        LastUpdated = DateTime.UtcNow
                     };
                     _context.MasterConfigs.Add(config);
                 }
                 else
                 {
                     config.Value = request.Value;
-                    config.UpdatedAt = DateTime.UtcNow;
+                    config.LastUpdated = DateTime.UtcNow;
                 }
 
                 await _context.SaveChangesAsync();
@@ -109,8 +107,7 @@ namespace NayifatAPI.Controllers
                     return Failure("Configuration not found", 404);
                 }
 
-                config.IsActive = false;
-                config.UpdatedAt = DateTime.UtcNow;
+                _context.MasterConfigs.Remove(config);
                 await _context.SaveChangesAsync();
 
                 return Success();

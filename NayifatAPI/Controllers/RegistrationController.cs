@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using NayifatAPI.Data;
 using NayifatAPI.Models;
+using System.Text.Json;
 
 namespace NayifatAPI.Controllers
 {
@@ -32,20 +33,28 @@ namespace NayifatAPI.Controllers
         }
 
         [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] UserRegistrationRequest request)
+        public async Task<IActionResult> Register([FromBody] object request)
         {
             if (!ValidateApiKey())
             {
                 return Error("Invalid API key", 401);
             }
 
+            UserRegistrationRequest? registrationRequest = null;
             try
             {
-                // Check if this is just an ID check
-                if (request.CheckOnly)
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+
+                // Deserialize as IdCheckRequest first to check if it's an ID check
+                var idCheckRequest = JsonSerializer.Deserialize<IdCheckRequest>(request.ToString()!, options);
+                
+                if (idCheckRequest?.CheckOnly == true)
                 {
                     var exists = await _context.Customers
-                        .AnyAsync(c => c.NationalId == request.NationalId);
+                        .AnyAsync(c => c.NationalId == idCheckRequest.NationalId);
 
                     if (exists)
                     {
@@ -55,9 +64,16 @@ namespace NayifatAPI.Controllers
                     return Success(new { message = "ID available" });
                 }
 
+                // If not an ID check, process as full registration
+                registrationRequest = JsonSerializer.Deserialize<UserRegistrationRequest>(request.ToString()!, options);
+                if (registrationRequest == null)
+                {
+                    return Error("Invalid request data", 400);
+                }
+
                 // Regular registration flow
                 var customerExists = await _context.Customers
-                    .AnyAsync(c => c.NationalId == request.NationalId);
+                    .AnyAsync(c => c.NationalId == registrationRequest.NationalId);
 
                 if (customerExists)
                 {
@@ -72,48 +88,48 @@ namespace NayifatAPI.Controllers
                     // Create customer record
                     var customer = new Customer
                     {
-                        NationalId = request.NationalId,
-                        FirstNameEn = request.FirstNameEn,
-                        SecondNameEn = request.SecondNameEn,
-                        ThirdNameEn = request.ThirdNameEn ?? string.Empty,
-                        FamilyNameEn = request.FamilyNameEn,
-                        FirstNameAr = request.FirstNameAr,
-                        SecondNameAr = request.SecondNameAr,
-                        ThirdNameAr = request.ThirdNameAr ?? string.Empty,
-                        FamilyNameAr = request.FamilyNameAr,
-                        Email = request.Email,
-                        Password = HashPassword(request.Password),
-                        Phone = request.Phone,
-                        DateOfBirth = request.DateOfBirth,
-                        IdExpiryDate = request.IdExpiryDate,
-                        BuildingNo = request.BuildingNo,
-                        Street = request.Street,
-                        District = request.District ?? string.Empty,
-                        City = request.City ?? string.Empty,
-                        Zipcode = request.Zipcode ?? string.Empty,
-                        AddNo = request.AddNo ?? string.Empty,
-                        Iban = request.Iban ?? string.Empty,
-                        Dependents = request.Dependents,
-                        SalaryDakhli = request.SalaryDakhli,
-                        SalaryCustomer = request.SalaryCustomer,
-                        Los = request.Los,
-                        Sector = request.Sector ?? string.Empty,
-                        Employer = request.Employer ?? string.Empty,
+                        NationalId = registrationRequest.NationalId,
+                        FirstNameEn = registrationRequest.FirstNameEn,
+                        SecondNameEn = registrationRequest.SecondNameEn,
+                        ThirdNameEn = registrationRequest.ThirdNameEn ?? string.Empty,
+                        FamilyNameEn = registrationRequest.FamilyNameEn,
+                        FirstNameAr = registrationRequest.FirstNameAr,
+                        SecondNameAr = registrationRequest.SecondNameAr,
+                        ThirdNameAr = registrationRequest.ThirdNameAr ?? string.Empty,
+                        FamilyNameAr = registrationRequest.FamilyNameAr,
+                        Email = registrationRequest.Email,
+                        Password = HashPassword(registrationRequest.Password),
+                        Phone = registrationRequest.Phone,
+                        DateOfBirth = registrationRequest.DateOfBirth,
+                        IdExpiryDate = registrationRequest.IdExpiryDate,
+                        BuildingNo = registrationRequest.BuildingNo,
+                        Street = registrationRequest.Street,
+                        District = registrationRequest.District ?? string.Empty,
+                        City = registrationRequest.City ?? string.Empty,
+                        Zipcode = registrationRequest.Zipcode ?? string.Empty,
+                        AddNo = registrationRequest.AddNo ?? string.Empty,
+                        Iban = registrationRequest.Iban ?? string.Empty,
+                        Dependents = registrationRequest.Dependents,
+                        SalaryDakhli = registrationRequest.SalaryDakhli,
+                        SalaryCustomer = registrationRequest.SalaryCustomer,
+                        Los = registrationRequest.Los,
+                        Sector = registrationRequest.Sector ?? string.Empty,
+                        Employer = registrationRequest.Employer ?? string.Empty,
                         RegistrationDate = DateTime.UtcNow,
-                        Consent = request.Consent,
-                        ConsentDate = request.Consent ? DateTime.UtcNow : null,
-                        NafathStatus = request.NafathStatus ?? string.Empty,
-                        NafathTimestamp = request.NafathStatus != null ? DateTime.UtcNow : null
+                        Consent = registrationRequest.Consent,
+                        ConsentDate = registrationRequest.Consent ? DateTime.UtcNow : null,
+                        NafathStatus = registrationRequest.NafathStatus ?? string.Empty,
+                        NafathTimestamp = registrationRequest.NafathStatus != null ? DateTime.UtcNow : null
                     };
 
                     _context.Customers.Add(customer);
 
                     // Handle device registration if provided
-                    if (request.DeviceInfo != null)
+                    if (registrationRequest.DeviceInfo != null)
                     {
                         // Disable any existing devices
                         await _context.CustomerDevices
-                            .Where(d => d.NationalId == request.NationalId)
+                            .Where(d => d.NationalId == registrationRequest.NationalId)
                             .ExecuteUpdateAsync(s => s
                                 .SetProperty(d => d.Status, "disabled")
                                 .SetProperty(d => d.LastUsedAt, DateTime.UtcNow));
@@ -121,11 +137,11 @@ namespace NayifatAPI.Controllers
                         // Register new device
                         var device = new CustomerDevice
                         {
-                            NationalId = request.NationalId,
-                            DeviceId = request.DeviceInfo.DeviceId,
-                            Platform = request.DeviceInfo.Platform,
-                            Model = request.DeviceInfo.Model,
-                            Manufacturer = request.DeviceInfo.Manufacturer,
+                            NationalId = registrationRequest.NationalId,
+                            DeviceId = registrationRequest.DeviceInfo.DeviceId,
+                            Platform = registrationRequest.DeviceInfo.Platform,
+                            Model = registrationRequest.DeviceInfo.Model,
+                            Manufacturer = registrationRequest.DeviceInfo.Manufacturer,
                             BiometricEnabled = true,
                             Status = "active",
                             CreatedAt = DateTime.UtcNow,
@@ -137,8 +153,8 @@ namespace NayifatAPI.Controllers
                         // Log device registration
                         var authLog = new AuthLog
                         {
-                            NationalId = request.NationalId,
-                            DeviceId = request.DeviceInfo.DeviceId,
+                            NationalId = registrationRequest.NationalId,
+                            DeviceId = registrationRequest.DeviceInfo.DeviceId,
                             AuthType = "device_registration",
                             Status = "success",
                             IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
@@ -169,7 +185,7 @@ namespace NayifatAPI.Controllers
                         }
                     };
 
-                    if (request.DeviceInfo != null)
+                    if (registrationRequest.DeviceInfo != null)
                     {
                         return Success(new
                         {
@@ -191,15 +207,15 @@ namespace NayifatAPI.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during registration for National ID: {NationalId}", request.NationalId);
+                _logger.LogError(ex, "Error during registration for National ID: {NationalId}", registrationRequest?.NationalId);
 
                 // Log registration failure if device info was provided
-                if (request.DeviceInfo != null)
+                if (registrationRequest?.DeviceInfo != null)
                 {
                     var authLog = new AuthLog
                     {
-                        NationalId = request.NationalId,
-                        DeviceId = request.DeviceInfo.DeviceId,
+                        NationalId = registrationRequest.NationalId,
+                        DeviceId = registrationRequest.DeviceInfo.DeviceId,
                         AuthType = "device_registration",
                         Status = "failed",
                         IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
@@ -263,5 +279,12 @@ namespace NayifatAPI.Controllers
         public required string Platform { get; set; }
         public required string Model { get; set; }
         public required string Manufacturer { get; set; }
+    }
+
+    public class IdCheckRequest
+    {
+        public bool CheckOnly { get; set; }
+        public required string NationalId { get; set; }
+        public required DeviceInfo DeviceInfo { get; set; }
     }
 } 

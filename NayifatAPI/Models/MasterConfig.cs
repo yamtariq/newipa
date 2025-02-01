@@ -9,25 +9,19 @@ namespace NayifatAPI.Models
     public class MasterConfig
     {
         [Key]
-        public int Id { get; set; }
-        
-        [Required]
-        public required string Page { get; set; }
-        
-        [Required]
-        public required string KeyName { get; set; }
-        
-        [Required]
-        [Column(TypeName = "nvarchar(max)")]
-        public required string Value { get; set; }
-        
-        public required bool IsActive { get; set; } = true;
-        
-        public required DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        
-        public DateTime? UpdatedAt { get; set; }
-        
-        [NotMapped]
-        public bool IsValid => !string.IsNullOrEmpty(Value) && IsActive;
+        [Column("config_id")]
+        public int ConfigId { get; set; }
+
+        [Column("page")]
+        public string Page { get; set; } = string.Empty;
+
+        [Column("key_name")]
+        public string KeyName { get; set; } = string.Empty;
+
+        [Column("value")]
+        public string Value { get; set; } = string.Empty;
+
+        [Column("last_updated")]
+        public DateTime LastUpdated { get; set; }
     }
 } 

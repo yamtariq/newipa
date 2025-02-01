@@ -4,10 +4,13 @@
 
 - **Code Modification Practices**  
   Focus edits only on parts relevant to the issue.  
-  Preserve all unrelated sections untouched.
+  please plase please Preserve all unrelated sections untouched.
   when running commands, use powershell when possible as I'm using windows only.
   when running multiple commands, don't use "&&", use ";" only when necessary.
 - 
 - **Response Protocol**  
-  Start replies with a robot emoji (🤖).  
+  Start replies with a brain emoji (🧠).  
   Demonstrate you followed these guidelines.
+  Please never assume anything or any data, always check the codebase for the information you need and if not found then ask the user for the information you need. 
+  Please always use the correct data type for the data you are working with.
+

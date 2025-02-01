@@ -10,79 +10,221 @@ class RegistrationService {
   // Check if user exists and validate identity
   Future<Map<String, dynamic>> validateIdentity(String id, String phone) async {
     try {
-      final response = await http.post(
-        Uri.parse('${Constants.authBaseUrl}${Constants.endpointValidateIdentity}'),
-        headers: Constants.authHeaders,
+      print('Checking if ID already registered...');
+      
+      // Get device info
+      final deviceInfo = await _getDeviceInfo();
+      
+      // First, check if ID is already registered
+      final checkResponse = await http.post(
+        Uri.parse('${Constants.apiBaseUrl}/Registration/register'),
+        headers: Constants.defaultHeaders,
         body: json.encode({
-          'id': id,
-          'phone': phone,
+          'checkOnly': true,
+          'nationalId': id,
+          'deviceInfo': deviceInfo
         }),
       );
 
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
+      print('Check registration response: ${checkResponse.statusCode}');
+      print('Check registration body: ${checkResponse.body}');
+
+      if (checkResponse.statusCode == 200) {
+        final checkResult = json.decode(checkResponse.body);
+        
+        // If user is already registered
+        if (checkResult['isRegistered'] == true) {
+          return {
+            'status': 'error',
+            'message': 'This ID is already registered'
+          };
+        }
+        
+        // If not registered, proceed with validation
+        return {
+          'status': 'success',
+          'message': 'ID is valid and not registered'
+        };
       }
-      return {'status': 'error', 'message': 'Failed to validate identity'};
+      
+      // Add more detailed error information
+      if (checkResponse.statusCode == 400) {
+        final errorResponse = json.decode(checkResponse.body);
+        return {
+          'status': 'error',
+          'message': errorResponse['error'] ?? 'Failed to validate identity',
+          'details': 'Status code: ${checkResponse.statusCode}, Body: ${checkResponse.body}'
+        };
+      }
+      
+      return {
+        'status': 'error',
+        'message': 'Failed to validate identity. Please try again later.',
+        'details': 'Status code: ${checkResponse.statusCode}'
+      };
     } catch (e) {
-      return {'status': 'error', 'message': e.toString()};
+      print('Error validating identity: $e');
+      return {
+        'status': 'error',
+        'message': 'Connection error. Please check your internet connection.'
+      };
     }
   }
 
   // Generate OTP
-  Future<Map<String, dynamic>> generateOTP(String nationalId) async {
+  Future<Map<String, dynamic>> generateOTP(String nationalId, {String? mobileNo}) async {
     try {
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPGenerate}'),
-        headers: Constants.authFormHeaders,
-        body: {
-          'national_id': nationalId,
-        },
-      );
+      print('\n=== GENERATE OTP REQUEST ===');
+      final url = '${Constants.apiBaseUrl}/proxy/forward?url=${Constants.proxyOtpGenerateUrl}';
+      print('URL: $url');
+      
+      // Format phone number: Add 966 prefix and remove any existing prefix
+      final formattedPhone = mobileNo != null 
+          ? '966${mobileNo.replaceAll('+', '').replaceAll('966', '')}'
+          : '';
+      
+      final headers = Constants.defaultHeaders;
+      print('Headers: $headers');
+      
+      final requestBody = Constants.otpGenerateRequestBody(nationalId, formattedPhone);
+      print('Request Body: ${json.encode(requestBody)}');
 
-      print('OTP Response: ${response.body}');
+      // Create a client that follows redirects
+      final client = http.Client();
+      try {
+        final response = await client.post(
+          Uri.parse(url),
+          headers: headers,
+          body: json.encode(requestBody),
+        );
 
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
+        print('\n=== GENERATE OTP RESPONSE ===');
+        print('Status Code: ${response.statusCode}');
+        print('Response Headers: ${response.headers}');
+        print('Response Body: ${response.body}');
+
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          print('Parsed Response Data: $data');
+          
+          if (data['success'] == true) {
+            print('OTP Generation Successful');
+            final successResponse = {
+              'status': 'success',
+              'message': 'OTP sent successfully',
+              'message_ar': 'تم إرسال رمز التحقق بنجاح',
+              'data': data['result']
+            };
+            print('Returning Success Response: $successResponse');
+            return successResponse;
+          }
+          
+          print('OTP Generation Failed with Error: ${data['message']}');
+          final errorResponse = {
+            'status': 'error',
+            'message': data['message'] ?? 'Failed to generate OTP',
+            'message_ar': 'فشل في إرسال رمز التحقق'
+          };
+          print('Returning Error Response: $errorResponse');
+          return errorResponse;
+        }
+
+        print('HTTP Request Failed with Status: ${response.statusCode}');
+        return {
+          'status': 'error',
+          'message': 'Failed to generate OTP',
+          'message_ar': 'فشل في إرسال رمز التحقق'
+        };
+      } finally {
+        client.close();
       }
-      return {
-        'status': 'error',
-        'message': 'Failed to generate OTP',
-      };
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('\n=== GENERATE OTP ERROR ===');
+      print('Error: $e');
+      print('Stack Trace: $stackTrace');
       return {
         'status': 'error',
         'message': e.toString(),
+        'message_ar': 'حدث خطأ أثناء إرسال رمز التحقق'
       };
+    } finally {
+      print('=== END GENERATE OTP ===\n');
     }
   }
 
   // Verify OTP
-  Future<Map<String, dynamic>> verifyOTP(
-      String nationalId, String otpCode) async {
+  Future<Map<String, dynamic>> verifyOTP(String nationalId, String otpCode) async {
     try {
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPVerification}'),
-        headers: Constants.authFormHeaders,
-        body: {
-          'national_id': nationalId.trim(),
-          'otp_code': otpCode.trim(),
-        },
-      );
+      print('\n=== VERIFY OTP REQUEST ===');
+      final url = '${Constants.apiBaseUrl}/proxy/forward?url=${Constants.proxyOtpVerifyUrl}';
+      print('URL: $url');
+      
+      final headers = Constants.defaultHeaders;
+      print('Headers: $headers');
+      
+      final requestBody = Constants.otpVerifyRequestBody(nationalId, otpCode);
+      print('Request Body: ${json.encode(requestBody)}');
 
-      print('Verify OTP Response: ${response.body}');
+      // Create a client that follows redirects
+      final client = http.Client();
+      try {
+        final response = await client.post(
+          Uri.parse(url),
+          headers: headers,
+          body: json.encode(requestBody),
+        );
 
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
+        print('\n=== VERIFY OTP RESPONSE ===');
+        print('Status Code: ${response.statusCode}');
+        print('Response Headers: ${response.headers}');
+        print('Response Body: ${response.body}');
+
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          print('Parsed Response Data: $data');
+          
+          if (data['success'] == true) {
+            print('OTP Verification Successful');
+            final successResponse = {
+              'status': 'success',
+              'message': 'OTP verified successfully',
+              'message_ar': 'تم التحقق من رمز التحقق بنجاح',
+              'data': data['result']
+            };
+            print('Returning Success Response: $successResponse');
+            return successResponse;
+          }
+          
+          print('OTP Verification Failed with Error: ${data['message']}');
+          final errorResponse = {
+            'status': 'error',
+            'message': data['message'] ?? 'Failed to verify OTP',
+            'message_ar': 'فشل في التحقق من رمز التحقق'
+          };
+          print('Returning Error Response: $errorResponse');
+          return errorResponse;
+        }
+
+        print('HTTP Request Failed with Status: ${response.statusCode}');
+        return {
+          'status': 'error',
+          'message': 'Failed to verify OTP',
+          'message_ar': 'فشل في التحقق من رمز التحقق'
+        };
+      } finally {
+        client.close();
       }
-      return {
-        'status': 'error',
-        'message': 'Failed to verify OTP',
-      };
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('\n=== VERIFY OTP ERROR ===');
+      print('Error: $e');
+      print('Stack Trace: $stackTrace');
       return {
         'status': 'error',
         'message': e.toString(),
+        'message_ar': 'حدث خطأ أثناء التحقق من رمز التحقق'
       };
+    } finally {
+      print('=== END VERIFY OTP ===\n');
     }
   }
 
@@ -90,10 +232,10 @@ class RegistrationService {
   Future<Map<String, dynamic>> setPassword(String id, String password) async {
     try {
       final response = await http.post(
-        Uri.parse('${Constants.authBaseUrl}${Constants.endpointSetPassword}'),
-        headers: Constants.authHeaders,
+        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointSetPassword}'),
+        headers: Constants.defaultHeaders,
         body: json.encode({
-          'id': id,
+          'national_id': id,
           'password': password,
         }),
       );
@@ -101,9 +243,15 @@ class RegistrationService {
       if (response.statusCode == 200) {
         return json.decode(response.body);
       }
-      return {'status': 'error', 'message': 'Failed to set password'};
+      return {
+        'status': 'error',
+        'message': 'Failed to set password'
+      };
     } catch (e) {
-      return {'status': 'error', 'message': e.toString()};
+      return {
+        'status': 'error',
+        'message': e.toString()
+      };
     }
   }
 
@@ -111,10 +259,10 @@ class RegistrationService {
   Future<Map<String, dynamic>> setMPIN(String id, String mpin) async {
     try {
       final response = await http.post(
-        Uri.parse('${Constants.authBaseUrl}${Constants.endpointSetQuickAccessPin}'),
-        headers: Constants.authHeaders,
+        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointSetQuickAccessPin}'),
+        headers: Constants.defaultHeaders,
         body: json.encode({
-          'id': id,
+          'national_id': id,
           'mpin': mpin,
         }),
       );
@@ -122,47 +270,110 @@ class RegistrationService {
       if (response.statusCode == 200) {
         return json.decode(response.body);
       }
-      return {'status': 'error', 'message': 'Failed to set MPIN'};
+      return {
+        'status': 'error',
+        'message': 'Failed to set MPIN'
+      };
     } catch (e) {
-      return {'status': 'error', 'message': e.toString()};
+      return {
+        'status': 'error',
+        'message': e.toString()
+      };
     }
   }
 
   // Check if user is already registered
   Future<Map<String, dynamic>> checkRegistration(String nationalId) async {
     try {
+      final url = Uri.parse('${Constants.apiBaseUrl}${Constants.endpointRegistration}');
+      
+      // Get device info for the request
+      final deviceInfo = await _getDeviceInfo();
+
+      final requestBody = {
+        'checkOnly': true,
+        'nationalId': nationalId,
+        'deviceInfo': deviceInfo
+      };
+
+      print('Registration Check URL: $url');
+      print('Registration Check Headers: ${Constants.defaultHeaders}');
+      print('Registration Check Body: ${json.encode(requestBody)}');
+
       final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointUserRegistration}'),
-        headers: Constants.userHeaders,
-        body: json.encode({
-          'national_id': nationalId,
-          'check_only': true
-        }),
+        url,
+        headers: Constants.defaultHeaders,
+        body: json.encode(requestBody),
       );
+
+      print('Registration Check Status Code: ${response.statusCode}');
+      print('Registration Check Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         return json.decode(response.body);
       }
-      return {'status': 'error', 'message': 'Failed to check registration'};
+      
+      // Add more detailed error information
+      if (response.statusCode == 400) {
+        final errorResponse = json.decode(response.body);
+        return {
+          'status': 'error',
+          'message': errorResponse['error'] ?? 'ID already registered',
+          'details': 'Status code: ${response.statusCode}, Body: ${response.body}'
+        };
+      }
+      
+      return {
+        'status': 'error',
+        'message': 'Failed to check registration',
+        'details': 'Status code: ${response.statusCode}, Body: ${response.body}'
+      };
     } catch (e) {
+      print('Registration Check Error: $e');
       return {'status': 'error', 'message': e.toString()};
     }
   }
 
   // Get government data
-  Future<Map<String, dynamic>> getGovernmentData(String nationalId) async {
+  Future<Map<String, dynamic>> getGovernmentData(String nationalId, {
+    String? dateOfBirthHijri,
+    String? idExpiryDate,
+  }) async {
     try {
-      final response = await http.get(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointGetGovernmentData}?national_id=$nationalId'),
-        headers: Constants.userHeaders,
+      print('\n=== GETTING GOVERNMENT DATA ===');
+      print('National ID: $nationalId');
+      print('URL: ${Constants.apiBaseUrl}${Constants.endpointGetGovernmentData}');
+
+      final response = await http.post(
+        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointGetGovernmentData}'),
+        headers: Constants.defaultHeaders,
+        body: json.encode({
+          'iqamaNumber': nationalId,
+          'dateOfBirthHijri': dateOfBirthHijri ?? '1398-07-01',
+          'idExpiryDate': idExpiryDate ?? '1-1-1'
+        }),
       );
 
+      print('Response Status: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+
       if (response.statusCode == 200) {
-        return json.decode(response.body);
+        return {
+          'status': 'success',
+          'data': json.decode(response.body)
+        };
       }
-      return {'status': 'error', 'message': 'Failed to get government data'};
+
+      return {
+        'status': 'error',
+        'message': 'Failed to get government data'
+      };
     } catch (e) {
-      return {'status': 'error', 'message': e.toString()};
+      print('Error getting government data: $e');
+      return {
+        'status': 'error',
+        'message': e.toString()
+      };
     }
   }
 
@@ -244,6 +455,8 @@ class RegistrationService {
     required bool enableBiometric,
   }) async {
     try {
+      print('Starting complete registration...');
+      
       // Get stored registration data for email and phone
       final storedData = await getStoredRegistrationData();
       if (storedData == null) {
@@ -259,82 +472,36 @@ class RegistrationService {
       }
 
       final userData = govData['data'];
-      if (userData['full_name'] == null || userData['arabic_name'] == null) {
+      if (userData['first_name'] == null || userData['last_name'] == null) {
         print('Missing required user data from government service');
         return false;
       }
 
-      // Merge the stored email with government data
-      userData['email'] = storedData['email'];
-
       final deviceInfo = await _getDeviceInfo();
       final requestBody = {
-        'national_id': nationalId,
-        'name': userData['full_name'],
-        'arabic_name': userData['arabic_name'],
+        'nationalId': nationalId,
+        'name': '${userData['first_name']} ${userData['last_name']}',
+        'arabicName': '${userData['first_name_ar']} ${userData['last_name_ar']}',
         'email': storedData['email'] ?? '',
         'password': password,
         'phone': storedData['phone'] ?? '',
-        'dob': userData['dob'],
-        'salary': userData['salary'],
-        'employment_status': userData['employment_status'],
-        'employer_name': userData['employer_name'],
-        'employment_date': userData['employment_date'],
-        'national_address': userData['national_address'],
-        'device_info': deviceInfo,
-        // Add Nafath data if available
-        if (storedData['nafath_data'] != null) ...{
-          'nafath_status': 'COMPLETED',
-          'nafath_trans_id': storedData['nafath_data']['transId'],
-          'nafath_random': storedData['nafath_data']['random'],
-        },
+        'dateOfBirth': userData['date_of_birth_hijri'],
+        'deviceInfo': deviceInfo,
+        'checkOnly': false
       };
 
-      print('Request body: ${json.encode(requestBody)}');
+      print('Registration request body: ${json.encode(requestBody)}');
 
       final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointUserRegistration}'),
-        headers: Constants.userHeaders,
+        Uri.parse('${Constants.apiBaseUrl}/Registration/register'),
+        headers: Constants.defaultHeaders,
         body: json.encode(requestBody),
       );
 
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
+      print('Registration response status: ${response.statusCode}');
+      print('Registration response body: ${response.body}');
 
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        if (responseData['status'] == 'success') {
-          // Store MPIN and biometric settings locally
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('user_mpin', mpin);
-          await prefs.setBool('biometric_enabled', enableBiometric);
-          await prefs.setString('user_id', nationalId);
-
-          print('Complete Registration - Storing MPIN and settings:');
-          print(' - MPIN stored');
-          print(' - Biometric enabled: $enableBiometric');
-          print(' - User ID stored: $nationalId');
-
-          // Initialize secure storage and store the complete user data
-          final secureStorage = const FlutterSecureStorage();
-          
-          // Get the response user data and ensure email is included
-          final responseUserData = responseData['data'] ?? userData;
-          final finalUserData = {
-            ...responseUserData,
-            'email': storedData['email'],
-            'isSessionActive': true
-          };
-          
-          // Store in both secure storage and SharedPreferences
-          print('Complete Registration - Final User Data being stored in Secure Storage: ${json.encode(finalUserData)}');
-          await secureStorage.write(key: 'user_data', value: json.encode(finalUserData));
-          await prefs.setString('email', storedData['email'] ?? '');
-
-          return true;
-        }
-      }
-      return false;
+      return response.statusCode == 200;
     } catch (e) {
       print('Error completing registration: $e');
       return false;

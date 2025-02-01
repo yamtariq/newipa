@@ -21,6 +21,9 @@ namespace NayifatAPI.Data
         public DbSet<YakeenCitizenInfo> YakeenCitizenInfos { get; set; }
         public DbSet<YakeenCitizenAddress> YakeenCitizenAddresses { get; set; }
         public DbSet<CitizenAddressListItem> CitizenAddressListItems { get; set; }
+        public DbSet<NotificationTemplate> NotificationTemplates { get; set; }
+        public DbSet<LoanApplication> LoanApplications { get; set; }
+        public DbSet<CardApplication> CardApplications { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -51,6 +54,16 @@ namespace NayifatAPI.Data
                     .HasForeignKey(e => e.NationalId)
                     .OnDelete(DeleteBehavior.Cascade);
 
+                entity.HasMany(e => e.LoanApplications)
+                    .WithOne(la => la.Customer)
+                    .HasForeignKey(la => la.NationalId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasMany(e => e.CardApplications)
+                    .WithOne(ca => ca.Customer)
+                    .HasForeignKey(ca => ca.NationalId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
                 // Configure decimal precision
                 entity.Property(e => e.SalaryCustomer)
                     .HasColumnType("decimal(18,2)");
@@ -69,8 +82,49 @@ namespace NayifatAPI.Data
             // UserNotification configuration
             modelBuilder.Entity<UserNotification>(entity =>
             {
-                entity.HasIndex(e => e.NotificationId);
-                entity.HasIndex(e => new { e.NationalId, e.IsRead });
+                entity.HasKey(e => e.NationalId);
+                
+                entity.Property(e => e.Notifications)
+                    .HasColumnType("nvarchar(max)");
+                
+                entity.Property(e => e.LastUpdated)
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            });
+
+            // NotificationTemplate configuration
+            modelBuilder.Entity<NotificationTemplate>(entity =>
+            {
+                entity.ToTable("notification_templates");
+                
+                entity.Property(e => e.Title)
+                    .HasMaxLength(255);
+                
+                entity.Property(e => e.Body)
+                    .HasColumnType("text");
+                
+                entity.Property(e => e.TitleEn)
+                    .HasMaxLength(255);
+                
+                entity.Property(e => e.BodyEn)
+                    .HasColumnType("text");
+                
+                entity.Property(e => e.TitleAr)
+                    .HasMaxLength(255);
+                
+                entity.Property(e => e.BodyAr)
+                    .HasColumnType("nvarchar(max)");
+                
+                entity.Property(e => e.Route)
+                    .HasMaxLength(255);
+                
+                entity.Property(e => e.AdditionalData)
+                    .HasColumnType("json");
+                
+                entity.Property(e => e.TargetCriteria)
+                    .HasColumnType("json");
+                
+                entity.Property(e => e.CreatedAt)
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
             });
 
             // AuthLog configuration
@@ -90,7 +144,24 @@ namespace NayifatAPI.Data
             // MasterConfig configuration
             modelBuilder.Entity<MasterConfig>(entity =>
             {
-                entity.HasIndex(e => e.Page);
+                entity.ToTable("master_config");
+                entity.HasKey(e => e.ConfigId);
+                
+                entity.Property(e => e.ConfigId)
+                    .HasColumnName("config_id");
+                
+                entity.Property(e => e.Page)
+                    .HasColumnName("page");
+                
+                entity.Property(e => e.KeyName)
+                    .HasColumnName("key_name");
+                
+                entity.Property(e => e.Value)
+                    .HasColumnName("value");
+                
+                entity.Property(e => e.LastUpdated)
+                    .HasColumnName("last_updated");
+
                 entity.HasIndex(e => new { e.Page, e.KeyName }).IsUnique();
             });
 

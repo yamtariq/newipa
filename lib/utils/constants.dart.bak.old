@@ -1,10 +1,8 @@
 class Constants {
   // API Base URLs
-  static const bool useNewApi = true;  // Feature flag for easy switching
-  static String get apiBaseUrl => 
-      useNewApi ? 'https://8f9f-51-252-155-185.ngrok-free.app/api' : 'https://icreditdept.com/api';
-  static String get authBaseUrl => '$apiBaseUrl/auth';
-  static const String masterFetchUrl = '/content/fetch';
+  static const String apiBaseUrl = 'https://icreditdept.com/api';
+  static const String authBaseUrl = '$apiBaseUrl/auth';
+  static const String masterFetchUrl = '$apiBaseUrl/master_fetch.php';
   // Used in: ContentUpdateService (content_update_service.dart) - For fetching all dynamic content:
   // - Loan ads: page=loans&key_name=loan_ad
   // - Card ads: page=cards&key_name=card_ad
@@ -12,11 +10,6 @@ class Constants {
   // - Arabic slides: page=home&key_name=slideshow_content_ar
   // - Contact details: page=home&key_name=contact_details
   // - Arabic contact details: page=home&key_name=contact_details_ar
-
-  // Proxy Endpoints
-  static const String proxyBaseUrl = 'https://icreditdept.com/api/testasp';
-  static String get proxyOtpGenerateUrl => '$proxyBaseUrl/test_local_generate_otp.php';
-  static String get proxyOtpVerifyUrl => '$proxyBaseUrl/test_local_verify_otp.php';
 
   // API Key
   static const String apiKey = '7ca7427b418bdbd0b3b23d7debf69bf7';
@@ -28,7 +21,7 @@ class Constants {
   // Base headers without content type
   static Map<String, String> get _baseHeaders => {
     'Accept': 'application/json',
-    'x-api-key': apiKey,  // Using x-api-key header
+    'api-key': apiKey,
   };
 
   // Default headers (JSON)
@@ -66,143 +59,87 @@ class Constants {
   // Remove content_updates.php since we're using master_fetch.php
   // static const String endpointContentUpdates = '/content_updates.php';
 
-  // User Registration Endpoints
-  static const String endpointRegistration = '/Registration/register';  // New endpoint
-  static const String endpointUserRegistration = endpointRegistration; // Alias for backward compatibility
-  static const String endpointGetGovernmentData = '/Yakeen/getCitizenInfo/json';  // Correct Yakeen endpoint
-
-  /* ==========================================
-   * OLD PHP ENDPOINTS (FOR REFERENCE/FALLBACK)
-   * ==========================================
-   static const String endpointSignIn = '/signin.php';
-   static const String endpointRefreshToken = '/refresh_token.php';
-   static const String endpointVerifyCredentials = '/verify_credentials.php';
-   static const String endpointOTPGenerate = '/otp_generate.php';
-   static const String endpointOTPVerification = '/otp_verification.php';
-   static const String endpointPasswordChange = '/password_change.php';
-   static const String endpointCheckDeviceRegistration = '/check_device_registration.php';
-   static const String endpointRegisterDevice = '/register_device.php';
-   static const String endpointUnregisterDevice = '/unregister_device.php';
-   static const String endpointReplaceDevice = '/replace_device.php';
-   static const String endpointUserRegistration = '/user_registration.php';
-   static const String endpointGetGovernmentData = '/get_gov_services.php';
-   static const String endpointValidateIdentity = '/validate_identity.php';
-   static const String endpointSetPassword = '/set_password.php';
-   static const String endpointSetQuickAccessPin = '/set_quick_access_pin.php';
-   static const String endpointVerifyOtp = '/verify_otp.php';
-   static const String endpointResendOtp = '/resend_otp.php';
-   static const String endpointLoanDecision = '/api/v1/Finnone/GetCustomerCreate';
-   static const String endpointUpdateLoanApplication = '/update_loan_application.php';
-   static const String endpointCardDecision = '/cards_decision.php';
-   static const String endpointUpdateCardApplication = '/update_cards_application.php';
-   static const String endpointGetNotifications = '/get_notifications.php';
-   static const String endpointSendNotification = '/send_notification.php';
-   */
-
-  // Authentication Endpoints
-  // Old: static const String endpointSignIn = '/signin.php';
-  static const String endpointSignIn = '/auth/signin';
+  // API Endpoints
+  static const String endpointSignIn = '/signin.php';
   // Used in: AuthService (auth_service.dart) - signIn(), login(), getUserData()
 
-  // Old: static const String endpointVerifyCredentials = '/verify_credentials.php';
-  static const String endpointVerifyCredentials = '/auth/verify-credentials';
-  // Used in: AuthService (auth_service.dart) - initiateDeviceTransition()
-
-  // Old: static const String endpointRefreshToken = '/refresh_token.php';
-  static const String endpointRefreshToken = '/auth/refresh';
+  static const String endpointRefreshToken = '/refresh_token.php';
   // Used in: AuthService (auth_service.dart) - _refreshToken()
 
-  // Old: static const String endpointOTPGenerate = '/otp_generate.php';
-  static const String endpointOTPGenerate = '/auth/otp/generate';
+  static const String endpointVerifyCredentials = '/verify_credentials.php';
+  // Used in: AuthService (auth_service.dart) - initiateDeviceTransition()
+
+  static const String endpointOTPGenerate = '/otp_generate.php';
   // Used in: AuthService (auth_service.dart) - generateOTP()
   // Used in: RegistrationService (registration_service.dart) - generateOTP()
 
-  // Old: static const String endpointOTPVerification = '/otp_verification.php';
-  static const String endpointOTPVerification = '/auth/otp/verify';
+  static const String endpointOTPVerification = '/otp_verification.php';
   // Used in: AuthService (auth_service.dart) - verifyOTP()
   // Used in: RegistrationService (registration_service.dart) - verifyOTP()
 
-  // Old: static const String endpointPasswordChange = '/password_change.php';
-  static const String endpointPasswordChange = '/auth/password';
+  static const String endpointPasswordChange = '/password_change.php';
   // Used in: AuthService (auth_service.dart) - changePassword()
 
-  // Device Management
-  // Old: static const String endpointCheckDeviceRegistration = '/check_device_registration.php';
-  static const String endpointCheckDeviceRegistration = '/device/check';
+  static const String endpointCheckDeviceRegistration = '/check_device_registration.php';
   // Used in: AuthService (auth_service.dart) - checkDeviceRegistration(), validateDeviceRegistration()
 
-  // Old: static const String endpointRegisterDevice = '/register_device.php';
-  static const String endpointRegisterDevice = '/device';
+  static const String endpointRegisterDevice = '/register_device.php';
   // Used in: AuthService (auth_service.dart) - registerDevice(), initiateDeviceTransition()
   // Used in: NotificationService (notification_service.dart) - registerDevice()
 
-  // Old: static const String endpointUnregisterDevice = '/unregister_device.php';
-  static const String endpointUnregisterDevice = '/device/unregister';
+  static const String endpointUnregisterDevice = '/unregister_device.php';
   // Used in: AuthService (auth_service.dart) - signOutDevice(), unregisterCurrentDevice()
 
-  // Old: static const String endpointReplaceDevice = '/replace_device.php';
-  static const String endpointReplaceDevice = '/device/replace';
+  static const String endpointReplaceDevice = '/replace_device.php';
   // Used in: AuthService (auth_service.dart) - replaceDevice()
 
-  // User Registration
-  // Old: static const String endpointUserRegistration = '/user_registration.php';
-  // static const String endpointRegistration = '/registration/register';  // Base endpoint for registration
+  static const String endpointUserRegistration = '/user_registration.php';
   // Used in: AuthService (auth_service.dart) - registerUser(), checkRegistrationStatus(), checkIdExists()
   // Used in: RegistrationService (registration_service.dart) - checkRegistration(), completeRegistration()
 
-  // Old: static const String endpointGetGovernmentData = '/get_gov_services.php';
+  static const String endpointGetGovernmentData = '/get_gov_services.php';
   // Used in: AuthService (auth_service.dart) - getGovernmentData(), getGovernmentServices()
   // Used in: RegistrationService (registration_service.dart) - getGovernmentData()
 
-  // Old: static const String endpointValidateIdentity = '/validate_identity.php';
-  static const String endpointValidateIdentity = '/auth/validate-identity';
+  // Loan Endpoints
+  static const String endpointLoanDecision = '/api/v1/Finnone/GetCustomerCreate';
+  // Used in: LoanService (loan_service.dart) - getLoanDecision()
+
+  static const String endpointUpdateLoanApplication = '/update_loan_application.php';
+  // Used in: LoanService (loan_service.dart) - updateLoanApplication()
+
+  // Card Endpoints
+  static const String endpointCardDecision = '/cards_decision.php';
+  // Used in: CardService (card_service.dart) - getCardDecision()
+
+  static const String endpointUpdateCardApplication = '/update_cards_application.php';
+  // Used in: CardService (card_service.dart) - updateCardApplication()
+
+  // Notification Endpoints
+  static const String endpointGetNotifications = '/get_notifications.php';
+  // Used in: NotificationService (notification_service.dart) - fetchNotifications()
+
+  static const String endpointSendNotification = '/send_notification.php';
+  // Used in: NotificationService (notification_service.dart) - sendNotification()
+
+  // Auth Endpoints
+  static const String endpointValidateIdentity = '/validate-identity';
   // Used in: ApiService (api_service.dart) - validateUserIdentity()
   // Used in: RegistrationService (registration_service.dart) - validateIdentity()
 
-  // Old: static const String endpointSetPassword = '/set_password.php';
-  static const String endpointSetPassword = '/auth/set-password';
+  static const String endpointSetPassword = '/set-password';
   // Used in: ApiService (api_service.dart) - setPassword()
   // Used in: RegistrationService (registration_service.dart) - setPassword()
 
-  // Old: static const String endpointSetQuickAccessPin = '/set_quick_access_pin.php';
-  static const String endpointSetQuickAccessPin = '/auth/set-quick-access-pin';
+  static const String endpointSetQuickAccessPin = '/set-quick-access-pin';
   // Used in: ApiService (api_service.dart) - setQuickAccessPin()
   // Used in: RegistrationService (registration_service.dart) - setMPIN()
 
-  // Old: static const String endpointVerifyOtp = '/verify_otp.php';
-  static const String endpointVerifyOtp = '/auth/verify-otp';
+  static const String endpointVerifyOtp = '/verify-otp';
   // Used in: ApiService (api_service.dart) - verifyOtp()
 
-  // Old: static const String endpointResendOtp = '/resend_otp.php';
-  static const String endpointResendOtp = '/auth/resend-otp';
+  static const String endpointResendOtp = '/resend-otp';
   // Used in: ApiService (api_service.dart) - resendOtp()
-
-  // Loan Management
-  // Old: static const String endpointLoanDecision = '/api/v1/Finnone/GetCustomerCreate';
-  static const String endpointLoanDecision = '/loan/decision';
-  // Used in: LoanService (loan_service.dart) - getLoanDecision()
-
-  // Old: static const String endpointUpdateLoanApplication = '/update_loan_application.php';
-  static const String endpointUpdateLoanApplication = '/loan/update';
-  // Used in: LoanService (loan_service.dart) - updateLoanApplication()
-
-  // Card Management
-  // Old: static const String endpointCardDecision = '/cards_decision.php';
-  static const String endpointCardDecision = '/card/decision';
-  // Used in: CardService (card_service.dart) - getCardDecision()
-
-  // Old: static const String endpointUpdateCardApplication = '/update_cards_application.php';
-  static const String endpointUpdateCardApplication = '/card/update';
-  // Used in: CardService (card_service.dart) - updateCardApplication()
-
-  // Notification Management
-  // Old: static const String endpointGetNotifications = '/get_notifications.php';
-  static const String endpointGetNotifications = '/notifications/list';
-  // Used in: NotificationService (notification_service.dart) - fetchNotifications()
-
-  // Old: static const String endpointSendNotification = '/send_notification.php';
-  static const String endpointSendNotification = '/notifications/send';
-  // Used in: NotificationService (notification_service.dart) - sendNotification()
 
   // Colors
   static const int primaryColorValue = 0xFF0077B6;
@@ -409,18 +346,4 @@ class Constants {
   // Error Colors
   static const int darkErrorColor = 0xFFFF5252;  // Red shade for dark theme
   static const int lightErrorColor = 0xFFD32F2F;  // Darker red for light theme
-
-  // OTP Request Format
-  static Map<String, dynamic> otpGenerateRequestBody(String nationalId, String mobileNo) => {
-    'nationalId': nationalId,
-    'mobileNo': mobileNo,
-    'purpose': 'REGISTRATION',
-    'userId': 1,
-  };
-
-  static Map<String, dynamic> otpVerifyRequestBody(String nationalId, String otp) => {
-    'nationalId': nationalId.trim(),
-    'otp': otp.trim(),
-    'userId': 1,
-  };
 } 

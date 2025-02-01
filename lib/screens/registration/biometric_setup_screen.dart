@@ -145,6 +145,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
   Future<void> _handleSetup() async {
     setState(() => _isLoading = true);
     try {
+      // 1. Complete registration with biometric preference
       final registrationResult = await _registrationService.completeRegistration(
         nationalId: widget.nationalId,
         password: widget.password,
@@ -152,146 +153,91 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
         enableBiometric: _isBiometricsEnabled,
       );
 
-      if (registrationResult) {
-        print('Registration successful, showing success dialog');
-        if (widget.onSetupComplete != null) {
-          widget.onSetupComplete(_isBiometricsEnabled);
-        }
+      if (!registrationResult) {
+        throw Exception(widget.isArabic
+            ? 'فشل إكمال التسجيل'
+            : 'Failed to complete registration');
+      }
 
-        final storedData = await _registrationService.getStoredRegistrationData();
-        print('Stored data for MainPage: $storedData');
-        print('UserData being passed to MainPage: ${storedData?['userData']}');
+      // 2. Get stored registration data
+      final storedData = await _registrationService.getStoredRegistrationData();
+      if (storedData == null || storedData['userData'] == null) {
+        throw Exception(widget.isArabic
+            ? 'بيانات المستخدم غير متوفرة'
+            : 'User data not available');
+      }
 
-        if (storedData == null || storedData['userData'] == null) {
-          print('Warning: storedData or userData is null!');
-        }
+      // 3. Store user data locally
+      final userData = <String, dynamic>{
+        ...(storedData['userData'] as Map<String, dynamic>),
+        'email': storedData['email'],
+        'isSessionActive': true,
+      };
+      await _authService.storeUserData(userData);
 
-        print('\n=== STORING USER DATA ===');
-        final userData = <String, dynamic>{
-          ...(storedData?['userData'] as Map<String, dynamic>? ?? {}),
-          'email': storedData?['email'],
-          'isSessionActive': true,
-        };
-        await _authService.storeUserData(userData);
-        print('User data being stored: $userData');
-        print('=== USER DATA STORED ===\n');
+      // 4. Store device registration
+      await _authService.storeDeviceRegistration(widget.nationalId);
 
-        print('\n=== STORING DEVICE REGISTRATION ===');
-        await _authService.storeDeviceRegistration(widget.nationalId);
-        print('=== DEVICE REGISTRATION STORED ===\n');
+      // 5. Start user session
+      await _authService.startSession(
+        widget.nationalId,
+        userId: storedData['userData']['id']?.toString(),
+      );
 
-        print('\n=== STARTING SESSION ===');
-        await _authService.startSession(
-          widget.nationalId,
-          userId: storedData?['userData']?['id']?.toString(),
-        );
-        print('=== SESSION STARTED ===\n');
+      if (!mounted) return;
 
-        if (!mounted) return;
+      // 6. Initialize session in provider
+      final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
+      sessionProvider.resetManualSignOff();
+      sessionProvider.setSignedIn(true);
+      await sessionProvider.initializeSession();
 
-        print('\n=== INITIALIZING SESSION IN PROVIDER ===');
-        print('1. Getting session provider');
-        final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
-        print('2. Current session state: ${sessionProvider.isSignedIn}');
-        
-        print('3. Resetting manual sign off');
-        sessionProvider.resetManualSignOff();
-        
-        print('4. Setting signed in state to true');
-        sessionProvider.setSignedIn(true);
-        
-        print('5. Initializing session');
-        await sessionProvider.initializeSession();
-        
-        print('6. Verifying session state after update');
-        final updatedSignedIn = Provider.of<SessionProvider>(context, listen: false).isSignedIn;
-        print('   - Updated signed in state: $updatedSignedIn');
-        print('=== SESSION INITIALIZED IN PROVIDER ===\n');
+      // 7. Show success dialog and navigate to main page
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => RegistrationSuccessDialog(
+          isArabic: widget.isArabic,
+          enableBiometric: _isBiometricsEnabled,
+          onContinue: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MainPage(
+                  isArabic: widget.isArabic,
+                  onLanguageChanged: (bool value) {},
+                  userData: {
+                    ...userData,
+                    'deviceRegistered': true,
+                    'deviceUserId': widget.nationalId,
+                  },
+                  initialRoute: '',
+                  isDarkMode: Provider.of<ThemeProvider>(context).isDarkMode,
+                ),
+              ),
+              (route) => false,
+            );
+          },
+        ),
+      );
 
-        final isDarkMode = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
-        final themeColor = Color(isDarkMode 
-            ? Constants.darkPrimaryColor 
-            : Constants.lightPrimaryColor);
-        final surfaceColor = Color(isDarkMode 
-            ? Constants.darkSurfaceColor 
-            : Constants.lightSurfaceColor);
-        final labelTextColor = Color(isDarkMode 
-            ? Constants.darkLabelTextColor 
-            : Constants.lightLabelTextColor);
-
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => Theme(
-            data: Theme.of(context).copyWith(
-              dialogBackgroundColor: surfaceColor,
-            ),
-            child: RegistrationSuccessDialog(
-              isArabic: widget.isArabic,
-              enableBiometric: _isBiometricsEnabled,
-              onContinue: () async {
-                Navigator.of(context).pop();
-                
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => MainPage(
-                      isArabic: widget.isArabic,
-                      onLanguageChanged: (bool value) {},
-                      userData: <String, dynamic>{
-                        ...userData,
-                        'deviceRegistered': true,
-                        'deviceUserId': widget.nationalId,
-                      },
-                      initialRoute: '',
-                      isDarkMode: isDarkMode,
-                    ),
-                  ),
-                  (route) => false,
-                );
-              },
-            ),
-          ),
-        );
-      } else {
-        final isDarkMode = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
-        final errorColor = Color(isDarkMode 
-            ? Constants.darkFormBorderColor 
-            : Constants.lightFormBorderColor);
+      // 8. Notify parent about completion
+      widget.onSetupComplete(_isBiometricsEnabled);
+    } catch (e) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              widget.isArabic
-                  ? 'فشل في إكمال التسجيل'
-                  : 'Failed to complete registration',
-              style: TextStyle(
+              e.toString(),
+              style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.w500,
               ),
             ),
-            backgroundColor: errorColor,
+            backgroundColor: Colors.red,
           ),
         );
       }
-    } catch (e) {
-      final isDarkMode = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
-      final errorColor = Color(isDarkMode 
-          ? Constants.darkFormBorderColor 
-          : Constants.lightFormBorderColor);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            widget.isArabic 
-                ? 'حدث خطأ' 
-                : 'An error occurred: ${e.toString()}',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          backgroundColor: errorColor,
-        ),
-      );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

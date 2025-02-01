@@ -32,6 +32,7 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
   bool _isLoading = false;
   String? _errorMessage;
   final AuthService _authService = AuthService();
+  final RegistrationService _registrationService = RegistrationService();
 
   void _handleDigit(String value) {
     setState(() {
@@ -87,16 +88,30 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
     final confirmedPin = _confirmPin.join();
     
     if (enteredPin == confirmedPin) {
-      setState(() => _isLoading = true);
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
 
       try {
-        // Save MPIN using AuthService
+        // 1. Set MPIN in the backend
+        final mpinResult = await _registrationService.setMPIN(
+          widget.nationalId,
+          enteredPin,
+        );
+
+        if (mpinResult['status'] != 'success') {
+          throw Exception(mpinResult['message']);
+        }
+
+        // 2. Store MPIN locally using secure storage
         await _authService.storeMPIN(enteredPin);
 
         if (!mounted) return;
 
-        // Navigate to biometric setup
-        Navigator.of(context).pushReplacement(
+        // 3. Navigate to biometric setup
+        Navigator.pushReplacement(
+          context,
           MaterialPageRoute(
             builder: (context) => BiometricSetupScreen(
               nationalId: widget.nationalId,
@@ -104,29 +119,27 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
               mpin: enteredPin,
               isArabic: widget.isArabic,
               showSteps: widget.showSteps,
-              onSetupComplete: (success) {
-                // Handle biometric setup completion
+              onSetupComplete: (bool success) async {
+                if (success) {
+                  await _registrationService.completeRegistration(
+                    nationalId: widget.nationalId,
+                    password: widget.password,
+                    mpin: enteredPin,
+                    enableBiometric: true,
+                  );
+                }
               },
             ),
           ),
         );
       } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                widget.isArabic
-                    ? 'حدث خطأ أثناء حفظ رمز الدخول'
-                    : 'Error saving MPIN',
-              ),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+        setState(() {
+          _errorMessage = e.toString();
+          _confirmPin.fillRange(0, _confirmPin.length, '');
+          _isConfirming = false;
+        });
       } finally {
-        if (mounted) {
-          setState(() => _isLoading = false);
-        }
+        setState(() => _isLoading = false);
       }
     } else {
       setState(() {

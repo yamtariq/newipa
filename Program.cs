@@ -7,6 +7,7 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using NayifatAPI.Data;
 using Microsoft.AspNetCore.Mvc.Controllers;
+using System.Net.Http.Headers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,6 +34,17 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
                 errorNumbersToAdd: null);
         }
     ));
+
+// Add HttpClient for proxy
+builder.Services.AddHttpClient("ProxyClient", client =>
+{
+    client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+})
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    AllowAutoRedirect = false,
+    AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate
+});
 
 var app = builder.Build();
 

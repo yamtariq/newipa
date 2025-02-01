@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using NayifatAPI.Data;
+using NayifatAPI.Services;
 using Serilog;
 using Serilog.Events;
 using NayifatAPI.Controllers;
@@ -59,6 +60,9 @@ builder.Services.AddSwaggerGen(c =>
 // Add DbContext configuration
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Register services
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 
 var app = builder.Build();
 
