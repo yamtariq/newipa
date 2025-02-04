@@ -284,10 +284,11 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
         print('Sign in response: ${json.encode(signInResponse)}');
 
         if (signInResponse['status'] == 'success') {
-          // Register the device first
-          print('Registering current device...');
+          // Register device
+          final deviceInfo = await AuthService().getDeviceInfo();
           final registerResponse = await AuthService().registerDevice(
             nationalId: _nationalIdController.text,
+            deviceInfo: deviceInfo,
           );
 
           print('Device registration response: ${json.encode(registerResponse)}');

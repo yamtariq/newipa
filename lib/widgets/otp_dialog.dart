@@ -69,6 +69,8 @@ class _OTPDialogState extends State<OTPDialog> {
   }
 
   void _startTimer() {
+    if (!mounted) return;
+    
     setState(() {
       _timeLeft = 120;
       _canResend = false;
@@ -76,6 +78,10 @@ class _OTPDialogState extends State<OTPDialog> {
 
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       setState(() {
         if (_timeLeft > 0) {
           _timeLeft--;
@@ -93,8 +99,45 @@ class _OTPDialogState extends State<OTPDialog> {
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
+  Future<void> _handleResend() async {
+    if (!_canResend || !mounted) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final result = await widget.onResendOTP();
+      
+      if (!mounted) return;
+      
+      if (result['status'] == 'success') {
+        setState(() {
+          _errorMessage = null;
+        });
+        _startTimer();
+        _otpController.clear();
+      } else {
+        final message = result['message'] ?? '';
+        final arabicMessage = _getArabicErrorMessage(message);
+        throw Exception(widget.isArabic ? arabicMessage : message);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<void> _handleVerify() async {
-    if (_otpController.text.isEmpty) return;
+    if (_otpController.text.isEmpty || !mounted) return;
 
     setState(() {
       _isLoading = true;
@@ -104,8 +147,9 @@ class _OTPDialogState extends State<OTPDialog> {
     try {
       final result = await widget.onVerifyOTP(_otpController.text);
       
+      if (!mounted) return;
+      
       if (result['status'] == 'success') {
-        if (!mounted) return;
         Navigator.pop(context, true);
       } else {
         final message = result['message'] ?? '';
@@ -113,10 +157,12 @@ class _OTPDialogState extends State<OTPDialog> {
         throw Exception(widget.isArabic ? arabicMessage : message);
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = e.toString().replaceAll('Exception: ', '');
       });
     } finally {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
@@ -139,39 +185,6 @@ class _OTPDialogState extends State<OTPDialog> {
         return 'تم التحقق من الرمز بنجاح';
       default:
         return 'حدث خطأ ما!';
-    }
-  }
-
-  Future<void> _handleResend() async {
-    if (!_canResend) return;
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final result = await widget.onResendOTP();
-      
-      if (result['status'] == 'success') {
-        setState(() {
-          _errorMessage = null;
-        });
-        _startTimer();
-        _otpController.clear();
-      } else {
-        final message = result['message'] ?? '';
-        final arabicMessage = _getArabicErrorMessage(message);
-        throw Exception(widget.isArabic ? arabicMessage : message);
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
     }
   }
 

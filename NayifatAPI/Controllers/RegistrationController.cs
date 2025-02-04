@@ -33,202 +33,137 @@ namespace NayifatAPI.Controllers
         }
 
         [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] object request)
+        public async Task<IActionResult> Register([FromBody] UserRegistrationRequest registrationRequest)
         {
+            _logger.LogInformation("🚀 Starting registration process for NationalId: {NationalId}", registrationRequest.NationalId);
+
+            // Validate API key
             if (!ValidateApiKey())
             {
+                _logger.LogWarning("❌ Invalid API key");
                 return Error("Invalid API key", 401);
             }
 
-            UserRegistrationRequest? registrationRequest = null;
+            // Validate request
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState.Values
+                    .SelectMany(v => v.Errors)
+                    .Select(e => e.ErrorMessage)
+                    .ToList();
+                _logger.LogWarning("❌ Invalid registration request: {@Errors}", errors);
+                return BadRequest(new { error = "Invalid registration data", details = errors });
+            }
+
+            // Check if user already exists
+            var existingUser = await _context.Customers.FirstOrDefaultAsync(c => c.NationalId == registrationRequest.NationalId);
+            if (existingUser != null)
+            {
+                _logger.LogWarning("❌ User with NationalId {NationalId} already exists", registrationRequest.NationalId);
+                return BadRequest(new { error = "User already registered" });
+            }
+
+            _logger.LogInformation("✅ User validation passed. Creating new customer record");
+            _logger.LogDebug("📝 Registration Request Data: {@RegistrationRequest}", registrationRequest);
+
+            // Start transaction
+            using var transaction = await _context.Database.BeginTransactionAsync();
+
             try
             {
-                var options = new JsonSerializerOptions
+                _logger.LogInformation("🔒 Hashing password");
+                var hashedPassword = HashPassword(registrationRequest.Password);
+
+                // Create customer record
+                _logger.LogInformation("👤 Creating new customer record");
+                var customer = new Customer
                 {
-                    PropertyNameCaseInsensitive = true
+                    NationalId = registrationRequest.NationalId,
+                    FirstNameEn = registrationRequest.FirstNameEn,
+                    SecondNameEn = registrationRequest.SecondNameEn ?? string.Empty,
+                    ThirdNameEn = registrationRequest.ThirdNameEn ?? string.Empty,
+                    FamilyNameEn = registrationRequest.FamilyNameEn,
+                    FirstNameAr = registrationRequest.FirstNameAr,
+                    SecondNameAr = registrationRequest.SecondNameAr ?? string.Empty,
+                    ThirdNameAr = registrationRequest.ThirdNameAr ?? string.Empty,
+                    FamilyNameAr = registrationRequest.FamilyNameAr,
+                    Email = registrationRequest.Email,
+                    Phone = registrationRequest.Phone,
+                    Password = hashedPassword,
+                    DateOfBirth = registrationRequest.DateOfBirth,
+                    IdExpiryDate = registrationRequest.IdExpiryDate,
+                    RegistrationDate = DateTime.UtcNow,
+                    Consent = true,
+                    ConsentDate = DateTime.UtcNow
                 };
 
-                // Deserialize as IdCheckRequest first to check if it's an ID check
-                var idCheckRequest = JsonSerializer.Deserialize<IdCheckRequest>(request.ToString()!, options);
-                
-                if (idCheckRequest?.CheckOnly == true)
+                _logger.LogDebug("📝 New Customer Data: {@Customer}", new 
                 {
-                    var exists = await _context.Customers
-                        .AnyAsync(c => c.NationalId == idCheckRequest.NationalId);
+                    customer.NationalId,
+                    customer.FirstNameEn,
+                    customer.FamilyNameEn,
+                    customer.Email,
+                    customer.Phone,
+                    customer.DateOfBirth,
+                    customer.IdExpiryDate,
+                    customer.RegistrationDate
+                });
 
-                    if (exists)
+                _context.Customers.Add(customer);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("✅ Customer record created successfully");
+
+                // Create device record if device info is provided
+                if (registrationRequest.DeviceInfo != null)
+                {
+                    _logger.LogInformation("📱 Adding device information");
+                    _logger.LogDebug("📱 Device Info: {@DeviceInfo}", registrationRequest.DeviceInfo);
+
+                    var device = new CustomerDevice
                     {
-                        return Error("This ID already registered", 400);
-                    }
-                    
-                    return Success(new { message = "ID available" });
-                }
-
-                // If not an ID check, process as full registration
-                registrationRequest = JsonSerializer.Deserialize<UserRegistrationRequest>(request.ToString()!, options);
-                if (registrationRequest == null)
-                {
-                    return Error("Invalid request data", 400);
-                }
-
-                // Regular registration flow
-                var customerExists = await _context.Customers
-                    .AnyAsync(c => c.NationalId == registrationRequest.NationalId);
-
-                if (customerExists)
-                {
-                    return Error("This ID already registered", 400);
-                }
-
-                // Start transaction
-                using var transaction = await _context.Database.BeginTransactionAsync();
-
-                try
-                {
-                    // Create customer record
-                    var customer = new Customer
-                    {
-                        NationalId = registrationRequest.NationalId,
-                        FirstNameEn = registrationRequest.FirstNameEn,
-                        SecondNameEn = registrationRequest.SecondNameEn,
-                        ThirdNameEn = registrationRequest.ThirdNameEn ?? string.Empty,
-                        FamilyNameEn = registrationRequest.FamilyNameEn,
-                        FirstNameAr = registrationRequest.FirstNameAr,
-                        SecondNameAr = registrationRequest.SecondNameAr,
-                        ThirdNameAr = registrationRequest.ThirdNameAr ?? string.Empty,
-                        FamilyNameAr = registrationRequest.FamilyNameAr,
-                        Email = registrationRequest.Email,
-                        Password = HashPassword(registrationRequest.Password),
-                        Phone = registrationRequest.Phone,
-                        DateOfBirth = registrationRequest.DateOfBirth,
-                        IdExpiryDate = registrationRequest.IdExpiryDate,
-                        BuildingNo = registrationRequest.BuildingNo,
-                        Street = registrationRequest.Street,
-                        District = registrationRequest.District ?? string.Empty,
-                        City = registrationRequest.City ?? string.Empty,
-                        Zipcode = registrationRequest.Zipcode ?? string.Empty,
-                        AddNo = registrationRequest.AddNo ?? string.Empty,
-                        Iban = registrationRequest.Iban ?? string.Empty,
-                        Dependents = registrationRequest.Dependents,
-                        SalaryDakhli = registrationRequest.SalaryDakhli,
-                        SalaryCustomer = registrationRequest.SalaryCustomer,
-                        Los = registrationRequest.Los,
-                        Sector = registrationRequest.Sector ?? string.Empty,
-                        Employer = registrationRequest.Employer ?? string.Empty,
-                        RegistrationDate = DateTime.UtcNow,
-                        Consent = registrationRequest.Consent,
-                        ConsentDate = registrationRequest.Consent ? DateTime.UtcNow : null,
-                        NafathStatus = registrationRequest.NafathStatus ?? string.Empty,
-                        NafathTimestamp = registrationRequest.NafathStatus != null ? DateTime.UtcNow : null
+                        NationalId = customer.NationalId,
+                        DeviceId = registrationRequest.DeviceInfo.DeviceId,
+                        Platform = registrationRequest.DeviceInfo.Platform,
+                        Model = registrationRequest.DeviceInfo.Model,
+                        Manufacturer = registrationRequest.DeviceInfo.Manufacturer,
+                        BiometricEnabled = true,
+                        Status = "active",
+                        CreatedAt = DateTime.UtcNow,
+                        LastUsedAt = DateTime.UtcNow
                     };
 
-                    _context.Customers.Add(customer);
-
-                    // Handle device registration if provided
-                    if (registrationRequest.DeviceInfo != null)
-                    {
-                        // Disable any existing devices
-                        await _context.CustomerDevices
-                            .Where(d => d.NationalId == registrationRequest.NationalId)
-                            .ExecuteUpdateAsync(s => s
-                                .SetProperty(d => d.Status, "disabled")
-                                .SetProperty(d => d.LastUsedAt, DateTime.UtcNow));
-
-                        // Register new device
-                        var device = new CustomerDevice
-                        {
-                            NationalId = registrationRequest.NationalId,
-                            DeviceId = registrationRequest.DeviceInfo.DeviceId,
-                            Platform = registrationRequest.DeviceInfo.Platform,
-                            Model = registrationRequest.DeviceInfo.Model,
-                            Manufacturer = registrationRequest.DeviceInfo.Manufacturer,
-                            BiometricEnabled = true,
-                            Status = "active",
-                            CreatedAt = DateTime.UtcNow,
-                            LastUsedAt = DateTime.UtcNow
-                        };
-
-                        _context.CustomerDevices.Add(device);
-
-                        // Log device registration
-                        var authLog = new AuthLog
-                        {
-                            NationalId = registrationRequest.NationalId,
-                            DeviceId = registrationRequest.DeviceInfo.DeviceId,
-                            AuthType = "device_registration",
-                            Status = "success",
-                            IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
-                            UserAgent = HttpContext.Request.Headers["User-Agent"].ToString(),
-                            CreatedAt = DateTime.UtcNow
-                        };
-
-                        _context.AuthLogs.Add(authLog);
-                    }
-
+                    _context.CustomerDevices.Add(device);
                     await _context.SaveChangesAsync();
-                    await transaction.CommitAsync();
-
-                    // Prepare response
-                    var response = new
-                    {
-                        status = "success",
-                        message = "Registration successful",
-                        government_data = new
-                        {
-                            national_id = customer.NationalId,
-                            first_name_en = customer.FirstNameEn,
-                            family_name_en = customer.FamilyNameEn,
-                            email = customer.Email,
-                            phone = customer.Phone,
-                            date_of_birth = customer.DateOfBirth?.ToString("yyyy-MM-dd"),
-                            id_expiry_date = customer.IdExpiryDate?.ToString("yyyy-MM-dd")
-                        }
-                    };
-
-                    if (registrationRequest.DeviceInfo != null)
-                    {
-                        return Success(new
-                        {
-                            response.status,
-                            response.message,
-                            response.government_data,
-                            device_registered = true,
-                            biometric_enabled = true
-                        });
-                    }
-
-                    return Success(response);
+                    _logger.LogInformation("✅ Device information added successfully");
                 }
-                catch
+
+                await transaction.CommitAsync();
+                _logger.LogInformation("✅ Registration completed successfully");
+
+                // Return success response with user data
+                var response = new
                 {
-                    await transaction.RollbackAsync();
-                    throw;
-                }
+                    success = true,
+                    data = new
+                    {
+                        national_id = customer.NationalId,
+                        first_name_en = customer.FirstNameEn,
+                        family_name_en = customer.FamilyNameEn,
+                        email = customer.Email,
+                        phone = customer.Phone,
+                        date_of_birth = customer.DateOfBirth?.ToString("yyyy-MM-dd"),
+                        id_expiry_date = customer.IdExpiryDate?.ToString("yyyy-MM-dd")
+                    }
+                };
+
+                _logger.LogDebug("📤 Response Data: {@Response}", response);
+                return Ok(response);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during registration for National ID: {NationalId}", registrationRequest?.NationalId);
-
-                // Log registration failure if device info was provided
-                if (registrationRequest?.DeviceInfo != null)
-                {
-                    var authLog = new AuthLog
-                    {
-                        NationalId = registrationRequest.NationalId,
-                        DeviceId = registrationRequest.DeviceInfo.DeviceId,
-                        AuthType = "device_registration",
-                        Status = "failed",
-                        IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
-                        UserAgent = HttpContext.Request.Headers["User-Agent"].ToString(),
-                        FailureReason = ex.Message,
-                        CreatedAt = DateTime.UtcNow
-                    };
-
-                    _context.AuthLogs.Add(authLog);
-                    await _context.SaveChangesAsync();
-                }
-
-                return Error("Internal server error", 500);
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "❌ Error during registration for NationalId: {NationalId}", registrationRequest.NationalId);
+                return BadRequest(new { error = "Registration failed", details = ex.Message });
             }
         }
 
@@ -240,7 +175,6 @@ namespace NayifatAPI.Controllers
 
     public class UserRegistrationRequest
     {
-        public bool CheckOnly { get; set; }
         public required string NationalId { get; set; }
         public required string FirstNameEn { get; set; }
         public required string SecondNameEn { get; set; }
@@ -251,8 +185,8 @@ namespace NayifatAPI.Controllers
         public string? ThirdNameAr { get; set; }
         public required string FamilyNameAr { get; set; }
         public required string Email { get; set; }
-        public required string Password { get; set; }
         public required string Phone { get; set; }
+        public required string Password { get; set; }
         public DateTime? DateOfBirth { get; set; }
         public DateTime? IdExpiryDate { get; set; }
         public string? BuildingNo { get; set; }
@@ -280,11 +214,4 @@ namespace NayifatAPI.Controllers
         public required string Model { get; set; }
         public required string Manufacturer { get; set; }
     }
-
-    public class IdCheckRequest
-    {
-        public bool CheckOnly { get; set; }
-        public required string NationalId { get; set; }
-        public required DeviceInfo DeviceInfo { get; set; }
-    }
-} 
+}

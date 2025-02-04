@@ -161,7 +161,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
 
       // 2. Get stored registration data
       final storedData = await _registrationService.getStoredRegistrationData();
-      if (storedData == null || storedData['userData'] == null) {
+      if (storedData == null) {
         throw Exception(widget.isArabic
             ? 'بيانات المستخدم غير متوفرة'
             : 'User data not available');
@@ -169,8 +169,11 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
 
       // 3. Store user data locally
       final userData = <String, dynamic>{
-        ...(storedData['userData'] as Map<String, dynamic>),
+        'national_id': widget.nationalId,
         'email': storedData['email'],
+        'phone': storedData['phone'],
+        'name': '${storedData['userData']['englishFirstName'] ?? ''} ${storedData['userData']['englishLastName'] ?? ''}',
+        'name_ar': '${storedData['userData']['firstName'] ?? ''} ${storedData['userData']['familyName'] ?? ''}',
         'isSessionActive': true,
       };
       await _authService.storeUserData(userData);

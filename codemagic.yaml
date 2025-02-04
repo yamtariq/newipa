@@ -14,8 +14,9 @@ workflows:
         XCODE_WORKSPACE: "Runner.xcworkspace"
         XCODE_SCHEME: "Runner"
       ios_signing:
-        distribution_type: app_store
+        distribution_type: development
         bundle_identifier: com.nayifat.app2025
+        code_signing_identity: "iPhone Developer"
     cache:
       cache_paths:
         - ~/.pub-cache
@@ -44,9 +45,9 @@ workflows:
           flutter test
       - name: Build iOS
         script: |
-          flutter build ios --release
+          flutter build ios --debug
           cd ios
-          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release clean archive -archivePath build/Runner.xcarchive
+          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Debug clean archive -archivePath build/Runner.xcarchive
           xcodebuild -exportArchive -archivePath build/Runner.xcarchive -exportOptionsPlist exportOptions.plist -exportPath build/ios/ipa
     artifacts:
       - build/ios/ipa/*.ipa
@@ -59,9 +60,3 @@ workflows:
         notify:
           success: true
           failure: true
-      app_store_connect:
-        auth: integration
-        submit_to_testflight: true
-        beta_groups:
-          - Nayifat Beta Testers
-        submit_to_app_store: false

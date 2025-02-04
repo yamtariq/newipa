@@ -42,6 +42,7 @@ class _AccountPageState extends State<AccountPage> {
   String _biometricsError = '';
   String _currentLanguage = 'English';
   bool _isLoading = true;
+  bool _isSignedIn = false;
   int _tabIndex = 4;  // For Account tab (settings)
 
   // Add ThemeProvider getter
@@ -54,6 +55,7 @@ class _AccountPageState extends State<AccountPage> {
     super.initState();
     _loadUserData();
     _checkBiometricsAvailability();
+    _checkSignInStatus();
   }
 
   Future<void> _loadUserData() async {
@@ -98,6 +100,13 @@ class _AccountPageState extends State<AccountPage> {
     }
   }
 
+  Future<void> _checkSignInStatus() async {
+    final isSignedIn = await _authService.isSessionActive();
+    setState(() {
+      _isSignedIn = isSignedIn;
+    });
+  }
+
   Future<void> _toggleBiometrics() async {
     if (!_isBiometricsAvailable) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -123,7 +132,7 @@ class _AccountPageState extends State<AccountPage> {
         // Verify biometrics before disabling
         final bool didAuthenticate = await _localAuth.authenticate(
           localizedReason: widget.isArabic 
-              ? 'يرجى المصادقة لتعطيل المصادقة البيومترية'
+              ? 'يرجى الموافقة لتعطيل المصادقة بالسمات الحيوية'
               : 'Please authenticate to disable biometric login',
           options: const AuthenticationOptions(
             stickyAuth: true,
@@ -141,7 +150,7 @@ class _AccountPageState extends State<AccountPage> {
         // Enable biometrics
         final bool didAuthenticate = await _localAuth.authenticate(
           localizedReason: widget.isArabic 
-              ? 'يرجى المصادقة لتمكين المصادقة البيومترية'
+              ? 'يرجى الموافقة لتمكين المصادقة بالسمات الحيوية'
               : 'Please authenticate to enable biometric login',
           options: const AuthenticationOptions(
             stickyAuth: true,
@@ -159,7 +168,7 @@ class _AccountPageState extends State<AccountPage> {
             SnackBar(
               content: Text(
                 widget.isArabic 
-                    ? 'تم تفعيل المصادقة البيومترية بنجاح'
+                    ? 'تم تفعيل المصادقة بالسمات الحيوية بنجاح'
                     : 'Biometric authentication enabled successfully',
                 style: const TextStyle(color: Colors.white),
               ),
@@ -173,7 +182,7 @@ class _AccountPageState extends State<AccountPage> {
             SnackBar(
               content: Text(
                 widget.isArabic 
-                    ? 'حدث خطأ أثناء تفعيل المصادقة البيومترية'
+                    ? 'حدث خطأ أثناء تفعيل المصادقة بالسمات الحيوية'
                     : 'Error enabling biometric authentication',
                 style: const TextStyle(color: Colors.white),
               ),
@@ -188,7 +197,7 @@ class _AccountPageState extends State<AccountPage> {
         SnackBar(
           content: Text(
             widget.isArabic 
-                ? 'حدث خطأ أثناء تحديث إعدادات المصادقة البيومترية'
+                ? 'حدث خطأ أثناء تحديث إعدادات المصادقة بالسمات الحيوية'
                 : 'Error updating biometric settings',
             style: const TextStyle(color: Colors.white),
           ),
@@ -1047,70 +1056,72 @@ class _AccountPageState extends State<AccountPage> {
                               ),
                             ),
                           ),
-                          _buildSettingItem(
-                            icon: Icons.fingerprint,
-                            title: 'Biometric Authentication',
-                            onTap: () {
-                              if (!_isBiometricsAvailable) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      _biometricsError,
-                                      style: TextStyle(
-                                        color: themeProvider.isDarkMode ? Colors.black : Colors.white,
+                          if (_isSignedIn) ...[
+                            _buildSettingItem(
+                              icon: Icons.fingerprint,
+                              title: 'Biometric Authentication',
+                              onTap: () {
+                                if (!_isBiometricsAvailable) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        _biometricsError,
+                                        style: TextStyle(
+                                          color: themeProvider.isDarkMode ? Colors.black : Colors.white,
+                                        ),
+                                      ),
+                                      backgroundColor: themeProvider.primaryColor,
+                                      duration: const Duration(seconds: 3),
+                                    ),
+                                  );
+                                } else {
+                                  _toggleBiometrics();
+                                }
+                              },
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (!_isBiometricsAvailable)
+                                    Icon(
+                                      Icons.error_outline,
+                                      color: themeProvider.primaryColor,
+                                      size: 20,
+                                    )
+                                  else
+                                    Switch(
+                                      value: _isBiometricsEnabled,
+                                      onChanged: (_) => _toggleBiometrics(),
+                                      activeColor: themeProvider.primaryColor,
+                                      activeTrackColor: Color(themeProvider.isDarkMode 
+                                          ? Constants.darkSwitchTrackColor
+                                          : Constants.lightSwitchTrackColor),
+                                      inactiveThumbColor: Color(themeProvider.isDarkMode 
+                                          ? Constants.darkSwitchInactiveThumbColor
+                                          : Constants.lightSwitchInactiveThumbColor),
+                                      inactiveTrackColor: Color(themeProvider.isDarkMode 
+                                          ? Constants.darkSwitchInactiveTrackColor
+                                          : Constants.lightSwitchInactiveTrackColor),
+                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      trackOutlineColor: MaterialStateProperty.all(
+                                        Color(themeProvider.isDarkMode 
+                                            ? Constants.darkSwitchTrackOutlineColor
+                                            : Constants.lightSwitchTrackOutlineColor)
                                       ),
                                     ),
-                                    backgroundColor: themeProvider.primaryColor,
-                                    duration: const Duration(seconds: 3),
-                                  ),
-                                );
-                              } else {
-                                _toggleBiometrics();
-                              }
-                            },
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (!_isBiometricsAvailable)
-                                  Icon(
-                                    Icons.error_outline,
-                                    color: themeProvider.primaryColor,
-                                    size: 20,
-                                  )
-                                else
-                                  Switch(
-                                    value: _isBiometricsEnabled,
-                                    onChanged: (_) => _toggleBiometrics(),
-                                    activeColor: themeProvider.primaryColor,
-                                    activeTrackColor: Color(themeProvider.isDarkMode 
-                                        ? Constants.darkSwitchTrackColor
-                                        : Constants.lightSwitchTrackColor),
-                                    inactiveThumbColor: Color(themeProvider.isDarkMode 
-                                        ? Constants.darkSwitchInactiveThumbColor
-                                        : Constants.lightSwitchInactiveThumbColor),
-                                    inactiveTrackColor: Color(themeProvider.isDarkMode 
-                                        ? Constants.darkSwitchInactiveTrackColor
-                                        : Constants.lightSwitchInactiveTrackColor),
-                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    trackOutlineColor: MaterialStateProperty.all(
-                                      Color(themeProvider.isDarkMode 
-                                          ? Constants.darkSwitchTrackOutlineColor
-                                          : Constants.lightSwitchTrackOutlineColor)
-                                    ),
-                                  ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                          _buildSettingItem(
-                            icon: Icons.pin,
-                            title: 'Change MPIN',
-                            onTap: _changeMPIN,
-                          ),
-                          _buildSettingItem(
-                            icon: Icons.lock,
-                            title: 'Change Password',
-                            onTap: _changePassword,
-                          ),
+                            _buildSettingItem(
+                              icon: Icons.pin,
+                              title: 'Change MPIN',
+                              onTap: _changeMPIN,
+                            ),
+                            _buildSettingItem(
+                              icon: Icons.lock,
+                              title: 'Change Password',
+                              onTap: _changePassword,
+                            ),
+                          ],
                           _buildSettingItem(
                             icon: Icons.language,
                             title: widget.isArabic ? 'اللغة Language' : 'Language اللغة',
@@ -1135,32 +1146,33 @@ class _AccountPageState extends State<AccountPage> {
                               ],
                             ),
                           ),
-                          _buildSettingItem(
-                            icon: Icons.logout,
-                            title: 'Sign Off',
-                            onTap: _signOut,
-                            trailing: Container(
-                              margin: const EdgeInsets.only(left: 8),
-                              child: TextButton(
-                                onPressed: _signOut,
-                                style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                  backgroundColor: themeProvider.primaryColor,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
+                          if (_isSignedIn)
+                            _buildSettingItem(
+                              icon: Icons.logout,
+                              title: 'Sign Off',
+                              onTap: _signOut,
+                              trailing: Container(
+                                margin: const EdgeInsets.only(left: 8),
+                                child: TextButton(
+                                  onPressed: _signOut,
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                    backgroundColor: themeProvider.primaryColor,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
+                                    ),
                                   ),
-                                ),
-                                child: Text(
-                                  widget.isArabic ? 'تسجيل خروج' : 'Sign Off',
-                                  style: TextStyle(
-                                    color: themeProvider.isDarkMode ? Colors.black : Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
+                                  child: Text(
+                                    widget.isArabic ? 'تسجيل خروج' : 'Sign Off',
+                                    style: TextStyle(
+                                      color: themeProvider.isDarkMode ? Colors.black : Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
                         ],
                       ),
               ),

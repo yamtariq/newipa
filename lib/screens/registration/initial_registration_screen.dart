@@ -18,6 +18,9 @@ import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../utils/constants.dart';
 import '../../widgets/nafath_verification_dialog.dart';
+import 'package:flutter_holo_date_picker/flutter_holo_date_picker.dart';
+import 'package:flutter_holo_date_picker/widget/date_picker_widget.dart';
+import '../../widgets/custom_hijri_picker.dart';
 
 class InitialRegistrationScreen extends StatefulWidget {
   final bool isArabic;
@@ -44,6 +47,8 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> w
   PhoneNumber _phoneNumber = PhoneNumber(isoCode: 'SA');
   DateTime? _selectedDate;
   DateTime? _selectedExpiryDate;
+  DateTime? _tempSelectedDate;
+  DateTime? _tempSelectedExpiryDate;
   bool _isLoading = false;
   bool _isHijri = true; // Default to Hijri as per Saudi standards
   String? _errorMessage;
@@ -857,7 +862,162 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> w
                                     color: primaryColor),
                               ),
                               readOnly: true,
-                              onTap: () => _selectDate(context, false),
+                              onTap: () async {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) {
+                                    int selectedTabIndex = 0;
+                                    // Initialize temp date
+                                    _tempSelectedDate = _selectedDate ?? DateTime.now().subtract(const Duration(days: 365 * 18));
+                                    return Dialog(
+                                      backgroundColor: themeProvider.isDarkMode 
+                                          ? Colors.grey[900]
+                                          : Color(Constants.lightFormBackgroundColor),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16)
+                                      ),
+                                      child: DefaultTabController(
+                                        length: 2,
+                                        child: StatefulBuilder(
+                                          builder: (context, setState) => Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              TabBar(
+                                                onTap: (index) {
+                                        setState(() {
+                                                    selectedTabIndex = index;
+                                        });
+                                      },
+                                                tabs: [
+                                                  Tab(text: widget.isArabic ? 'هجري' : 'Hijri'),
+                                                  Tab(text: widget.isArabic ? 'ميلادي' : 'Gregorian'),
+                                                ],
+                                                labelColor: primaryColor,
+                                                unselectedLabelColor: Color(themeProvider.isDarkMode 
+                                                    ? Constants.darkLabelTextColor 
+                                                    : Constants.lightLabelTextColor),
+                                                indicatorColor: primaryColor,
+                                              ),
+                                              const SizedBox(height: 20),
+                                              SizedBox(
+                                                height: 200,
+                                                child: TabBarView(
+                                                  children: [
+                                                    // Hijri Calendar
+                                                    Builder(
+                                                      builder: (context) {
+                                                        final now = HijriCalendar.now();
+                                                        return CustomHijriPicker(
+                                                          isArabic: widget.isArabic,
+                                                          minYear: now.hYear - 90,
+                                                          maxYear: now.hYear,
+                                                          initialYear: now.hYear - 18,
+                                                          primaryColor: primaryColor,
+                                                          isDarkMode: themeProvider.isDarkMode,
+                                                          onDateSelected: (day, month, year) {
+                                                            print('Selected Hijri Date: $day/$month/$year');
+                                                            // Convert to Gregorian for storage
+                                                            final hijri = HijriCalendar()
+                                                              ..hYear = year
+                                                              ..hMonth = month
+                                                              ..hDay = day;
+                                                            final gregorian = hijri.hijriToGregorian(year, month, day);
+                                                            setState(() {
+                                                              _tempSelectedDate = gregorian;
+                                                            });
+                                                          },
+                                                        );
+                                                      }
+                                                    ),
+                                                    // Gregorian Calendar
+                                                    Builder(
+                                                      builder: (context) {
+                                                        return DatePickerWidget(
+                                                          looping: true,
+                                                          firstDate: DateTime(1900),
+                                                          lastDate: DateTime.now(),
+                                                          initialDate: _selectedDate ?? DateTime.now().subtract(const Duration(days: 365 * 18)),
+                                                          dateFormat: "dd/MM/yyyy",
+                                                          locale: widget.isArabic ? DateTimePickerLocale.ar : DateTimePickerLocale.en_us,
+                                                          pickerTheme: DateTimePickerTheme(
+                                                            backgroundColor: Colors.transparent,
+                                                            itemTextStyle: TextStyle(
+                                                              color: Color(themeProvider.isDarkMode 
+                                                                  ? Constants.darkLabelTextColor 
+                                                                  : Constants.lightLabelTextColor),
+                                                              fontSize: 18,
+                                                            ),
+                                                            dividerColor: primaryColor,
+                                                          ),
+                                                          onChange: (DateTime newDate, _) {
+                                                            setState(() {
+                                                              _tempSelectedDate = newDate;
+                                                            });
+                                                          },
+                                                        );
+                                                      }
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              const SizedBox(height: 20),
+                                              Padding(
+                                                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                                                child: Row(
+                                                  mainAxisAlignment: MainAxisAlignment.end,
+                                                  children: [
+                                                    TextButton(
+                                                      onPressed: () => Navigator.of(context).pop(),
+                                                      child: Text(
+                                                        widget.isArabic ? 'إلغاء' : 'Cancel',
+                                                        style: TextStyle(
+                                                          color: Color(themeProvider.isDarkMode 
+                                                              ? Constants.darkLabelTextColor 
+                                                              : Constants.lightLabelTextColor),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    TextButton(
+                                                      onPressed: () {
+                                                        if (_tempSelectedDate != null) {
+                                                          final isHijri = selectedTabIndex == 0;
+                                                          if (isHijri) {
+                                                            final hijri = HijriCalendar.fromDate(_tempSelectedDate!);
+                                                            setState(() {
+                                                              _selectedDate = _tempSelectedDate;
+                                          _dobController.text = widget.isArabic
+                                                                  ? '${hijri.hDay}/${hijri.hMonth}/${hijri.hYear} هـ'
+                                                                  : '${hijri.hDay}/${hijri.hMonth}/${hijri.hYear} H';
+                                                            });
+                                                          } else {
+                                                            setState(() {
+                                                              _selectedDate = _tempSelectedDate;
+                                                              _dobController.text = DateFormat('dd/MM/yyyy').format(_tempSelectedDate!);
+                                                            });
+                                                          }
+                                                        }
+                                                        Navigator.of(context).pop();
+                                                      },
+                                                      child: Text(
+                                                        widget.isArabic ? 'موافق' : 'OK',
+                                                        style: TextStyle(
+                                                          color: primaryColor,
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
                                   return widget.isArabic
@@ -888,7 +1048,162 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> w
                                     color: primaryColor),
                               ),
                               readOnly: true,
-                              onTap: () => _selectExpiryDate(context),
+                              onTap: () async {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) {
+                                    int selectedTabIndex = 0;
+                                    // Initialize temp date
+                                    _tempSelectedExpiryDate = _selectedExpiryDate ?? DateTime.now();
+                                    return Dialog(
+                                      backgroundColor: themeProvider.isDarkMode 
+                                          ? Colors.grey[900]
+                                          : Color(Constants.lightFormBackgroundColor),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16)
+                                      ),
+                                      child: DefaultTabController(
+                                        length: 2,
+                                        child: StatefulBuilder(
+                                          builder: (context, setState) => Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              TabBar(
+                                                onTap: (index) {
+                                        setState(() {
+                                                    selectedTabIndex = index;
+                                        });
+                                      },
+                                                tabs: [
+                                                  Tab(text: widget.isArabic ? 'هجري' : 'Hijri'),
+                                                  Tab(text: widget.isArabic ? 'ميلادي' : 'Gregorian'),
+                                                ],
+                                                labelColor: primaryColor,
+                                                unselectedLabelColor: Color(themeProvider.isDarkMode 
+                                                    ? Constants.darkLabelTextColor 
+                                                    : Constants.lightLabelTextColor),
+                                                indicatorColor: primaryColor,
+                                              ),
+                                              const SizedBox(height: 20),
+                                              SizedBox(
+                                                height: 200,
+                                                child: TabBarView(
+                                                  children: [
+                                                    // Hijri Calendar for ID Expiry
+                                                    Builder(
+                                                      builder: (context) {
+                                                        final now = HijriCalendar.now();
+                                                        return CustomHijriPicker(
+                                                          isArabic: widget.isArabic,
+                                                          minYear: now.hYear,
+                                                          maxYear: now.hYear + 10,
+                                                          initialYear: now.hYear,
+                                                          primaryColor: primaryColor,
+                                                          isDarkMode: themeProvider.isDarkMode,
+                                                          onDateSelected: (day, month, year) {
+                                                            print('Selected Hijri Date: $day/$month/$year');
+                                                            // Convert to Gregorian for storage
+                                                            final hijri = HijriCalendar()
+                                                              ..hYear = year
+                                                              ..hMonth = month
+                                                              ..hDay = day;
+                                                            final gregorian = hijri.hijriToGregorian(year, month, day);
+                                                            setState(() {
+                                                              _tempSelectedExpiryDate = gregorian;
+                                                            });
+                                                          },
+                                                        );
+                                                      }
+                                                    ),
+                                                    // Gregorian Calendar for ID Expiry
+                                                    Builder(
+                                                      builder: (context) {
+                                                        return DatePickerWidget(
+                                                          looping: true,
+                                                          firstDate: DateTime.now(),
+                                                          lastDate: DateTime(2100),
+                                                          initialDate: _selectedExpiryDate ?? DateTime.now(),
+                                                          dateFormat: "dd/MM/yyyy",
+                                                          locale: widget.isArabic ? DateTimePickerLocale.ar : DateTimePickerLocale.en_us,
+                                                          pickerTheme: DateTimePickerTheme(
+                                                            backgroundColor: Colors.transparent,
+                                                            itemTextStyle: TextStyle(
+                                                              color: Color(themeProvider.isDarkMode 
+                                                                  ? Constants.darkLabelTextColor 
+                                                                  : Constants.lightLabelTextColor),
+                                                              fontSize: 18,
+                                                            ),
+                                                            dividerColor: primaryColor,
+                                                          ),
+                                                          onChange: (DateTime newDate, _) {
+                                                            setState(() {
+                                                              _tempSelectedExpiryDate = newDate;
+                                                            });
+                                                          },
+                                                        );
+                                                      }
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              const SizedBox(height: 20),
+                                              Padding(
+                                                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                                                child: Row(
+                                                  mainAxisAlignment: MainAxisAlignment.end,
+                                                  children: [
+                                                    TextButton(
+                                                      onPressed: () => Navigator.of(context).pop(),
+                                                      child: Text(
+                                                        widget.isArabic ? 'إلغاء' : 'Cancel',
+                                                        style: TextStyle(
+                                                          color: Color(themeProvider.isDarkMode 
+                                                              ? Constants.darkLabelTextColor 
+                                                              : Constants.lightLabelTextColor),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    TextButton(
+                                                      onPressed: () {
+                                                        if (_tempSelectedExpiryDate != null) {
+                                                          final isHijri = selectedTabIndex == 0;
+                                                          if (isHijri) {
+                                                            final hijri = HijriCalendar.fromDate(_tempSelectedExpiryDate!);
+                                                            setState(() {
+                                                              _selectedExpiryDate = _tempSelectedExpiryDate;
+                                          _idExpiryController.text = widget.isArabic
+                                                                  ? '${hijri.hDay}/${hijri.hMonth}/${hijri.hYear} هـ'
+                                                                  : '${hijri.hDay}/${hijri.hMonth}/${hijri.hYear} H';
+                                                            });
+                                                          } else {
+                                                            setState(() {
+                                                              _selectedExpiryDate = _tempSelectedExpiryDate;
+                                                              _idExpiryController.text = DateFormat('dd/MM/yyyy').format(_tempSelectedExpiryDate!);
+                                                            });
+                                                          }
+                                                        }
+                                                        Navigator.of(context).pop();
+                                                      },
+                                                      child: Text(
+                                                        widget.isArabic ? 'موافق' : 'OK',
+                                                        style: TextStyle(
+                                                          color: primaryColor,
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
                                   return widget.isArabic

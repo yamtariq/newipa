@@ -224,7 +224,7 @@ class NotificationService {
       debugPrint('\n=== Fetching Notifications from API ===');
       final url = '${Constants.apiBaseUrl}${Constants.endpointGetNotifications}';
       final body = {
-        'national_id': nationalId,
+        'nationalId': nationalId == '' ? 'all' : nationalId,  // Use 'all' only if nationalId is empty
         'mark_as_read': true,
       };
 

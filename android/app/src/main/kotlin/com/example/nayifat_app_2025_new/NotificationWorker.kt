@@ -90,7 +90,7 @@ class NotificationWorker(
             connection.readTimeout = 30000
 
             val requestBody = JSONObject().apply {
-                put("national_id", nationalId)
+                put("nationalId", nationalId)
                 put("mark_as_read", true)
             }
             Log.d(TAG, "Step 4.3: Request body prepared: ${requestBody}")

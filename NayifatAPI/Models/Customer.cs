@@ -57,20 +57,20 @@ namespace NayifatAPI.Models
         public decimal? SalaryCustomer { get; set; }
         
         public int? Los { get; set; }
-
+        
         // Employment Information
         public string? Sector { get; set; }
         public string? Employer { get; set; }
 
-        // Additional properties for filtering
-        [Column(TypeName = "decimal(18,2)")]
-        public decimal? Salary { get; set; }
+        // // Additional properties for filtering
+        // [Column(TypeName = "decimal(18,2)")]
+        // public decimal? Salary { get; set; }
         
-        public string? EmploymentStatus { get; set; }
+        // public string? EmploymentStatus { get; set; }
         
-        public string? EmployerName { get; set; }
+        // public string? EmployerName { get; set; }
         
-        public string? Language { get; set; }
+        // public string? Language { get; set; }
 
         // Security
         [Required]

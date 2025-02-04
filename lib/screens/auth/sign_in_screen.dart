@@ -20,6 +20,8 @@ import 'forget_password_screen.dart';
 import 'forget_mpin_screen.dart';
 import '../../providers/theme_provider.dart';
 import '../../utils/constants.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'dart:async';
 
 class SignInScreen extends StatefulWidget {
   final bool isArabic;
@@ -248,10 +250,7 @@ class _SignInScreenState extends State<SignInScreen> {
       // Check if MPIN is set
       _isMPINSet = await _authService.isMPINSet();
 
-      // Check if biometrics are enabled
-      final isBiometricEnabled = await _authService.isBiometricEnabled();
-
-      // Get last used national ID if device is registered
+      // Check if device is registered and get last used national ID
       final isDeviceRegistered = await _authService.isDeviceRegistered();
       if (isDeviceRegistered) {
         final prefs = await SharedPreferences.getInstance();
@@ -261,30 +260,18 @@ class _SignInScreenState extends State<SignInScreen> {
         }
       }
 
-      // Check if this device is registered for the current user
-      bool isDeviceRegisteredForUser = false;
-      if (_lastUsedNationalId != null) {
-        isDeviceRegisteredForUser =
-            await _authService.isDeviceRegisteredToUser(_lastUsedNationalId!);
-      }
-
       setState(() {
-        // If device is registered for this user, never use password mode
-        if (isDeviceRegisteredForUser) {
-          _isPasswordMode = false;
+        // If device is registered and has quick sign-in methods, show them
+        if (isDeviceRegistered && (_isBiometricsAvailable || _isMPINSet)) {
+          _isPasswordMode = widget.startWithPassword;
         } else {
-          // If not registered, respect startWithPassword parameter or fallback to quick sign-in if available
-          _isPasswordMode =
-              widget.startWithPassword || !(isBiometricEnabled || _isMPINSet);
+          // Otherwise, always use password mode
+          _isPasswordMode = true;
         }
       });
 
-      // If biometric is enabled and we have the user ID, trigger biometric auth
-      if (isBiometricEnabled &&
-          _lastUsedNationalId != null &&
-          !_isPasswordMode &&
-          _isBiometricsAvailable) {
-        // Add slight delay to ensure UI is ready
+      // If startWithBiometric is true and biometrics are available, trigger it
+      if (widget.startWithBiometric && _isBiometricsAvailable) {
         Future.delayed(const Duration(milliseconds: 500), () {
           _authenticateWithBiometrics();
         });
@@ -294,7 +281,6 @@ class _SignInScreenState extends State<SignInScreen> {
       print('- Biometrics Available: $_isBiometricsAvailable');
       print('- MPIN Set: $_isMPINSet');
       print('- Device Registered: $isDeviceRegistered');
-      print('- Device Registered For User: $isDeviceRegisteredForUser');
       print('- Last Used ID: $_lastUsedNationalId');
       print('- Password Mode: $_isPasswordMode');
     } catch (e) {
@@ -306,11 +292,80 @@ class _SignInScreenState extends State<SignInScreen> {
     print('\n=== HANDLE SIGN IN RESPONSE START ===');
     print('Response data: ${json.encode(response)}');
 
-    if (response['status'] == 'success') {
-      // Reset manual sign off flag in session provider
-      Provider.of<SessionProvider>(context, listen: false).resetManualSignOff();
-
+    if (response['success'] == true && response['data'] != null) {
+      final responseData = response['data'];
+      final userData = responseData['user'];
+      
       try {
+        // Store user data in local storage
+        final prefs = await SharedPreferences.getInstance();
+        final secureStorage = const FlutterSecureStorage();
+        
+        // Store access token securely FIRST
+        final token = responseData['token'];
+        print('\n=== TOKEN STORAGE ===');
+        print('Token from response: $token');
+        
+        if (token != null) {
+          await secureStorage.write(key: 'auth_token', value: token);
+          print('✅ Auth Token stored successfully');
+          
+          // Verify token was stored
+          final storedToken = await secureStorage.read(key: 'auth_token');
+          print('Verification - Stored token exists: ${storedToken != null}');
+        } else {
+          print('❌ No token found in response data');
+          print('Response data structure: ${json.encode(responseData)}');
+          throw Exception('No auth token in response');
+        }
+        
+        // Store refresh token securely if available
+        final refreshToken = responseData['refresh_token'];
+        if (refreshToken != null) {
+          await secureStorage.write(key: 'refresh_token', value: refreshToken);
+          print('✅ Refresh Token stored successfully');
+        }
+
+        // Store session data
+        await secureStorage.write(key: 'session_active', value: 'true');
+        await secureStorage.write(key: 'session_user_id', value: userData['id']?.toString() ?? _nationalIdController.text);
+        print('✅ Session data stored');
+        
+        // Store user data
+        final userDataJson = json.encode(userData);
+        await prefs.setString('user_data', userDataJson);
+        await secureStorage.write(
+          key: 'user_data',
+          value: userDataJson
+        );
+        print('\n=== STORED USER DATA ===');
+        print('User Data: $userDataJson');
+        
+        // Store other response data
+        final lastLogin = DateTime.now().toIso8601String();
+        await prefs.setString('last_login', lastLogin);
+        print('Last Login: $lastLogin');
+        
+        if (responseData['settings'] != null) {
+          await prefs.setString('user_settings', json.encode(responseData['settings']));
+          print('Settings: ${json.encode(responseData['settings'])}');
+        }
+        if (responseData['preferences'] != null) {
+          await prefs.setString('user_preferences', json.encode(responseData['preferences']));
+          print('Preferences: ${json.encode(responseData['preferences'])}');
+        }
+        print('=== LOCAL STORAGE UPDATED SUCCESSFULLY ===\n');
+
+        // Update session provider state BEFORE starting session
+        final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
+        sessionProvider.resetManualSignOff();
+        sessionProvider.setSignedIn(true);
+        await sessionProvider.initializeSession();
+
+        // Then start session
+        await _authService.startSession(_nationalIdController.text, userId: userData['id']?.toString());
+        print('Session started successfully');
+        
         // For quick sign-in (MPIN/biometric), go directly to main page
         if (!_isPasswordMode) {
           print('Quick sign-in successful, navigating to main page');
@@ -320,10 +375,7 @@ class _SignInScreenState extends State<SignInScreen> {
               MaterialPageRoute(
                 builder: (context) => MainPage(
                   isArabic: widget.isArabic,
-                  onLanguageChanged: (bool newIsArabic) {
-                    // Handle language change if needed
-                  },
-                  userData: response['user'] ?? {},
+                  userData: userData,
                   isDarkMode: Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
                 ),
               ),
@@ -332,13 +384,21 @@ class _SignInScreenState extends State<SignInScreen> {
           return;
         }
 
-        // For password sign-in, always register this device
-        print('Registering current device...');
+        // Register device
+        print('\n=== REGISTERING DEVICE ===');
+        final deviceInfo = await _authService.getDeviceInfo();
+        print('Device Info: ${json.encode(deviceInfo)}');
+        
         final registerResponse = await _authService.registerDevice(
           nationalId: _nationalIdController.text,
+          deviceInfo: deviceInfo,
         );
+        print('Register Response: ${json.encode(registerResponse)}');
 
-        if (registerResponse['status'] == 'success') {
+        if (registerResponse['success'] == true) {
+          await _authService.storeDeviceRegistration(_nationalIdController.text);
+          print('Device registration stored locally');
+          
           if (mounted) {
             Navigator.pushReplacement(
               context,
@@ -347,13 +407,14 @@ class _SignInScreenState extends State<SignInScreen> {
                   isArabic: widget.isArabic,
                   nationalId: _nationalIdController.text,
                   password: _passwordController.text,
-                  user: response['user'] ?? {},
+                  user: userData,
                   showSteps: false,
                 ),
               ),
             );
           }
         } else {
+          print('Device registration failed: ${registerResponse['message']}');
           throw Exception(registerResponse['message'] ?? 'Failed to register device');
         }
       } catch (e, stackTrace) {
@@ -362,14 +423,19 @@ class _SignInScreenState extends State<SignInScreen> {
           _showErrorBanner(
             widget.isArabic
                 ? 'حدث خطأ أثناء تسجيل الدخول'
-                : 'Error during sign in process'
+                : e.toString()
           );
         }
       }
     } else {
-      print('Sign in failed with code: ${response['code']}');
+      print('Sign in failed with code: ${response['details']?['code']}');
 
-      switch (response['code']) {
+      final errorCode = response['details']?['code'] ?? 'UNKNOWN_ERROR';
+      final errorMessage = widget.isArabic 
+          ? (response['details']?['message_ar'] ?? response['error'])
+          : (response['error'] ?? 'Unknown error');
+
+      switch (errorCode) {
         case 'CUSTOMER_NOT_FOUND':
           await showDialog(
             context: context,
@@ -377,49 +443,162 @@ class _SignInScreenState extends State<SignInScreen> {
             builder: (BuildContext context) {
               return _buildCustomDialog(
                 title: widget.isArabic ? 'مستخدم جديد' : 'New User',
-                message: widget.isArabic
-                    ? 'لم يتم العثور على حسابك. هل تريد إنشاء حساب جديد؟'
-                    : 'Your account was not found. Would you like to create a new account?',
+                message: errorMessage,
                 icon: Icons.person_add_rounded,
-                iconColor: Colors.red[700],
+                iconColor: Colors.orange[700],
                 actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: Text(
-                      widget.isArabic ? 'إلغاء' : 'Cancel',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w600,
-                      ),
+                  Directionality(
+                    textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: widget.isArabic
+                          ? [
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.of(context).pop(false);
+                                    _initiateUserRegistration();
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF0077B6),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    widget.isArabic ? 'تسجيل' : 'Register',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextButton(
+                                  onPressed: () => Navigator.of(context).pop(false),
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    widget.isArabic ? 'إلغاء' : 'Cancel',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.grey[600],
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ]
+                          : [
+                              Expanded(
+                                child: TextButton(
+                                  onPressed: () => Navigator.of(context).pop(false),
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    widget.isArabic ? 'إلغاء' : 'Cancel',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.grey[600],
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.of(context).pop();
+                                    _initiateUserRegistration();
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF0077B6),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    widget.isArabic ? 'تسجيل' : 'Register',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                     ),
                   ),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      _initiateUserRegistration();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0077B6),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: Text(
-                      widget.isArabic ? 'تسجيل' : 'Register',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
+                ],
+              );
+            },
+          );
+          break;
+
+        case 'PASSWORD_NOT_SET':
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (BuildContext context) {
+              return _buildCustomDialog(
+                title: widget.isArabic ? 'تنبيه' : 'Alert',
+                message: errorMessage,
+                icon: Icons.password_rounded,
+                iconColor: Colors.red[700],
+                actions: [
+                  Directionality(
+                    textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ForgetPasswordScreen(
+                                    isArabic: widget.isArabic,
+                                  ),
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0077B6),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: Text(
+                              widget.isArabic ? 'تعيين كلمة المرور' : 'Set Password',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -435,56 +614,152 @@ class _SignInScreenState extends State<SignInScreen> {
             builder: (BuildContext context) {
               return _buildCustomDialog(
                 title: widget.isArabic ? 'تنبيه' : 'Alert',
-                message: widget.isArabic
-                    ? 'كلمة المرور غير صحيحة. الرجاء المحاولة مرة أخرى.'
-                    : 'Invalid password. Please try again.',
+                message: errorMessage,
                 icon: Icons.lock_outline,
                 iconColor: Colors.red[700],
                 actions: [
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      // Clear password field
-                      _passwordController.clear();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0077B6),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: Text(
-                      widget.isArabic ? 'موافق' : 'OK',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  Directionality(
+                    textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: widget.isArabic
+                          ? [
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.of(context).pop();
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ForgetPasswordScreen(
+                                          isArabic: widget.isArabic,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF0077B6),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    widget.isArabic ? 'نسيت كلمة المرور؟' : 'Forgot Password?',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      widget.isArabic ? 'المحاولة مرة أخرى' : 'Try Again',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.grey[600],
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ]
+                          : [
+                              Expanded(
+                                child: TextButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      widget.isArabic ? 'المحاولة مرة أخرى' : 'Try Again',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.grey[600],
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Center(
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.of(context).pop();
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => ForgetPasswordScreen(
+                                            isArabic: widget.isArabic,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF0077B6),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                      widget.isArabic ? 'نسيت كلمة المرور؟' : 'Forgot Password?',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                     ),
                   ),
                 ],
               );
             },
           );
+          // Clear password field after showing error
+          _passwordController.clear();
           break;
 
         case 'INVALID_MPIN':
         case 'BIOMETRIC_VERIFICATION_FAILED':
           // These cases are handled locally, just show error message
-          _showErrorBanner(
-            widget.isArabic ? 'فشل التحقق' : 'Verification failed'
-          );
+          _showErrorBanner(errorMessage);
           break;
 
         default:
           if (mounted) {
-            _showErrorBanner(
-              widget.isArabic
-                  ? response['message_ar'] ?? 'حدث خطأ أثناء تسجيل الدخول'
-                  : response['message'] ?? 'Error during sign in process'
-            );
+            _showErrorBanner(errorMessage);
           }
       }
     }
@@ -492,118 +767,147 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   Future<void> _authenticateWithBiometrics() async {
-    print('=== BIOMETRIC AUTHENTICATION START ===');
-    if (_nationalIdController.text.isEmpty) {
-      print('National ID is empty, showing error');
-      _showErrorBanner(
-        widget.isArabic
-            ? 'يرجى إدخال رقم الهوية أولاً'
-            : 'Please enter your National ID first'
-      );
-      return;
-    }
+    if (_isLoading) return;
 
-    setState(() {
-      _isLoading = true;
-      _isPasswordMode = false; // Ensure we're in quick sign-in mode
-    });
+    setState(() => _isLoading = true);
 
     try {
-      print('Requesting biometric authentication...');
       final bool didAuthenticate = await _localAuth.authenticate(
         localizedReason: widget.isArabic
-            ? 'قم بتسجيل السمات الحيوية للمتابعة'
-            : 'Authenticate to continue',
+            ? 'استخدم السمات الحيوية لتسجيل الدخول'
+            : 'Use biometrics to sign in',
         options: const AuthenticationOptions(
           stickyAuth: true,
           biometricOnly: true,
-          useErrorDialogs: true,
         ),
       );
-      print('Biometric authentication result: $didAuthenticate');
 
-      if (mounted && didAuthenticate) {
-        print('Verifying biometric with backend...');
-        final result = await _authService.verifyBiometric(
-          nationalId: _nationalIdController.text,
-        );
-        print('Backend verification result: ${json.encode(result)}');
+      if (didAuthenticate) {
+        // Get user data from local storage
+        final prefs = await SharedPreferences.getInstance();
+        final userDataString = prefs.getString('user_data');
+        if (userDataString == null) {
+          throw Exception('User data not found');
+        }
+        final userData = json.decode(userDataString);
 
-        await _handleSignInResponse(result);
+        // Initialize session and reset manual sign off
+        final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
+        sessionProvider.resetManualSignOff();
+        await sessionProvider.initializeSession();
+
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MainPage(
+                isArabic: widget.isArabic,
+                userData: userData,
+                isDarkMode: Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
+              ),
+            ),
+          );
+        }
       }
-    } catch (e, stackTrace) {
-      print('Error during biometric authentication:');
-      print('Error: $e');
-      print('Stack trace: $stackTrace');
-      if (mounted) {
-        _showErrorBanner(
-          widget.isArabic
-              ? 'حدث خطأ أثناء التحقق'
-              : 'Authentication error occurred'
-        );
-      }
+    } catch (e) {
+      _showErrorBanner(
+        widget.isArabic
+            ? 'فشل في مصادقة السمات الحيوية'
+            : 'Biometric authentication failed',
+      );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
-      print('=== BIOMETRIC AUTHENTICATION END ===');
     }
   }
 
   Future<void> _authenticateWithMPIN() async {
-    print('=== MPIN AUTHENTICATION START ===');
-    if (_mpinDigits.contains('')) {
-      print('MPIN is incomplete');
-      return;
-    }
+    if (_isLoading) return;
 
-    setState(() {
-      _isLoading = true;
-      _isPasswordMode = false; // Ensure we're in quick sign-in mode
-    });
+    final mpin = _mpinDigits.join();
+    if (mpin.length != 6) return;
+
+    setState(() => _isLoading = true);
 
     try {
-      final mpin = _mpinDigits.join();
-      print('Verifying MPIN locally...');
       // First verify MPIN locally
-      final isValid = await _authService.verifyMPIN(mpin);
-      print('Local MPIN verification result: $isValid');
+      final bool isValid = await _authService.verifyMPIN(mpin);
+      
+      if (isValid) {
+        // Get the national ID and user data from secure storage first
+        final secureStorage = const FlutterSecureStorage();
+        final nationalId = await secureStorage.read(key: 'device_user_id');
+        final secureUserData = await secureStorage.read(key: 'user_data');
 
-      if (!isValid) {
-        print('Invalid MPIN, showing error');
-        _showErrorBanner(
-          widget.isArabic ? 'رمز الدخول غير صحيح' : 'Invalid MPIN'
+        if (nationalId == null) {
+          throw Exception('Device not registered');
+        }
+
+        // Perform MPIN-based login which will handle session initialization
+        final loginResult = await _authService.loginWithMPIN(
+          nationalId: nationalId,
+          mpin: mpin,
         );
-        // Clear MPIN on error
-        setState(() {
-          _mpinDigits.fillRange(0, _mpinDigits.length, '');
-        });
-        return;
-      }
 
-      print('Verifying device and getting token...');
-      final result = await _authService.signIn(
-        nationalId: _nationalIdController.text,
+        if (loginResult['success'] != true) {
+          throw Exception(loginResult['message'] ?? 'MPIN authentication failed');
+        }
+
+        // Get user data from secure storage or login result
+        Map<String, dynamic> userData;
+        if (secureUserData != null) {
+          userData = json.decode(secureUserData);
+        } else if (loginResult['data']?['user'] != null) {
+          userData = loginResult['data']['user'];
+          // Store the user data for future use
+          await secureStorage.write(
+            key: 'user_data',
+            value: json.encode(userData)
+          );
+          // Also store in SharedPreferences for redundancy
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('user_data', json.encode(userData));
+        } else {
+          throw Exception('User data not available');
+        }
+
+        // Initialize session and reset manual sign off
+        final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
+        sessionProvider.resetManualSignOff();
+        await sessionProvider.initializeSession();
+
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MainPage(
+                isArabic: widget.isArabic,
+                userData: userData,
+                isDarkMode: Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
+              ),
+            ),
+          );
+        }
+      } else {
+        _showErrorBanner(
+          widget.isArabic ? 'رمز MPIN غير صحيح' : 'Invalid MPIN',
+        );
+        _mpinDigits.fillRange(0, _mpinDigits.length, '');
+        setState(() {});
+      }
+    } catch (e) {
+      print('Error in MPIN authentication: $e');
+      _showErrorBanner(
+        widget.isArabic
+            ? 'فشل في المصادقة باستخدام MPIN'
+            : 'MPIN authentication failed',
       );
-      print('Device verification result: ${json.encode(result)}');
-
-      await _handleSignInResponse(result);
-    } catch (e, stackTrace) {
-      print('Error during MPIN authentication:');
-      print('Error: $e');
-      print('Stack trace: $stackTrace');
-      if (mounted) {
-        _showErrorBanner(
-          widget.isArabic
-              ? 'حدث خطأ أثناء التحقق'
-              : 'Authentication error occurred'
-        );
-      }
+      _mpinDigits.fillRange(0, _mpinDigits.length, '');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
-      print('=== MPIN AUTHENTICATION END ===');
     }
   }
 
@@ -642,14 +946,13 @@ class _SignInScreenState extends State<SignInScreen> {
         _showErrorBanner(
           widget.isArabic
               ? 'حدث خطأ أثناء تسجيل الدخول'
-              : 'An error occurred during sign in'
+              : e.toString()
         );
       }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
-      print('=== PASSWORD AUTHENTICATION END ===\n');
     }
   }
 
@@ -679,29 +982,29 @@ class _SignInScreenState extends State<SignInScreen> {
     });
 
     try {
-      // Step 1 & 2: Check user exists and verify password
+      // Step 1: Sign in with credentials
       print('\n=== STARTING SIGN IN PROCESS ===');
       final signInResult = await _authService.signIn(
         nationalId: _nationalIdController.text,
         password: _passwordController.text,
       );
 
-      if (signInResult['status'] != 'success') {
+      if (signInResult['success'] != true) {
         print('Sign in failed: ${signInResult['code']}');
-      await _handleSignInResponse(signInResult);
+        await _handleSignInResponse(signInResult);
         return;
       }
 
-      // Step 3: Generate OTP
+      // Step 2: Generate OTP
       print('\n=== GENERATING OTP ===');
       final otpGenResult = await _authService.generateOTP(_nationalIdController.text);
-      if (otpGenResult['status'] != 'success') {
+      if (otpGenResult['success'] != true) {
         throw Exception(widget.isArabic 
           ? (otpGenResult['message_ar'] ?? 'فشل في إرسال رمز التحقق')
           : (otpGenResult['message'] ?? 'Failed to send OTP'));
       }
 
-      // Step 4: Show OTP dialog and verify
+      // Step 3: Show OTP dialog and verify
       final otpVerified = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
@@ -714,23 +1017,19 @@ class _SignInScreenState extends State<SignInScreen> {
       );
 
       if (otpVerified == true) {
-        // Step 5: Register device and proceed with sign in
-        final deviceRegistration = await _authService.registerDevice(
-          nationalId: _nationalIdController.text,
+        // Step 4: Save user data and proceed with device registration
+        print('✅ OTP verification completed, MPIN setup will start automatically');
+      } else {
+        _showErrorBanner(
+          widget.isArabic
+              ? 'فشل في التحقق من رمز OTP'
+              : 'OTP verification failed'
         );
-
-        if (deviceRegistration['status'] != 'success') {
-          throw Exception(deviceRegistration['message'] ?? 'Failed to register device');
-        }
-
-        // Step 6: Complete sign in process
-        await _handleSignInResponse({
-          ...signInResult,
-          'device_registered': true
-        });
       }
-    } catch (e) {
-      print('Error during sign in process: $e');
+    } catch (e, stackTrace) {
+      print('Error during sign in process:');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
       if (mounted) {
         _showErrorBanner(
           widget.isArabic
@@ -740,12 +1039,15 @@ class _SignInScreenState extends State<SignInScreen> {
       }
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _isTimerActive = false;
+        });
       }
     }
   }
 
-  Future<void> _initiateUserRegistration() async {
+  void _initiateUserRegistration() async {
     // Navigate to registration screen
     Navigator.pushReplacement(
       context,
@@ -763,7 +1065,7 @@ class _SignInScreenState extends State<SignInScreen> {
       final response = await _authService.generateOTP(nationalId);
       print('OTP Generation Response: ${json.encode(response)}');
 
-      if (response['status'] != 'success') {
+      if (response['success'] != true) {
         print('OTP Generation failed with status: ${response['status']}');
         print('Error message: ${response['message']}');
         print('Arabic message: ${response['message_ar']}');
@@ -790,11 +1092,27 @@ class _SignInScreenState extends State<SignInScreen> {
   Future<Map<String, dynamic>> _resendOTP() async {
     try {
       final response = await _authService.generateOTP(_nationalIdController.text);
-      if (response['status'] != 'success') {
+      if (response['success'] != true) {
         throw Exception(widget.isArabic 
           ? (response['message_ar'] ?? 'فشل في إرسال رمز التحقق')
           : (response['message'] ?? 'Failed to send OTP'));
       }
+      
+      // Close current OTP dialog and show new one to reset timer
+      if (mounted) {
+        Navigator.pop(context); // Close current dialog
+        await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => OTPDialog(
+            nationalId: _nationalIdController.text,
+            isArabic: widget.isArabic,
+            onResendOTP: _resendOTP,
+            onVerifyOTP: _verifyOTPCode,
+          ),
+        );
+      }
+      
       return response;
     } catch (e) {
       _showErrorBanner(e.toString());
@@ -803,18 +1121,194 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   Future<Map<String, dynamic>> _verifyOTPCode(String otp) async {
-    try {
-      final response = await _authService.verifyOTP(_nationalIdController.text, otp);
-      if (response['status'] != 'success') {
+    int maxRetries = 3;
+    int currentTry = 0;
+    
+    while (currentTry < maxRetries) {
+      try {
+        print('\n=== VERIFYING OTP (Attempt ${currentTry + 1}/${maxRetries}) ===');
+        print('National ID: ${_nationalIdController.text}');
+        print('OTP: $otp');
+        
+        final response = await _authService.verifyOTP(_nationalIdController.text, otp).timeout(
+          const Duration(seconds: 30),
+          onTimeout: () {
+            throw TimeoutException('Request timed out. Please try again.');
+          },
+        );
+        
+        print('OTP Verification Response: ${json.encode(response)}');
+        
+        if (response['status'] == 'success') {
+          print('✅ OTP verified successfully');
+
+          if (mounted) {
+            try {
+              // Return success before showing dialog to close OTP dialog
+              Navigator.of(context).pop(true);
+              
+              // Show success dialog and navigate
+              if (mounted) {
+                await showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (BuildContext context) {
+                    return _buildCustomDialog(
+                      title: widget.isArabic ? 'تم التحقق بنجاح' : 'Verification Successful',
+                      message: widget.isArabic
+                          ? 'سنقوم الآن بإعداد رمز الدخول السريع والسمات الحيوية لتسهيل تسجيل الدخول في المستقبل'
+                          : 'We will now set up your MPIN and biometrics for easier sign-in in the future',
+                      icon: Icons.check_circle_outline,
+                      iconColor: Colors.green[700],
+                      actions: [
+                        Directionality(
+                          textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 200,
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.of(context).pop();
+                                    // Navigate to MPIN setup screen
+                                    Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => MPINSetupScreen(
+                                          isArabic: widget.isArabic,
+                                          nationalId: _nationalIdController.text,
+                                          password: _passwordController.text,
+                                          user: response['data'],
+                                          showSteps: false,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF0077B6),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    widget.isArabic ? 'متابعة' : 'Continue',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              }
+            } catch (error) {
+              print('Error in OTP verification flow: $error');
+              throw Exception(widget.isArabic 
+                ? 'حدث خطأ أثناء عملية التحقق'
+                : 'Error during verification process');
+            }
+          }
+          return response;
+        }
+        
         throw Exception(widget.isArabic 
           ? (response['message_ar'] ?? 'رمز التحقق غير صحيح')
           : (response['message'] ?? 'Invalid OTP'));
+      } catch (e) {
+        currentTry++;
+        print('❌ Error verifying OTP (Attempt $currentTry/$maxRetries): $e');
+        
+        if (e is TimeoutException || (e.toString().contains('Connection closed') && currentTry < maxRetries)) {
+          // Show retry dialog for connection issues
+          if (mounted) {
+            final shouldRetry = await showDialog<bool>(
+              context: context,
+              barrierDismissible: false,
+              builder: (BuildContext context) {
+                return _buildCustomDialog(
+                  title: widget.isArabic ? 'خطأ في الاتصال' : 'Connection Error',
+                  message: widget.isArabic
+                      ? 'سنقوم بإرسال رمز تحقق جديد. هل تريد المتابعة؟'
+                      : 'We will send a new OTP. Would you like to continue?',
+                  icon: Icons.error_outline,
+                  iconColor: Colors.orange[700],
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: Text(
+                        widget.isArabic ? 'إلغاء' : 'Cancel',
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                    ),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0077B6),
+                        foregroundColor: Colors.white,
+                      ),
+                      child: Text(widget.isArabic ? 'متابعة' : 'Continue'),
+                    ),
+                  ],
+                );
+              },
+            ) ?? false;
+
+            if (!shouldRetry) {
+              break;
+            }
+            
+            // Generate new OTP before continuing
+            try {
+              await _generateOTP(_nationalIdController.text);
+              // Close the current OTP dialog and show a new one
+              Navigator.pop(context); // Close current OTP dialog
+              await showDialog<bool>(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => OTPDialog(
+                  nationalId: _nationalIdController.text,
+                  isArabic: widget.isArabic,
+                  onResendOTP: _resendOTP,
+                  onVerifyOTP: _verifyOTPCode,
+                ),
+              );
+            } catch (otpError) {
+              print('Error generating new OTP: $otpError');
+              _showErrorBanner(
+                widget.isArabic
+                    ? 'فشل في إرسال رمز التحقق الجديد'
+                    : 'Failed to send new OTP'
+              );
+              break;
+            }
+            return {}; // Return empty map to prevent further processing
+          }
+        }
+        
+        if (currentTry >= maxRetries || (!e.toString().contains('Connection closed') && !(e is TimeoutException))) {
+          _showErrorBanner(
+            widget.isArabic
+                ? 'فشل في التحقق من الرمز. يرجى المحاولة مرة أخرى'
+                : 'Failed to verify OTP. Please try again'
+          );
+          rethrow;
+        }
       }
-      return response;
-    } catch (e) {
-      _showErrorBanner(e.toString());
-      rethrow;
     }
+    
+    throw Exception(widget.isArabic 
+      ? 'فشل في الاتصال بالخادم. يرجى المحاولة مرة أخرى لاحقاً'
+      : 'Failed to connect to server. Please try again later');
   }
 
   @override
@@ -1264,103 +1758,99 @@ class _SignInScreenState extends State<SignInScreen> {
     final bool isBackspace = value == '⌫';
     final bool isClear = value == 'C';
     
-    return GestureDetector(
-      onTapDown: (_) => setState(() {}),
-      onTapUp: (_) => setState(() {}),
-      onTapCancel: () => setState(() {}),
-      child: Container(
-        width: 75,
-        height: 75,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: isDarkMode 
-              ? Color(Constants.darkFormBackgroundColor)
-              : (isSpecial ? themeColor : Colors.white),
-          gradient: !isSpecial ? LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: isDarkMode ? [
-              Color(Constants.darkGradientStartColor),
-              Color(Constants.darkGradientEndColor),
-            ] : [
-              Colors.white,
-              Colors.white,
-            ],
-          ) : null,
-          boxShadow: [
-            BoxShadow(
-              color: isDarkMode 
-                  ? Color(Constants.darkPrimaryShadowColor)
-                  : Color(Constants.lightPrimaryShadowColor),
-              blurRadius: 10,
-              spreadRadius: 1,
-              offset: const Offset(0, 2),
-            ),
-            BoxShadow(
-              color: isDarkMode 
-                  ? Color(Constants.darkSecondaryShadowColor)
-                  : Color(Constants.lightSecondaryShadowColor),
-              blurRadius: 10,
-              spreadRadius: 1,
-              offset: const Offset(0, -2),
-            ),
+    return Container(
+      width: 75,
+      height: 75,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: isDarkMode 
+            ? Color(Constants.darkFormBackgroundColor)
+            : (isSpecial ? themeColor : Colors.white),
+        gradient: !isSpecial ? LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDarkMode ? [
+            Color(Constants.darkGradientStartColor),
+            Color(Constants.darkGradientEndColor),
+          ] : [
+            Colors.white,
+            Colors.white,
           ],
-        ),
-        child: ClipOval(
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                if (isBackspace) {
-                  _handleMPINBackspace();
-                } else if (isClear) {
-                  _handleMPINClear();
-                } else {
-                  _handleMPINKeyPress(value);
-                }
-              },
-              splashColor: themeColor.withOpacity(0.1),
-              highlightColor: themeColor.withOpacity(0.05),
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isDarkMode 
-                        ? Color(Constants.darkFormBorderColor)
-                        : (isSpecial ? Colors.transparent : Color(Constants.lightFormBorderColor)),
-                    width: 1,
-                  ),
-                ),
-                child: Center(
-                  child: isBackspace
-                      ? Icon(
-                          Icons.backspace_rounded,
-                          color: isDarkMode ? themeColor : Colors.white,
-                          size: 28,
-                        )
-                      : isClear
-                          ? Text(
-                              'C',
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w100,
-                                color: isDarkMode ? themeColor : Colors.white,
-                                letterSpacing: 1,
-                              ),
-                            )
-                          : Text(
-                              value,
-                              style: TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.w500,
-                                color: isDarkMode 
-                                    ? Color(Constants.darkLabelTextColor)
-                                    : Color(Constants.lightLabelTextColor),
-                                letterSpacing: 1,
-                              ),
-                            ),
-                ),
+        ) : null,
+        boxShadow: [
+          BoxShadow(
+            color: isDarkMode 
+                ? Color(Constants.darkPrimaryShadowColor)
+                : Color(Constants.lightPrimaryShadowColor),
+            blurRadius: 10,
+            spreadRadius: 1,
+            offset: const Offset(0, 2),
+          ),
+          BoxShadow(
+            color: isDarkMode 
+                ? Color(Constants.darkSecondaryShadowColor)
+                : Color(Constants.lightSecondaryShadowColor),
+            blurRadius: 10,
+            spreadRadius: 1,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            if (isBackspace) {
+              _handleMPINBackspace();
+            } else if (isClear) {
+              _handleMPINClear();
+            } else {
+              _handleMPINKeyPress(value);
+            }
+          },
+          splashColor: themeColor.withOpacity(0.1),
+          highlightColor: themeColor.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(37.5),
+          child: Container(
+            width: 75,
+            height: 75,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isDarkMode 
+                    ? Color(Constants.darkFormBorderColor)
+                    : (isSpecial ? Colors.transparent : Color(Constants.lightFormBorderColor)),
+                width: 1,
               ),
+            ),
+            child: Center(
+              child: isBackspace
+                  ? Icon(
+                      Icons.backspace_rounded,
+                      color: isDarkMode ? themeColor : Colors.white,
+                      size: 28,
+                    )
+                  : isClear
+                      ? Text(
+                          'C',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w100,
+                            color: isDarkMode ? themeColor : Colors.white,
+                            letterSpacing: 1,
+                          ),
+                        )
+                      : Text(
+                          value,
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w500,
+                            color: isDarkMode 
+                                ? Color(Constants.darkLabelTextColor)
+                                : Color(Constants.lightLabelTextColor),
+                            letterSpacing: 1,
+                          ),
+                        ),
             ),
           ),
         ),
@@ -1540,11 +2030,10 @@ class _SignInScreenState extends State<SignInScreen> {
             ),
             child: Text(
               widget.isArabic ? 'نسيت كلمة المرور؟' : 'Forgot Password?',
-              style: TextStyle(
-                color: _isTimerActive 
-                    ? Colors.grey 
-                    : themeColor,
-                fontSize: 14,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),

@@ -58,30 +58,14 @@ namespace NayifatAPI.Controllers
                     user = new
                     {
                         national_id = customer.NationalId,
-                        name_en = customer.FullNameEn,
-                        name_ar = customer.FullNameAr,
+                        first_name_en = customer.FirstNameEn,
+                        last_name_en = customer.FamilyNameEn,
                         email = customer.Email,
                         phone = customer.Phone,
                         date_of_birth = customer.DateOfBirth?.ToString("yyyy-MM-dd"),
                         id_expiry_date = customer.IdExpiryDate?.ToString("yyyy-MM-dd"),
-                        building_no = customer.BuildingNo,
-                        street = customer.Street,
-                        district = customer.District,
-                        city = customer.City,
-                        zipcode = customer.Zipcode,
-                        add_no = customer.AddNo,
-                        iban = customer.Iban,
-                        dependents = customer.Dependents,
-                        salary_dakhli = customer.SalaryDakhli,
-                        salary_customer = customer.SalaryCustomer,
-                        los = customer.Los,
-                        sector = customer.Sector,
-                        employer = customer.Employer,
-                        registration_date = customer.RegistrationDate.ToString("yyyy-MM-dd HH:mm:ss"),
-                        consent = customer.Consent,
-                        consent_date = customer.ConsentDate?.ToString("yyyy-MM-dd HH:mm:ss"),
-                        nafath_status = customer.NafathStatus,
-                        nafath_timestamp = customer.NafathTimestamp?.ToString("yyyy-MM-dd HH:mm:ss")
+                        mpin_enabled = customer.MpinEnabled,
+                        registration_date = customer.RegistrationDate.ToString("yyyy-MM-dd HH:mm:ss")
                     },
                     devices = deviceList
                 });

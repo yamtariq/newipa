@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
+import 'dart:async';  // Add this import for TimeoutException
 import '../utils/constants.dart';
 import '../services/api_service.dart';
 import '../services/theme_service.dart';
@@ -50,20 +51,23 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
   Future<bool> _verifyOTP(String otp) async {
     try {
       final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPVerification}'),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'api-key': Constants.apiKey,
-        },
-        body: {
-          'national_id': _idNumberController.text,
+        Uri.parse('${Constants.apiBaseUrl}/proxy/forward?url=${Constants.proxyOtpVerifyUrl}'),
+        headers: Constants.defaultHeaders,
+        body: jsonEncode({
+          'nationalId': _idNumberController.text,
           'otp_code': otp,
-        },
+          'type': 'application',
+          'request': {
+            'nationalId': _idNumberController.text,
+            'otp_code': otp,
+            'type': 'application'
+          }
+        }),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['status'] == 'success';
+        return data['success'] == true;
       }
       return false;
     } catch (e) {
@@ -75,21 +79,24 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
   Future<bool> _sendOTP() async {
     try {
       final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPGenerate}'),
+        Uri.parse('${Constants.apiBaseUrl}/proxy/forward?url=${Constants.proxyOtpGenerateUrl}'),
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'api-key': Constants.apiKey,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-API-Key': Constants.apiKey
         },
-        body: {
-          'national_id': _idNumberController.text,
-        },
+        body: jsonEncode(Constants.otpGenerateRequestBody(
+          _idNumberController.text,
+          _phoneController.text,
+          purpose: 'application'
+        )),
       );
 
       print('OTP Generation Response: ${response.body}'); // Debug log
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['status'] == 'success';
+        return data['success'] == true;
       }
       return false;
     } catch (e) {
@@ -98,66 +105,189 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
     }
   }
 
-  Future<bool> _showOTPDialog() async {
-    bool isVerified = false;
+  Future<Map<String, dynamic>> _verifyOTPCode(String otp) async {
+    int maxRetries = 3;
+    int currentTry = 0;
     
-    // Send OTP first
-    final otpSent = await _sendOTP();
-    if (!otpSent) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.isArabic
-                  ? 'فشل في إرسال رمز التحقق. الرجاء المحاولة مرة أخرى'
-                  : 'Failed to send OTP. Please try again',
-            ),
-            backgroundColor: Colors.red,
-          ),
+    while (currentTry < maxRetries) {
+      try {
+        print('\n=== VERIFYING OTP (Attempt ${currentTry + 1}/${maxRetries}) ===');
+        print('National ID: ${_idNumberController.text}');
+        print('OTP: $otp');
+        
+        final response = await http.post(
+          Uri.parse('${Constants.apiBaseUrl}/proxy/forward?url=${Constants.proxyOtpVerifyUrl}'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-API-Key': Constants.apiKey
+          },
+          body: jsonEncode(Constants.otpVerifyRequestBody(
+            _idNumberController.text,
+            otp
+          )),
+        ).timeout(
+          const Duration(seconds: 30),
+          onTimeout: () {
+            throw TimeoutException('Request timed out. Please try again.');
+          },
         );
+        
+        print('OTP Verification Response: ${json.encode(response.body)}');
+        final data = jsonDecode(response.body);
+        
+        if (data['success'] == true) {
+          print('✅ OTP verified successfully');
+          return data;
+        }
+        
+        throw Exception(widget.isArabic 
+          ? (data['message_ar'] ?? 'رمز التحقق غير صحيح')
+          : (data['message'] ?? 'Invalid OTP'));
+      } catch (e) {
+        currentTry++;
+        print('❌ Error verifying OTP (Attempt $currentTry/$maxRetries): $e');
+        
+        if (e is TimeoutException || (e.toString().contains('Connection closed') && currentTry < maxRetries)) {
+          if (mounted) {
+            final shouldRetry = await showDialog<bool>(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => Dialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: Colors.orange[700],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        widget.isArabic ? 'خطأ في الاتصال' : 'Connection Error',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.isArabic
+                            ? 'سنقوم بإرسال رمز تحقق جديد. هل تريد المتابعة؟'
+                            : 'We will send a new OTP. Would you like to continue?',
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: Text(
+                              widget.isArabic ? 'إلغاء' : 'Cancel',
+                              style: TextStyle(color: Colors.grey[600]),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0077B6),
+                              foregroundColor: Colors.white,
+                            ),
+                            child: Text(widget.isArabic ? 'متابعة' : 'Continue'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ) ?? false;
+
+            if (!shouldRetry) {
+              break;
+            }
+            
+            try {
+              final otpSent = await _sendOTP();
+              if (!otpSent) {
+                throw Exception(widget.isArabic 
+                  ? 'فشل في إرسال رمز التحقق الجديد'
+                  : 'Failed to send new OTP');
+              }
+              Navigator.pop(context);
+              await showDialog<bool>(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => OTPDialog(
+                  nationalId: _idNumberController.text,
+                  isArabic: widget.isArabic,
+                  onResendOTP: () async {
+                    final response = await http.post(
+                      Uri.parse('${Constants.apiBaseUrl}/proxy/forward?url=${Constants.proxyOtpGenerateUrl}'),
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-API-Key': Constants.apiKey
+                      },
+                      body: jsonEncode(Constants.otpGenerateRequestBody(
+                        _idNumberController.text,
+                        _phoneController.text,
+                        purpose: 'application'
+                      )),
+                    );
+                    return json.decode(response.body);
+                  },
+                  onVerifyOTP: _verifyOTPCode,
+                ),
+              );
+            } catch (otpError) {
+              print('Error generating new OTP: $otpError');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      widget.isArabic
+                          ? 'فشل في إرسال رمز التحقق الجديد'
+                          : 'Failed to send new OTP'
+                    ),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+              break;
+            }
+            return {};
+          }
+        }
+        
+        if (currentTry >= maxRetries || (!e.toString().contains('Connection closed') && !(e is TimeoutException))) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  widget.isArabic
+                      ? 'فشل في التحقق من الرمز. يرجى المحاولة مرة أخرى'
+                      : 'Failed to verify OTP. Please try again'
+                ),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          rethrow;
+        }
       }
-      return false;
     }
-
-    if (!mounted) return false;
-
-    final otpVerified = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => OTPDialog(
-        nationalId: _idNumberController.text,
-        isArabic: widget.isArabic,
-        onResendOTP: () async {
-          final response = await http.post(
-            Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPGenerate}'),
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'api-key': Constants.apiKey,
-            },
-            body: {
-              'national_id': _idNumberController.text,
-            },
-          );
-          return json.decode(response.body);
-        },
-        onVerifyOTP: (otp) async {
-          final response = await http.post(
-            Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPVerification}'),
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'api-key': Constants.apiKey,
-            },
-            body: {
-              'national_id': _idNumberController.text,
-              'otp_code': otp,
-            },
-          );
-          return json.decode(response.body);
-        },
-      ),
-    );
-
-    return otpVerified ?? false;
+    
+    throw Exception(widget.isArabic 
+      ? 'فشل في الاتصال بالخادم. يرجى المحاولة مرة أخرى لاحقاً'
+      : 'Failed to connect to server. Please try again later');
   }
 
   Future<void> _submitForm() async {
@@ -412,6 +542,58 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
         );
       },
     );
+  }
+
+  Future<bool> _showOTPDialog() async {
+    bool isVerified = false;
+    
+    // Send OTP first
+    final otpSent = await _sendOTP();
+    if (!otpSent) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              widget.isArabic
+                  ? 'فشل في إرسال رمز التحقق. الرجاء المحاولة مرة أخرى'
+                  : 'Failed to send OTP. Please try again',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return false;
+    }
+
+    if (!mounted) return false;
+
+    final otpVerified = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => OTPDialog(
+        nationalId: _idNumberController.text,
+        isArabic: widget.isArabic,
+        onResendOTP: () async {
+          final response = await http.post(
+            Uri.parse('${Constants.apiBaseUrl}/proxy/forward?url=${Constants.proxyOtpGenerateUrl}'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'X-API-Key': Constants.apiKey
+            },
+            body: jsonEncode(Constants.otpGenerateRequestBody(
+              _idNumberController.text,
+              _phoneController.text,
+              purpose: 'application'
+            )),
+          );
+          return json.decode(response.body);
+        },
+        onVerifyOTP: _verifyOTPCode,
+      ),
+    );
+
+    return otpVerified ?? false;
   }
 
   @override
@@ -669,15 +851,15 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
                                                 ? 'الرجاء إدخال رقم الهاتف'
                                                 : 'Please enter your phone number';
                                           }
-                                          if (value.length != 10) {
+                                          if (value.length != 9) {
                                             return widget.isArabic
                                                 ? 'رقم الهاتف يجب أن يكون 10 أرقام'
                                                 : 'Phone number must be 10 digits';
                                           }
-                                          if (!value.startsWith('05')) {
+                                          if (!value.startsWith('5')) {
                                             return widget.isArabic
-                                                ? 'رقم الهاتف يجب أن يبدأ بـ 05'
-                                                : 'Phone number must start with 05';
+                                                ? '5'
+                                                : 'Phone number must start with 5';
                                           }
                                           return null;
                                         },

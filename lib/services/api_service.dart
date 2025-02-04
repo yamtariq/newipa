@@ -138,23 +138,14 @@ class ApiService {
   // Registration Step 3: Set Quick Access PIN
   Future<Map<String, dynamic>> setQuickAccessPin(String id, String pin) async {
     try {
-      final response = await http.post(
-        Uri.parse('${Constants.authBaseUrl}${Constants.endpointSetQuickAccessPin}'),
-        body: json.encode({
-          'id': id,
-          'pin': pin,
-        }),
-        headers: Constants.authHeaders,
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to set quick access PIN: ${response.statusCode}');
-      }
+      // MPIN is now stored only locally, no API call needed
+      return {
+        'success': true,
+        'message': 'MPIN stored locally'
+      };
     } catch (e) {
-      print('Error setting quick access PIN: $e');
-      throw Exception('Network error: $e');
+      print('Error with MPIN: $e');
+      throw Exception('Error: $e');
     }
   }
 

@@ -16,6 +16,7 @@ class AuthService {
   final FlutterSecureStorage _secureStorage = FlutterSecureStorage();
   final LocalAuthentication _localAuth = LocalAuthentication();
   Timer? _refreshTimer;
+  bool _isSigningIn = false;
 
   // Get default headers for all requests
   Map<String, String> get _headers => Constants.authHeaders;
@@ -313,97 +314,264 @@ class AuthService {
     }
   }
 
-  // Register device - simplified flow
-  Future<Map<String, dynamic>> registerDevice({
-    required String nationalId,
-  }) async {
-    try {
-      final deviceInfo = await getDeviceInfo();
-      
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointRegisterDevice}'),
-        headers: await getAuthHeaders(),  // Use auth headers for proper API key
-        body: jsonEncode({
-          'national_id': nationalId,
-          'deviceId': deviceInfo['deviceId'],
-          'platform': deviceInfo['platform'],
-          'model': deviceInfo['model'],
-          'manufacturer': deviceInfo['manufacturer'],
-        }),
-      );
-
-      final data = jsonDecode(response.body);
-      print('Device registration response: $data');
-
-      if (data['status'] == 'success') {
-        // Store device registration data locally
-        await storeDeviceRegistration(nationalId);
-      }
-
-      return data;
-    } catch (e) {
-      print('Error registering device: $e');
-      return {
-        'status': 'error',
-        'message': 'Error registering device: $e',
-        'message_ar': 'حدث خطأ أثناء تسجيل الجهاز'
-      };
-    }
-  }
-
   // Core sign-in method
   Future<Map<String, dynamic>> signIn({
     required String nationalId,
     String? password,
-    String? deviceId,
+    bool isQuickSignIn = false,
   }) async {
     try {
-      print('\n=== SIGN IN PROCESS ===');
-      final signInEndpoint = '${Constants.apiBaseUrl}${Constants.endpointSignIn}';
-      print('Endpoint: ${Constants.endpointSignIn}');
-      print('Full URL: $signInEndpoint');
-
-      // Get device info
-      final deviceInfo = await getDeviceInfo();
+      _isSigningIn = true;
       
-      // Prepare request body
+      print('\n=== SIGN IN PROCESS START ===');
+      print('Step 1: Initial Parameters');
+      print('- National ID: $nationalId');
+      print('- Sign in type: ${isQuickSignIn ? 'Quick Sign In' : 'Password Sign In'}');
+      print('- Password provided: ${password != null ? 'Yes' : 'No'}');
+
+      print('\nStep 2: Getting Device Info');
+      final deviceInfo = await getDeviceInfo();
+      print('- Raw Device Info: ${json.encode(deviceInfo)}');
+      print('- Device ID: ${deviceInfo['deviceId']}');
+      print('- Platform: ${deviceInfo['platform']}');
+      print('- Model: ${deviceInfo['model']}');
+
+      print('\nStep 3: Preparing Sign In Request');
       final Map<String, dynamic> requestBody = {
-        'national_id': nationalId,
-        'deviceId': deviceId ?? deviceInfo['deviceId'],
-        'device_info': deviceInfo,
+        'nationalId': nationalId,
+        'deviceId': deviceInfo['deviceId'],
       };
 
-      // Add password if provided (for password sign-in)
       if (password != null) {
         requestBody['password'] = password;
       }
 
-      print('Request Headers: ${Constants.authHeaders}');
-      print('Request Body: ${json.encode(requestBody)}');
+      final headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-API-Key': Constants.apiKey,
+      };
 
+      print('API Call Details:');
+      print('- Endpoint: ${Constants.apiBaseUrl}/auth/signin');
+      print('- Headers: ${json.encode(headers)}');
+      print('- Request Body: ${json.encode(requestBody)}');
+
+      print('\nStep 4: Making Sign In API Call');
       final response = await http.post(
-        Uri.parse(signInEndpoint),
-        headers: Constants.authHeaders,
-        body: jsonEncode(requestBody),
+        Uri.parse('${Constants.apiBaseUrl}/auth/signin'),
+        headers: headers,
+        body: json.encode(requestBody),
       );
 
-      print('Response Status Code: ${response.statusCode}');
-      print('Response Body: ${response.body}');
+      print('\nStep 5: Processing Response');
+      print('- Status Code: ${response.statusCode}');
+      print('- Response Headers: ${response.headers}');
+      print('- Raw Response Body: ${response.body}');
 
-      final responseData = jsonDecode(response.body);
-      print('Parsed Response: ${json.encode(responseData)}');
+      final Map<String, dynamic> parsedResponse = json.decode(response.body);
+      print('- Parsed Response: ${json.encode(parsedResponse)}');
 
-      return responseData;
+      if (parsedResponse['success'] == true && parsedResponse['data'] != null) {
+        print('\nStep 6: Successful Sign In');
+        print('- Processing user data and tokens');
+
+        // Store tokens immediately
+        if (parsedResponse['data']['token'] != null) {
+          await _secureStorage.write(
+            key: 'auth_token',
+            value: parsedResponse['data']['token']
+          );
+          print('✅ Auth token stored successfully');
+        }
+        
+        if (parsedResponse['data']['refresh_token'] != null) {
+          await _secureStorage.write(
+            key: 'refresh_token',
+            value: parsedResponse['data']['refresh_token']
+          );
+          print('✅ Refresh token stored successfully');
+        }
+
+        // Store session data
+        await _secureStorage.write(key: 'session_active', value: 'true');
+        if (parsedResponse['data']['user'] != null) {
+          final userData = parsedResponse['data']['user'];
+          await _secureStorage.write(
+            key: 'session_user_id',
+            value: userData['id']?.toString() ?? nationalId
+          );
+        }
+        print('✅ Session data stored');
+
+        // Verify token storage
+        final storedToken = await _secureStorage.read(key: 'auth_token');
+        print('Token verification:');
+        print('- Token exists: ${storedToken != null}');
+        if (storedToken != null) {
+          print('- Token length: ${storedToken.length}');
+          print('- First 10 chars: ${storedToken.substring(0, 10)}...');
+        }
+
+        final responseData = parsedResponse['data'];
+        final userData = responseData['user'];
+
+        if (userData != null) {
+          print('\n=== DETAILED USER DATA STORAGE LOGGING ===');
+          print('1. Original User Data from API:');
+          print(json.encode(userData));
+
+          // Store user data in both secure storage and shared preferences
+          final userDataToStore = {
+            ...userData,
+            'name': userData['name'] ?? '', // Ensure name is stored
+            'full_name': userData['name'] ?? '', // Store name as full_name for consistency
+            'firstName': userData['name']?.toString().split(' ').firstOrNull ?? '', // Extract first name safely
+            'lastName': userData['name'] != null && userData['name'].toString().split(' ').length > 1 
+                ? userData['name'].toString().split(' ').sublist(1).join(' ')
+                : '', // Extract last name safely with null check and preserve full last name
+          };
+
+          print('\n3. Enhanced User Data to Store:');
+          print(json.encode(userDataToStore));
+
+          final prefs = await SharedPreferences.getInstance();
+          
+          // Store in SharedPreferences
+          await prefs.setString('user_data', json.encode(userDataToStore));
+          print('\n4. SharedPreferences Storage:');
+          print('- Stored at key: user_data');
+          print('- Verification - Retrieved data:');
+          print(prefs.getString('user_data'));
+          
+          // Store in SecureStorage
+          await _secureStorage.write(key: 'user_data', value: json.encode(userDataToStore));
+          print('\n5. Secure Storage:');
+          print('- Stored at key: user_data');
+          print('- Verification - Retrieved data:');
+          print(await _secureStorage.read(key: 'user_data'));
+          
+          // Set device registration status
+          await prefs.setBool('device_registered', true);
+          await prefs.setString('device_user_id', nationalId);
+          await _secureStorage.write(key: 'device_registered', value: 'true');
+          await _secureStorage.write(key: 'device_user_id', value: nationalId);
+          
+          print('\n6. Final Storage Check:');
+          print('- SharedPreferences user_data exists: ${prefs.getString('user_data') != null}');
+          print('- SecureStorage user_data exists: ${(await _secureStorage.read(key: 'user_data')) != null}');
+          print('- Device registration status: ${prefs.getBool('device_registered')}');
+          print('- Device user ID: ${prefs.getString('device_user_id')}');
+          print('=== END DETAILED STORAGE LOGGING ===\n');
+        }
+      } else {
+        print('\nStep 6: Sign In Failed');
+        print('- Error Code: ${parsedResponse['code']}');
+        print('- Error Message: ${parsedResponse['message']}');
+      }
+
+      print('\n=== SIGN IN PROCESS END ===');
+      return parsedResponse;
     } catch (e, stackTrace) {
-      print('\n=== ERROR IN SIGN IN PROCESS ===');
+      print('\n!!! ERROR IN SIGN IN PROCESS !!!');
       print('Error: $e');
       print('Stack trace: $stackTrace');
       return {
-        'status': 'error',
-        'message': 'Error during sign in: $e',
-        'message_ar': 'حدث خطأ أثناء تسجيل الدخول'
+        'success': false,
+        'error': e.toString(),
+      };
+    } finally {
+      _isSigningIn = false;
+    }
+  }
+
+  // Register device with detailed logging
+  Future<Map<String, dynamic>> registerDevice({
+    required String nationalId,
+    required Map<String, dynamic> deviceInfo,
+  }) async {
+    try {
+      print('\n=== DEVICE REGISTRATION START ===');
+      print('Step 1: Initial Parameters');
+      print('- National ID: $nationalId');
+      print('- Device Info: ${json.encode(deviceInfo)}');
+
+      print('\nStep 2: Preparing Request');
+      final requestBody = {
+        'nationalId': nationalId,
+        'deviceId': deviceInfo['deviceId'],
+        'platform': deviceInfo['platform'],
+        'model': deviceInfo['model'],
+        'manufacturer': deviceInfo['manufacturer']
+      };
+
+      final headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-API-Key': Constants.apiKey,
+      };
+
+      print('API Call Details:');
+      print('- Endpoint: ${Constants.apiBaseUrl}/device');
+      print('- Headers: ${json.encode(headers)}');
+      print('- Request Body: ${json.encode(requestBody)}');
+
+      print('\nStep 3: Making API Call');
+      final response = await http.post(
+        Uri.parse('${Constants.apiBaseUrl}/device'),
+        headers: headers,
+        body: json.encode(requestBody),
+      );
+
+      print('\nStep 4: Processing Response');
+      print('- Status Code: ${response.statusCode}');
+      print('- Response Headers: ${response.headers}');
+      print('- Raw Response Body: ${response.body}');
+
+      final parsedResponse = json.decode(response.body);
+      print('- Parsed Response: ${json.encode(parsedResponse)}');
+
+      print('\n=== DEVICE REGISTRATION END ===');
+      
+      // Ensure we always return a success boolean
+      return {
+        'success': parsedResponse['success'] ?? false,
+        ...parsedResponse,
+      };
+    } catch (e, stackTrace) {
+      print('\n!!! ERROR IN DEVICE REGISTRATION !!!');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
+      return {
+        'success': false,
+        'error': e.toString(),
       };
     }
+  }
+
+  Future<Map<String, dynamic>> _getDeviceInfo() async {
+    final deviceInfo = DeviceInfoPlugin();
+    final Map<String, dynamic> info = {};
+
+    try {
+      if (Platform.isAndroid) {
+        final androidInfo = await deviceInfo.androidInfo;
+        info['deviceId'] = androidInfo.id;
+        info['platform'] = 'android';
+        info['model'] = androidInfo.model;
+        info['manufacturer'] = androidInfo.manufacturer;
+      } else if (Platform.isIOS) {
+        final iosInfo = await deviceInfo.iosInfo;
+        info['deviceId'] = iosInfo.identifierForVendor;
+        info['platform'] = 'ios';
+        info['model'] = iosInfo.model;
+        info['manufacturer'] = 'Apple';
+      }
+    } catch (e) {
+      print('Error getting device info: $e');
+    }
+
+    return info;
   }
 
   // Store device registration data
@@ -471,25 +639,41 @@ class AuthService {
       
       print('Local MPIN verification successful');
 
-      // Get device info
-      final deviceInfo = await getDeviceInfo();
-      final deviceId = deviceInfo['deviceId'];
+      // Set up session after successful MPIN verification
+      await _secureStorage.write(key: 'session_active', value: 'true');
+      await _secureStorage.write(key: 'session_user_id', value: nationalId);
+      await _secureStorage.write(key: 'national_id', value: nationalId);
       
-      if (deviceId == null) {
-        print('Could not get device ID');
-        throw Exception('Could not get device ID');
-      }
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('session_active', true);
+      await prefs.setString('session_user_id', nationalId);
+      await prefs.setString('national_id', nationalId);
       
-      // Use the core signIn method
-      return await signIn(
-        nationalId: nationalId,
-        deviceId: deviceId,
-      );
+      // Start session management
+      await startSession(nationalId);
+      
+      print('Session data stored successfully');
+      print('- Session active: true');
+      print('- User ID: $nationalId');
+      
+      // Return success response with session data
+      return {
+        'success': true,
+        'data': {
+          'user': {
+            'id': nationalId,
+            'national_id': nationalId
+          },
+          'session_active': true,
+          'auth_method': 'mpin'
+        }
+      };
     } catch (e) {
       print('Error during MPIN login: $e');
       return {
-        'status': 'error',
-        'message': 'Error during MPIN login: $e',
+        'success': false,
+        'error': e.toString(),
+        'message': 'Error during MPIN login',
         'message_ar': 'حدث خطأ أثناء تسجيل الدخول'
       };
     }
@@ -506,17 +690,53 @@ class AuthService {
         throw Exception('Biometric authentication is not enabled for this device');
       }
 
-      final deviceInfo = await getDeviceInfo();
-      final deviceId = deviceInfo['deviceId'];
-      
-      if (deviceId == null) {
-        throw Exception('Could not get device ID');
-      }
-      
-      return await signIn(
-        nationalId: nationalId,
-        deviceId: deviceId,
+      // Authenticate using biometrics
+      final didAuthenticate = await _localAuth.authenticate(
+        localizedReason: 'Please authenticate to sign in',
+        options: const AuthenticationOptions(
+          stickyAuth: true,
+          biometricOnly: true,
+        ),
       );
+
+      if (!didAuthenticate) {
+        return {
+          'success': false,
+          'error': 'BIOMETRIC_FAILED',
+          'message': 'Biometric authentication failed',
+          'message_ar': 'فشل التحقق من البصمة'
+        };
+      }
+
+      // Set up session after successful biometric verification
+      await _secureStorage.write(key: 'session_active', value: 'true');
+      await _secureStorage.write(key: 'session_user_id', value: nationalId);
+      await _secureStorage.write(key: 'national_id', value: nationalId);
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('session_active', true);
+      await prefs.setString('session_user_id', nationalId);
+      await prefs.setString('national_id', nationalId);
+      
+      // Start session management
+      await startSession(nationalId);
+      
+      print('Session data stored successfully');
+      print('- Session active: true');
+      print('- User ID: $nationalId');
+      
+      // Return success response with session data
+      return {
+        'success': true,
+        'data': {
+          'user': {
+            'id': nationalId,
+            'national_id': nationalId
+          },
+          'session_active': true,
+          'auth_method': 'biometric'
+        }
+      };
     } catch (e) {
       print('Error during biometric verification: $e');
       throw Exception('Error during biometric verification: $e');
@@ -548,7 +768,7 @@ class AuthService {
         throw Exception('Failed to check registration status: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error: $e');
+      print('Error checking registration status: $e');
       throw Exception('Error checking registration status: $e');
     }
   }
@@ -694,19 +914,116 @@ class AuthService {
   // Check if session is active
   Future<bool> isSessionActive() async {
     try {
-      final token = await _secureStorage.read(key: 'auth_token');
-      return token != null;
+      print('\n=== CHECKING SESSION STATUS ===');
+      
+      // Check session flags
+      final sessionActive = await _secureStorage.read(key: 'session_active');
+      final userId = await _secureStorage.read(key: 'session_user_id');
+      
+      print('\nSession Flags:');
+      print('- Session Active flag: $sessionActive');
+      print('- User ID: ${userId ?? 'not found'}');
+      
+      // For MPIN/biometric sessions, we only need session_active and user_id
+      final isActive = sessionActive == 'true' && userId != null;
+      
+      print('\nFinal Status:');
+      print('- Session active: $isActive');
+      print('=== SESSION CHECK END ===\n');
+      
+      return isActive;
     } catch (e) {
-      print('Error checking session status: $e');
+      print('❌ Error checking session status: $e');
       return false;
     }
   }
 
   // Sign out
   Future<void> signOut() async {
-    await signOff(); // Use existing signOff method
+    try {
+      print('\n=== SIGN OUT PROCESS START ===');
+      
+      // 1. Cancel refresh timer first to prevent re-initialization
+      _refreshTimer?.cancel();
+      _refreshTimer = null;
+      
+      // 2. Clear session data
+      await signOff();
+      
+      // 3. Sign out device (this includes server call)
+      await signOutDevice();
+      
+      // 4. Get storage instances
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Store temporary values we want to keep
+      final isArabic = prefs.getBool('isArabic') ?? false;
+      final isDarkMode = prefs.getBool('is_dark_mode') ?? false;
+      
+      // 5. Clear user-specific data from SharedPreferences
+      print('Clearing user-specific data from SharedPreferences...');
+      final keysToRemove = [
+        'user_data',
+        'registration_data',  // Added registration data
+        'national_id',
+        'device_user_id',
+        'auth_token',
+        'refresh_token',
+        'session_data',
+        'biometrics_enabled',
+        'mpin_set',
+        'last_sign_in',
+        'user_preferences',
+        'session_active',
+        'session_user_id',
+        'biometric_user_id',
+        'device_registered',
+        'mpin',
+      ];
+      
+      for (var key in keysToRemove) {
+        await prefs.remove(key);
+      }
+      
+      // 6. Clear user-specific data from SecureStorage
+      print('Clearing user-specific data from SecureStorage...');
+      final secureKeysToRemove = [
+        'user_data',
+        'registration_data',  // Added registration data
+        'auth_token',
+        'refresh_token',
+        'device_user_id',
+        'mpin',
+        'biometrics_enabled',
+        'device_registered',
+        'session_data',
+        'session_active',
+        'session_user_id',
+        'biometric_user_id',
+        'national_id',
+        'user_password',
+      ];
+      
+      for (var key in secureKeysToRemove) {
+        await _secureStorage.delete(key: key);
+      }
+      
+      // 7. Reset device registration and biometric flags
+      await _secureStorage.write(key: 'device_registered', value: 'false');
+      await _secureStorage.write(key: 'biometrics_enabled', value: 'false');
+      
+      // 8. Restore app settings
+      await prefs.setBool('isArabic', isArabic);
+      await prefs.setBool('is_dark_mode', isDarkMode);
+      
+      print('=== SIGN OUT PROCESS COMPLETE ===\n');
+    } catch (e) {
+      print('Error during sign out: $e');
+      throw Exception('Failed to sign out: $e');
+    }
   }
 
+  // Modify signOutDevice to not throw on 404
   Future<void> signOutDevice() async {
     try {
       print('Signing out device completely...');
@@ -728,18 +1045,8 @@ class AuthService {
           );
 
           print('Device unregister response: ${response.body}');
-
-          // Even if server call fails, continue with local cleanup
-          if (response.statusCode == 200) {
-            try {
-              final data = jsonDecode(response.body);
-              if (data['status'] != 'success') {
-                print('Server returned error: ${data['message']}');
-              }
-            } catch (e) {
-              print('Error parsing server response: $e');
-            }
-          } else {
+          // Don't throw on 404, just log it
+          if (response.statusCode != 200 && response.statusCode != 404) {
             print('Server returned status code: ${response.statusCode}');
           }
         } catch (e) {
@@ -747,30 +1054,11 @@ class AuthService {
           // Continue with local cleanup even if server call fails
         }
       }
-
-      // Clear all device-related data
-      await _secureStorage.delete(key: 'auth_token');
-      await _secureStorage.delete(key: 'device_registered');
-      await _secureStorage.delete(key: 'device_user_id');
-      await _secureStorage.delete(key: 'biometrics_enabled');
-      await _secureStorage.delete(key: 'biometric_user_id');
-      await _secureStorage.delete(key: 'mpin');
-      await _secureStorage.delete(key: 'mpin_set');
-      await _secureStorage.delete(key: 'session_active');
-      await _secureStorage.delete(key: 'user_data');
-      await _secureStorage.delete(key: 'user_password');
-
-      // Clear shared preferences
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('device_user_id');
-      await prefs.remove('device_registered');
-      await prefs.setBool('session_active', false);
       
       print('Device signed out successfully');
     } catch (e) {
       print('Error during device sign out: $e');
-      // Still throw the error so UI can handle it
-      throw Exception('Failed to sign out device: $e');
+      // Don't throw, just log the error
     }
   }
 
@@ -1235,71 +1523,116 @@ class AuthService {
   // Refresh the session
   Future<void> refreshSession() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final isActive = prefs.getBool('session_active') ?? false;
+      final sessionActive = await _secureStorage.read(key: 'session_active');
       
-      if (isActive) {
+      if (sessionActive == 'true') {
+        final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('session_active', true);
         print('Session refreshed successfully');
+      } else {
+        _refreshTimer?.cancel();
+        _refreshTimer = null;
+        print('Session refresh cancelled - session not active');
       }
     } catch (e) {
       print('Error refreshing session: $e');
     }
   }
 
+  // Get user's mobile number from stored data
+  Future<String?> getStoredMobileNumber() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userDataStr = prefs.getString('user_data');
+      
+      if (userDataStr != null) {
+        final userData = json.decode(userDataStr);
+        print('Retrieved user data for mobile number: ${json.encode(userData)}');
+        
+        // Try different possible keys for mobile number
+        String? mobileNo = userData['mobile_no'] ?? 
+                         userData['mobileNo'] ?? 
+                         userData['phone'] ?? 
+                         userData['phoneNumber'] ??
+                         userData['mobile'];
+                         
+        if (mobileNo != null) {
+          // Clean the number: remove any non-digit characters and ensure it starts with 966
+          String cleanNumber = mobileNo.toString().replaceAll(RegExp(r'[^\d]'), '');
+          
+          // Remove leading zeros
+          cleanNumber = cleanNumber.replaceAll(RegExp(r'^0+'), '');
+          
+          // Remove 966 if it exists at the start
+          if (cleanNumber.startsWith('966')) {
+            cleanNumber = cleanNumber.substring(3);
+          }
+          
+          // Add 966 prefix
+          final formattedNumber = '966$cleanNumber';
+          
+          print('Formatted mobile number: $formattedNumber');
+          return formattedNumber;
+        } else {
+          print('No mobile number found in user data. Available keys: ${userData.keys.toList()}');
+        }
+      } else {
+        print('No user data found in SharedPreferences');
+      }
+      return null;
+    } catch (e) {
+      print('Error getting stored mobile number: $e');
+      return null;
+    }
+  }
+
   // Generate OTP
   Future<Map<String, dynamic>> generateOTP(String nationalId) async {
     try {
-      print('\n=== GENERATING OTP ===');
-      print('National ID: $nationalId');
-      print('Endpoint: ${Constants.apiBaseUrl}${Constants.endpointOTPGenerate}');
+      final mobileNo = await getStoredMobileNumber();
       
-      // Use auth form headers since this endpoint expects form data
-      final headers = Constants.authFormHeaders;
-      print('Using headers: $headers');
+      if (mobileNo == null) {
+        throw Exception('Mobile number not found in stored user data');
+      }
 
-      final body = {
-        'national_id': nationalId,
-      };
-      print('Request Body: $body');
+      final requestBody = Constants.otpGenerateRequestBody(
+        nationalId, 
+        mobileNo,
+        purpose: 'Login'
+      );
+      
+      print('Generating OTP for:');
+      print('National ID: $nationalId');
+      print('Mobile Number: $mobileNo');
+
+      final url = '${Constants.apiBaseUrl}/proxy/forward?url=${Constants.proxyOtpGenerateUrl}';
+      print('🌐 URL: $url');
 
       final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPGenerate}'),
-        headers: headers,
-        body: body,  // Send as form data
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-API-Key': Constants.apiKey
+        },
+        body: json.encode(requestBody),
       );
 
-      print('Response Status Code: ${response.statusCode}');
-      print('Response Body: ${response.body}');
+      print('OTP Generation Response Status: ${response.statusCode}');
+      print('OTP Generation Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        print('Parsed Response: $data');
-        
-        // If the response doesn't have a status field, wrap it in a standard format
-        if (!data.containsKey('status')) {
-          return {
-            'status': response.statusCode == 200 ? 'success' : 'error',
-            'message': data['message'] ?? 'OTP sent successfully',
-            'message_ar': data['message_ar'] ?? 'تم إرسال رمز التحقق بنجاح',
-            'data': data
-          };
-        }
-        
-        print('=== OTP GENERATION END ===\n');
-        return data;
+        final responseData = json.decode(response.body);
+        print('OTP Generation Response: $responseData');
+        return responseData;
       } else {
-        print('HTTP Error: ${response.statusCode}');
         throw Exception('Failed to generate OTP: ${response.statusCode}');
       }
     } catch (e) {
       print('Error generating OTP: $e');
-      print('Stack trace: ${StackTrace.current}');
       return {
-        'status': 'error',
-        'message': 'Failed to generate OTP',
-        'message_ar': 'فشل في إرسال رمز التحقق',
-        'error': e.toString()
+        'success': false,
+        'message': e.toString(),
       };
     }
   }
@@ -1307,59 +1640,126 @@ class AuthService {
   // Verify OTP
   Future<Map<String, dynamic>> verifyOTP(String nationalId, String otp) async {
     try {
-      print('\n=== VERIFYING OTP ===');
-      print('National ID: $nationalId');
-      print('OTP: $otp');
-      print('Endpoint: ${Constants.apiBaseUrl}${Constants.endpointOTPVerification}');
+      print('\n=== VERIFY OTP REQUEST ===');
+      final url = '${Constants.apiBaseUrl}/proxy/forward?url=${Constants.proxyOtpVerifyUrl}';
+      print('🌐 URL: $url');
       
-      // Use auth form headers since this endpoint expects form data
-      final headers = Constants.authFormHeaders;
-      print('Using headers: $headers');
-
-      final body = {
-        'national_id': nationalId,
-        'otp_code': otp,
+      final headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-API-Key': Constants.apiKey
       };
-      print('Request Body: $body');
+      print('📤 Headers: $headers');
+      
+      final requestBody = Constants.otpVerifyRequestBody(nationalId, otp);
+      print('📤 Request Body: ${json.encode(requestBody)}');
 
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPVerification}'),
-        headers: headers,
-        body: body,  // Send as form data
-      );
+      // Create a client that follows redirects
+      final client = http.Client();
+      try {
+        final response = await client.post(
+          Uri.parse(url),
+          headers: headers,
+          body: json.encode(requestBody),
+        );
 
-      print('Response Status Code: ${response.statusCode}');
-      print('Response Body: ${response.body}');
+        print('\n=== VERIFY OTP RESPONSE ===');
+        print('📥 Status Code: ${response.statusCode}');
+        print('📥 Response Headers: ${response.headers}');
+        print('📥 Response Body: ${response.body}');
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        print('Parsed Response: $data');
-        
-        // If the response doesn't have a status field, wrap it in a standard format
-        if (!data.containsKey('status')) {
-          return {
-            'status': response.statusCode == 200 ? 'success' : 'error',
-            'message': data['message'] ?? 'OTP verified successfully',
-            'message_ar': data['message_ar'] ?? 'تم التحقق من الرمز بنجاح',
-            'data': data
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          print('✅ Parsed Response Data: $data');
+          
+          if (data['success'] == true) {
+            print('✅ OTP Verification Successful');
+            final successResponse = {
+              'status': 'success',
+              'message': 'OTP verified successfully',
+              'message_ar': 'تم التحقق من رمز التحقق بنجاح',
+              'data': data['result']
+            };
+            print('✅ Returning Success Response: $successResponse');
+            return successResponse;
+          }
+          
+          print('❌ OTP Verification Failed with Error: ${data['message']}');
+          final errorResponse = {
+            'status': 'error',
+            'message': data['message'] ?? 'Failed to verify OTP',
+            'message_ar': 'فشل في التحقق من رمز التحقق'
           };
+          print('❌ Returning Error Response: $errorResponse');
+          return errorResponse;
         }
-        
-        print('=== OTP VERIFICATION END ===\n');
-        return data;
-      } else {
-        print('HTTP Error: ${response.statusCode}');
-        throw Exception('Failed to verify OTP: ${response.statusCode}');
+
+        print('❌ HTTP Request Failed with Status: ${response.statusCode}');
+        return {
+          'status': 'error',
+          'message': 'Failed to verify OTP',
+          'message_ar': 'فشل في التحقق من رمز التحقق'
+        };
+      } finally {
+        client.close();
       }
-    } catch (e) {
-      print('Error verifying OTP: $e');
-      print('Stack trace: ${StackTrace.current}');
+    } catch (e, stackTrace) {
+      print('\n=== VERIFY OTP ERROR ===');
+      print('❌ Error: $e');
+      print('❌ Stack Trace: $stackTrace');
       return {
         'status': 'error',
-        'message': 'Failed to verify OTP',
-        'message_ar': 'فشل في التحقق من الرمز',
-        'error': e.toString()
+        'message': e.toString(),
+        'message_ar': 'حدث خطأ أثناء التحقق من رمز التحقق'
       };
+    } finally {
+      print('=== END VERIFY OTP ===\n');
+    }
+  }
+
+  // Add this getter for the session provider to check
+  bool get isSigningIn => _isSigningIn;
+
+  // Get user data from secure storage
+  Future<String?> getSecureUserData() async {
+    try {
+      return await _secureStorage.read(key: 'user_data');
+    } catch (e) {
+      print('Error reading from secure storage: $e');
+      return null;
+    }
+  }
+
+  // Get device ID from storage
+  Future<String?> getDeviceId() async {
+    try {
+      print('\n=== GETTING DEVICE ID ===');
+      
+      // Try secure storage first
+      String? deviceId = await _secureStorage.read(key: 'device_user_id');
+      print('Secure Storage Device ID: $deviceId');
+      
+      if (deviceId != null) {
+        print('Device ID found in secure storage');
+        return deviceId;
+      }
+      
+      // Fall back to SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      deviceId = prefs.getString('device_user_id');
+      print('SharedPreferences Device ID: $deviceId');
+      
+      if (deviceId != null) {
+        print('Device ID found in SharedPreferences');
+        // Sync to secure storage for next time
+        await _secureStorage.write(key: 'device_user_id', value: deviceId);
+      }
+      
+      print('=== GET DEVICE ID END ===\n');
+      return deviceId;
+    } catch (e) {
+      print('Error getting device ID: $e');
+      return null;
     }
   }
 }

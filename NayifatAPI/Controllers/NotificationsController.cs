@@ -471,10 +471,6 @@ namespace NayifatAPI.Controllers
                         {
                             switch (column.ToLower())
                             {
-                                case "sector":
-                                    return query.Where(c => values.Contains(c.Sector));
-                                case "employer":
-                                    return query.Where(c => values.Contains(c.Employer));
                                 case "city":
                                     return query.Where(c => values.Contains(c.City));
                                 default:
@@ -795,16 +791,6 @@ namespace NayifatAPI.Controllers
                         {
                             switch (fieldName.ToLower())
                             {
-                                case "sector":
-                                    localQuery = localQuery.Where(c => c.Sector == strValue);
-                                    filterApplied = true;
-                                    _logger.LogInformation("Applied simple Sector filter: {Value}", strValue);
-                                    break;
-                                case "employer":
-                                    localQuery = localQuery.Where(c => c.Employer == strValue);
-                                    filterApplied = true;
-                                    _logger.LogInformation("Applied simple Employer filter: {Value}", strValue);
-                                    break;
                                 case "city":
                                     localQuery = localQuery.Where(c => c.City == strValue);
                                     filterApplied = true;

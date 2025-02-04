@@ -5,6 +5,7 @@ using NayifatAPI.Data;
 using NayifatAPI.Models;
 using System.Security.Cryptography;
 using System.Text;
+using BCrypt.Net;
 
 namespace NayifatAPI.Controllers
 {
@@ -37,33 +38,50 @@ namespace NayifatAPI.Controllers
 
                 if (customer == null)
                 {
-                    await LogAuthAttempt(request.NationalId, request.DeviceId, "failed", "Customer not found");
-                    return Error("Invalid credentials", 401, new { code = "CUSTOMER_NOT_FOUND" });
+                    return Error(
+                        message: "National ID not registered in the system", 
+                        statusCode: 401, 
+                        details: new { 
+                            code = "CUSTOMER_NOT_FOUND",
+                            message_ar = "رقم الهوية غير مسجل في النظام"
+                        }
+                    );
                 }
 
                 // Password authentication flow
                 if (!string.IsNullOrEmpty(request.Password))
                 {
-                    if (customer.Password == null || !VerifyPassword(request.Password, customer.Password))
+                    _logger.LogInformation("Starting password verification for NationalId: {NationalId}", request.NationalId);
+                    
+                    if (customer.Password == null)
                     {
-                        await LogAuthAttempt(request.NationalId, request.DeviceId, "failed", "Invalid password");
-                        return Error("Invalid credentials", 401, new { code = "INVALID_PASSWORD" });
+                        _logger.LogWarning("No password hash found for NationalId: {NationalId}", request.NationalId);
+                        await LogAuthAttempt(request.NationalId, request.DeviceId, "failed", "Password not set");
+                        return Error(
+                            message: "Password not set for this account", 
+                            statusCode: 401, 
+                            details: new { 
+                                code = "PASSWORD_NOT_SET",
+                                message_ar = "كلمة المرور غير معينة لهذا الحساب"
+                            }
+                        );
                     }
 
-                    // Check device registration if deviceId provided
-                    if (!string.IsNullOrEmpty(request.DeviceId))
-                    {
-                        var device = await _context.CustomerDevices
-                            .FirstOrDefaultAsync(d => 
-                                d.NationalId == request.NationalId && 
-                                d.DeviceId == request.DeviceId &&
-                                d.Status == "active");
+                    var isPasswordValid = VerifyPassword(request.Password, customer.Password);
+                    _logger.LogInformation("Password verification result for NationalId {NationalId}: {Result}", 
+                        request.NationalId, isPasswordValid ? "Success" : "Failed");
 
-                        if (device == null)
-                        {
-                            await LogAuthAttempt(request.NationalId, request.DeviceId, "failed", "Device not registered");
-                            return Error("Device not registered", 401, new { code = "DEVICE_NOT_REGISTERED" });
-                        }
+                    if (!isPasswordValid)
+                    {
+                        await LogAuthAttempt(request.NationalId, request.DeviceId, "failed", "Invalid password");
+                        return Error(
+                            message: "Invalid password", 
+                            statusCode: 401, 
+                            details: new { 
+                                code = "INVALID_PASSWORD",
+                                message_ar = "كلمة المرور غير صحيحة"
+                            }
+                        );
                     }
 
                     // Generate token
@@ -82,9 +100,13 @@ namespace NayifatAPI.Controllers
                         user = new
                         {
                             national_id = customer.NationalId,
-                            name = $"{customer.FirstNameEn} {customer.FamilyNameEn}".Trim(),
+                            first_name_en = customer.FirstNameEn,
+                            first_name_ar = customer.FirstNameAr,
+                            family_name_en = customer.FamilyNameEn,
+                            family_name_ar = customer.FamilyNameAr,
                             email = customer.Email,
-                            phone = customer.Phone
+                            phone = customer.Phone,
+                            device_id = request.DeviceId
                         }
                     });
                 }
@@ -396,8 +418,15 @@ namespace NayifatAPI.Controllers
 
         private bool VerifyPassword(string password, string hashedPassword)
         {
-            // TODO: Implement proper password verification
-            return password == hashedPassword;
+            try
+            {
+                return BCrypt.Net.BCrypt.Verify(password, hashedPassword);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error verifying password");
+                return false;
+            }
         }
 
         private string HashPassword(string password)
@@ -430,7 +459,7 @@ namespace NayifatAPI.Controllers
     public class SignInRequest
     {
         public required string NationalId { get; set; }
-        public required string Password { get; set; }
+        public string? Password { get; set; }
         public required string DeviceId { get; set; }
     }
 

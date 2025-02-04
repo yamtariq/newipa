@@ -32,12 +32,14 @@ import 'dart:async';
 import '../utils/constants.dart';
 import 'package:flutter/foundation.dart';
 import '../services/theme_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 // Arabic versions
 import 'registration_page_ar.dart';
 import 'auth/sign_in_page_ar.dart';
 import 'loan_calculator_page_ar.dart';
 import 'cards_page_ar.dart';
 import 'loans_page_ar.dart';
+import 'account_page.dart';
 import 'application_landing_screen.dart';
 import 'splash_screen.dart';
 
@@ -86,11 +88,17 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    
+    // Add storage data logging
+    _logStorageData();
+    
     WidgetsBinding.instance.addObserver(this);
     _notificationService.setLanguage(widget.isArabic);
+    
+    // Initialize all required data
+    _initializeUserData();  // Move this first
     _initializeApp();
     _loadData();
-    _initializeUserData();
     _checkDeviceRegistration();
     
     // Initialize notifications and start periodic checks
@@ -218,24 +226,131 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     // ... existing code ...
   }
 
-  void _initializeUserData() async {
+  Future<void> _initializeUserData() async {
     try {
-      final storedUserData = await _authService.getUserData();
-
-      if (storedUserData != null) {
-        setState(() {
-          String fullName = widget.isArabic
-              ? (storedUserData['arabic_name'] ??
-                  storedUserData['full_name'] ??
-                  storedUserData['name'] ??
-                  '')
-              : (storedUserData['full_name'] ??
-                  storedUserData['name'] ??
-                  storedUserData['arabic_name'] ??
-                  '');
-          userName = fullName.split(' ')[0];
-        });
+      print('\n=== INITIALIZE USER DATA START ===');
+      
+      // Function to extract name based on language
+      String extractName(Map<String, dynamic> data) {
+        print('Extracting name from data: ${json.encode(data)}');
+        String? firstName;
+        
+        if (widget.isArabic) {
+          // Try Arabic name fields first
+          firstName = data['firstName_ar']?.toString() ??
+                     data['first_name_ar']?.toString() ??
+                     data['firstNameAr']?.toString() ??
+                     
+                     data['firstName']?.toString();  // Added for registration data
+                     
+        } else {
+          // Try English name fields first
+          firstName = data['firstName_en']?.toString() ??
+                     data['first_name_en']?.toString() ??
+                     data['firstNameEn']?.toString() ??
+                    
+                     data['englishFirstName']?.toString();  // Added for registration data
+                     
+        }
+        
+        // If still empty, try generic field
+        if (firstName == null || firstName.isEmpty) {
+          firstName = data['firstName']?.toString();
+        }
+        
+        print('Extracted firstName: $firstName');
+        return firstName ?? '';
       }
+
+      // First try widget.userData
+      if (widget.userData.isNotEmpty) {
+        print('\n1. Checking widget.userData:');
+        print('Content: ${json.encode(widget.userData)}');
+        
+        String firstName = extractName(widget.userData);
+        print('Extracted firstName: $firstName');
+        
+        if (firstName.isNotEmpty && mounted) {
+          setState(() {
+            userName = firstName;
+            print('Set userName from widget.userData: $userName');
+          });
+          return;
+        } else {
+          print('widget.userData does not contain a valid name; falling back to secure storage.');
+        }
+      }
+      
+      // Then try secure storage
+      print('\n2. Checking secure storage:');
+      final storage = FlutterSecureStorage();
+      final userDataStr = await storage.read(key: 'user_data');
+      print('Secure storage data: $userDataStr');
+      
+      if (userDataStr != null) {
+        final storedUserData = json.decode(userDataStr);
+        String firstName = extractName(storedUserData);
+        print('Extracted firstName from secure storage: $firstName');
+        
+        if (firstName.isNotEmpty && mounted) {
+          setState(() {
+            userName = firstName;
+            print('Set userName from secure storage: $userName');
+          });
+          return;
+        } else {
+          print('Secure storage does not contain a valid name; falling back to SharedPreferences.');
+        }
+      }
+      
+      // Finally try SharedPreferences
+      print('\n3. Checking SharedPreferences:');
+      final prefs = await SharedPreferences.getInstance();
+      
+      // First check registration data which contains user details
+      final registrationDataStr = prefs.getString('registration_data');
+      if (registrationDataStr != null) {
+        try {
+          final registrationData = json.decode(registrationDataStr);
+          if (registrationData['userData'] != null) {
+            final userData = registrationData['userData'];
+            String firstName = widget.isArabic ? 
+                userData['firstName']?.toString() ?? '' :
+                userData['englishFirstName']?.toString() ?? '';
+                
+            print('Extracted firstName from registration data: $firstName');
+            
+            if (firstName.isNotEmpty && mounted) {
+              setState(() {
+                userName = firstName;
+                print('Set userName from registration data: $userName');
+              });
+              return;
+            }
+          }
+        } catch (e) {
+          print('Error parsing registration data: $e');
+        }
+      }
+      
+      // Then check regular user_data
+      final prefsUserDataStr = prefs.getString('user_data');
+      print('SharedPreferences data: $prefsUserDataStr');
+      
+      if (prefsUserDataStr != null) {
+        final storedUserData = json.decode(prefsUserDataStr);
+        String firstName = extractName(storedUserData);
+        print('Extracted firstName from SharedPreferences: $firstName');
+        
+        if (firstName.isNotEmpty && mounted) {
+          setState(() {
+            userName = firstName;
+            print('Set userName from SharedPreferences: $userName');
+          });
+        }
+      }
+      
+      print('=== INITIALIZE USER DATA END ===\n');
     } catch (e) {
       print('Error initializing user data: $e');
     }
@@ -257,17 +372,12 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
       print('\n=== SIGN OFF SEQUENCE START ===');
       print('1. Sign Off button clicked');
 
-      // First clear auth service data
-      print('2. Calling AuthService.signOff()');
-      await _authService.signOff();
-      print('3. AuthService.signOff() completed');
-
-      // Then update the session provider
-      print('4. Calling SessionProvider.signOff()');
+      // Update the session provider first
+      print('2. Calling SessionProvider.signOff()');
       await Provider.of<SessionProvider>(context, listen: false).signOff();
-      print('5. SessionProvider.signOff() completed');
+      print('3. SessionProvider.signOff() completed');
 
-      print('6. Sign Off sequence completed successfully');
+      print('4. Sign Off sequence completed successfully');
       print('=== SIGN OFF SEQUENCE END ===\n');
     } catch (e) {
       print('ERROR in Sign Off sequence: $e');
@@ -288,6 +398,12 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
 
   Future<void> _handleSignOutDevice() async {
     try {
+      print('\n=== SIGN OUT SEQUENCE START ===');
+      
+      // Log storage data before sign out
+      print('1. Checking storage data BEFORE sign out:');
+      await _logStorageData();
+
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (BuildContext context) {
@@ -317,92 +433,45 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: Provider.of<ThemeProvider>(context).isDarkMode 
-                        ? Color(Constants.darkLabelTextColor)
-                        : Color(Constants.lightLabelTextColor),
                   ),
-                  textAlign: TextAlign.center,
                 ),
               ],
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const SizedBox(height: 8),
                 Text(
                   widget.isArabic
-                      ? 'هل أنت متأكد أنك تريد تسجيل الخروج من هذا الجهاز؟'
-                      : 'Are you sure you want to sign out this device?',
+                      ? 'هل أنت متأكد من تسجيل الخروج؟'
+                      : 'Are you sure you want to sign out?',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
-                    color: Provider.of<ThemeProvider>(context).isDarkMode 
-                        ? Color(Constants.darkLabelTextColor)
-                        : Color(Constants.lightLabelTextColor),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  widget.isArabic
-                      ? 'سيؤدي هذا إلى إزالة جميع بيانات المصادقة.'
-                      : 'This will remove all authentication data.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Provider.of<ThemeProvider>(context).isDarkMode 
-                        ? Color(Constants.darkHintTextColor)
-                        : Color(Constants.lightHintTextColor),
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[800],
                   ),
                 ),
               ],
             ),
             actions: [
-              Container(
-                width: double.infinity,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                child: Column(
-                  children: [
-                    ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(true),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 0,
-                        minimumSize: const Size(double.infinity, 0),
-                      ),
-                      child: Text(
-                        widget.isArabic ? 'تسجيل الخروج' : 'Sign Out',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(false),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        minimumSize: const Size(double.infinity, 0),
-                      ),
-                      child: Text(
-                        widget.isArabic ? 'إلغاء' : 'Cancel',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey[800],
-                        ),
-                      ),
-                    ),
-                  ],
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text(
+                  widget.isArabic ? 'إلغاء' : 'Cancel',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: Text(
+                  widget.isArabic ? 'تأكيد' : 'Confirm',
+                  style: TextStyle(
+                    color: Colors.red[700],
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
@@ -411,15 +480,33 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
       );
 
       if (confirmed == true) {
-        await _authService.signOutDevice();
-        await Provider.of<SessionProvider>(context, listen: false).signOff();
-        setState(() {
-          userName = null;
-          isDeviceRegistered = false;
-        });
-
-        // Refresh the page to show non-authenticated state
+        print('\n2. User confirmed sign out - proceeding with sign out sequence');
+        
+        // Update session provider state first
         if (mounted) {
+          print('3. Updating SessionProvider state');
+          final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
+          sessionProvider.setSignedIn(false);
+          sessionProvider.setManualSignOff(true);
+        }
+        
+        // Then sign out completely using auth service
+        print('4. Calling AuthService.signOut()');
+        await _authService.signOut();
+        
+        print('\n5. Checking storage data AFTER sign out:');
+        await _logStorageData();
+        
+        // Update local state
+        if (mounted) {
+          print('6. Updating local state');
+          setState(() {
+            userName = null;
+            isDeviceRegistered = false;
+          });
+
+          print('7. Navigating to fresh MainPage');
+          // Refresh the main page with empty user data
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -432,18 +519,25 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
             ),
           );
         }
+        print('=== SIGN OUT SEQUENCE COMPLETE ===\n');
+      } else {
+        print('Sign out cancelled by user');
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            widget.isArabic
-                ? 'حدث خطأ أثناء تسجيل الخروج'
-                : 'Error signing out device: $e',
+    } catch (e, stackTrace) {
+      print('ERROR during sign out sequence: $e');
+      print('Stack trace:\n$stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              widget.isArabic
+                  ? 'حدث خطأ أثناء تسجيل الخروج'
+                  : 'Error signing out: ${e.toString()}',
+            ),
+            backgroundColor: Colors.red,
           ),
-          backgroundColor: Colors.red,
-        ),
-      );
+        );
+      }
     }
   }
 
@@ -515,17 +609,22 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
           final isMPINSet = await _authService.isMPINSet();
 
           // If either biometric or MPIN is set up, don't start with password screen
-          startWithPassword = !(isBiometricEnabled || isMPINSet);
+          if (isBiometricEnabled || isMPINSet) {
+            startWithPassword = false;
+          }
         }
 
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => widget.isArabic
-                ? SignInPageAr(startWithPassword: startWithPassword)
-                : SignInPage(startWithPassword: startWithPassword),
-          ),
-        );
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SignInScreen(
+                isArabic: widget.isArabic,
+                startWithPassword: startWithPassword,
+              ),
+            ),
+          );
+        }
         return;
       }
 
@@ -1833,6 +1932,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
 
   Widget _buildAuthButtons() {
     final isSignedIn = context.watch<SessionProvider>().isSignedIn;
+    final hasActiveSession = context.watch<SessionProvider>().hasActiveSession;
     final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
     final primaryColor = Color(isDarkMode 
         ? Constants.darkPrimaryColor 
@@ -1845,8 +1945,8 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
         ? Constants.darkFormBackgroundColor 
         : Constants.lightFormBackgroundColor);
 
-    if (isSignedIn) {
-      // Only show Sign Off button when session is active
+    // Show only Sign Off when session is active
+    if (hasActiveSession) {
       return Container(
         margin: const EdgeInsets.only(left: 8),
         child: TextButton(
@@ -1869,8 +1969,10 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
           ),
         ),
       );
-    } else if (isDeviceRegistered) {
-      // Show both Sign In and Sign Out Device buttons when device is registered but session is inactive
+    }
+
+    // Show Sign Out when signed in but no active session
+    if (isSignedIn && !hasActiveSession) {
       return Row(
         children: [
           Container(
@@ -1908,7 +2010,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                 ),
               ),
               child: Text(
-                widget.isArabic ? 'خروج تام' : 'Full SignOut',
+                widget.isArabic ? 'خروج تام' : 'Sign Out',
                 style: TextStyle(
                   color: errorColor,
                   fontWeight: FontWeight.w600,
@@ -1919,55 +2021,76 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
           ),
         ],
       );
-    } else {
-      // Show both Sign In and Register buttons when device is not registered
-      return Row(
-        children: [
-          Container(
-            margin: const EdgeInsets.only(left: 8),
-            child: TextButton(
-              onPressed: () => _navigateToPage('/signin'),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                backgroundColor: surfaceColor,
-                side: BorderSide(color: primaryColor),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
+    }
+
+    // Show Register and Sign In when not signed in
+    return Row(
+      children: [
+        Container(
+          margin: const EdgeInsets.only(left: 8),
+          child: TextButton(
+            onPressed: () => _navigateToPage('/signin'),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              backgroundColor: surfaceColor,
+              side: BorderSide(color: primaryColor),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
               ),
-              child: Text(
-                widget.isArabic ? 'دخول' : 'SignIn',
-                style: TextStyle(
-                  color: primaryColor,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
+            ),
+            child: Text(
+              widget.isArabic ? 'دخول' : 'Sign In',
+              style: TextStyle(
+                color: primaryColor,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
               ),
             ),
           ),
-          Container(
-            margin: const EdgeInsets.only(left: 8),
-            child: TextButton(
-              onPressed: () => _navigateToPage('/register'),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                backgroundColor: primaryColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
+        ),
+        Container(
+          margin: const EdgeInsets.only(left: 8),
+          child: TextButton(
+            onPressed: () => _navigateToPage('/register'),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              backgroundColor: primaryColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
               ),
-              child: Text(
-                widget.isArabic ? 'تسجيل' : 'Register',
-                style: TextStyle(
-                  color: surfaceColor,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
+            ),
+            child: Text(
+              widget.isArabic ? 'تسجيل' : 'Register',
+              style: TextStyle(
+                color: surfaceColor,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
               ),
             ),
           ),
-        ],
-      );
+        ),
+      ],
+    );
+  }
+
+  // Add the logging function
+  Future<void> _logStorageData() async {
+    try {
+      // Get SharedPreferences data
+      final prefs = await SharedPreferences.getInstance();
+      final keys = prefs.getKeys();
+      print('-----STORAGE DATA----- SharedPreferences Data:');
+      for (String key in keys) {
+        print('-----STORAGE DATA----- $key: ${prefs.get(key)}');
+      }
+
+      // Get Secure Storage data
+      print('-----STORAGE DATA----- Secure Storage Data:');
+      final secureUserDataStr = await _authService.getSecureUserData();
+      print('-----STORAGE DATA----- Secure user data: $secureUserDataStr');
+
+    } catch (e) {
+      print('-----STORAGE DATA----- Error logging storage data: $e');
     }
   }
 }

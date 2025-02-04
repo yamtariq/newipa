@@ -1,0 +1,6 @@
+@NayifatPortalAdmin_HostAddress = http://localhost:5248
+
+GET {{NayifatPortalAdmin_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

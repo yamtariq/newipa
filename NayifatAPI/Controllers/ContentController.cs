@@ -20,6 +20,53 @@ namespace NayifatAPI.Controllers
             _logger = logger;
         }
 
+        [HttpPost("timestamps")]
+        public async Task<IActionResult> GetTimestamps()
+        {
+            _logger.LogInformation("TTT_");
+            _logger.LogInformation("TTT_=== Getting Content Timestamps ===");
+
+            if (!ValidateApiKey())
+            {
+                _logger.LogInformation("TTT_Invalid API key");
+                return Error("Invalid API key", 401);
+            }
+
+            try
+            {
+                _logger.LogInformation("TTT_Fetching timestamps from database");
+                
+                var timestamps = await _context.MasterConfigs
+                    .Select(c => new { c.Page, c.KeyName, c.LastUpdated })
+                    .ToListAsync();
+
+                _logger.LogInformation("TTT_Found {Count} content items", timestamps.Count);
+
+                var result = timestamps.GroupBy(t => t.Page)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.ToDictionary(t => t.KeyName, t => t.LastUpdated)
+                    );
+
+                foreach (var page in result.Keys)
+                {
+                    _logger.LogInformation("TTT_Page: {Page}", page);
+                    foreach (var (key, timestamp) in result[page])
+                    {
+                        _logger.LogInformation("TTT_  - {Key}: {Timestamp}", key, timestamp);
+                    }
+                }
+
+                _logger.LogInformation("TTT_Successfully retrieved all timestamps");
+                return Success(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "TTT_Error getting content timestamps: {Message}", ex.Message);
+                return Error("Error getting content timestamps");
+            }
+        }
+
         [HttpPost("fetch")]
         public async Task<IActionResult> MasterFetch([FromBody] MasterFetchRequest request)
         {

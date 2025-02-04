@@ -128,9 +128,11 @@ class _DeviceReplacementBiometricScreenState
       final String? existingIban = existingUserData?['ibanNo'];
       print('Existing IBAN: $existingIban');
 
-      // Replace device registration
+      // Register device
+      final deviceInfo = await _authService.getDeviceInfo();
       final response = await _authService.registerDevice(
         nationalId: widget.userData['nationalId'],
+        deviceInfo: deviceInfo,
       );
 
       if (response['status'] != 'success') {
@@ -253,79 +255,79 @@ class _DeviceReplacementBiometricScreenState
                       ),
 
                       Column(
-              children: [
-                const SizedBox(height: 100),
+                        children: [
+                          const SizedBox(height: 100),
                           // Title with decoration
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  child: Column(
-                    children: [
-                      Text(
-                        widget.isArabic ? 'السمات الحيوية' : 'Biometrics',
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                            child: Column(
+                              children: [
+                                Text(
+                                  widget.isArabic ? 'السمات الحيوية' : 'Biometrics',
                                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: primaryColor,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        width: 60,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: primaryColor,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                                    fontWeight: FontWeight.bold,
+                                    color: primaryColor,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  width: 60,
+                                  height: 4,
+                                  decoration: BoxDecoration(
+                                    color: primaryColor,
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
 
                           Expanded(
                             child: Column(
                               children: [
-                const SizedBox(height: 40),
-                Container(
+                                const SizedBox(height: 40),
+                                Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
+                                  child: Column(
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
                                           Icon(
                                             Icons.fingerprint,
                                             size: 84,
                                             color: primaryColor,
                                           ),
                                           const SizedBox(width: 5),
-                          Text(
+                                          Text(
                                             '/',
-                            style: TextStyle(
+                                            style: TextStyle(
                                               fontSize: 90,
-                              color: primaryColor,
-                              fontWeight: FontWeight.w200,
-                            ),
-                          ),
-                          const SizedBox(width: 5),
-                          SizedBox(
-                            width: 84,
-                            height: 84,
-                            child: Center(
-                              child: Image.asset(
-                                'assets/images/faceid.png',
-                                width: 70,
-                                height: 70,
-                                color: primaryColor,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        widget.isArabic 
-                                            ? 'تسجيل الدخول بالسمات الحيوية'
-                                            : 'Biometric Login',
+                                              color: primaryColor,
+                                              fontWeight: FontWeight.w200,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 5),
+                                          SizedBox(
+                                            width: 84,
+                                            height: 84,
+                                            child: Center(
+                                              child: Image.asset(
+                                                'assets/images/faceid.png',
+                                                width: 70,
+                                                height: 70,
+                                                color: primaryColor,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 24),
+                                      Text(
+                                        widget.isArabic 
+                                          ? 'تسجيل الدخول بالسمات الحيوية'
+                                          : 'Biometric Login',
                                         style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                           fontWeight: FontWeight.bold,
                                         ),
@@ -336,12 +338,12 @@ class _DeviceReplacementBiometricScreenState
                                         widget.isArabic
                                             ? 'يمكنك تسجيل الدخول باستخدام بصمة الإصبع أو بصمة الوجه'
                                             : 'You can sign in using your fingerprint or face ID',
-                        style: TextStyle(
-                          fontSize: 16,
+                                        style: TextStyle(
+                                          fontSize: 16,
                                           color: Colors.grey[600],
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
                                       const SizedBox(height: 32),
                                       if (!_isBiometricsAvailable)
                                         Text(
@@ -353,21 +355,20 @@ class _DeviceReplacementBiometricScreenState
                                         )
                                       else
                                         Container(
-                        width: double.infinity,
+                                          width: double.infinity,
                                           padding: const EdgeInsets.symmetric(horizontal: 100),
-                        child: ElevatedButton(
+                                          child: ElevatedButton(
                                             onPressed: _isLoading ? null : _enableBiometrics,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: primaryColor,
                                               padding: const EdgeInsets.symmetric(
                                                 horizontal: 32,
                                                 vertical: 16,
                                               ),
-                            shape: RoundedRectangleBorder(
+                                              shape: RoundedRectangleBorder(
                                                 borderRadius: BorderRadius.circular(12),
-                            ),
-
-                          ),
+                                              ),
+                                            ),
                                             child: _isLoading
                                                 ? const SizedBox(
                                                     width: 20,
@@ -383,9 +384,9 @@ class _DeviceReplacementBiometricScreenState
                                                         ? 'تفعيل'
                                                         : 'Enable',
                                                     style: const TextStyle(
-                              fontSize: 16,
+                                                      fontSize: 16,
                                                       color: Colors.white,
-                              fontWeight: FontWeight.bold,
+                                                      fontWeight: FontWeight.bold,
                                                     ),
                                                   ),
                                           ),
@@ -407,9 +408,9 @@ class _DeviceReplacementBiometricScreenState
                                   color: primaryColor.withOpacity(0.05),
                                   blurRadius: 10,
                                   offset: const Offset(0, -5),
-                            ),
+                                ),
                               ],
-                          ),
+                            ),
                             child: Row(
                               children: [
                                 Expanded(
@@ -420,20 +421,20 @@ class _DeviceReplacementBiometricScreenState
                                       padding: const EdgeInsets.symmetric(vertical: 16),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                        child: Text(
+                                      ),
+                                    ),
+                                    child: Text(
                                       widget.isArabic ? 'التالي' : 'Next',
                                       style: const TextStyle(
-                            fontSize: 16,
+                                        fontSize: 16,
                                         color: Colors.white,
                                         fontWeight: FontWeight.bold,
-                          ),
+                                      ),
                                     ),
-                        ),
-                      ),
-                    ],
-                  ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -444,10 +445,10 @@ class _DeviceReplacementBiometricScreenState
                           child: const Center(
                             child: CircularProgressIndicator(),
                           ),
+                        ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
-          ),
               ),
             );
           },

@@ -7,6 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../utils/constants.dart';
+import '../../providers/session_provider.dart';
+import 'dart:convert';
 
 class MPINSetupScreen extends StatefulWidget {
   final String nationalId;
@@ -364,17 +366,59 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
                 isArabic: widget.isArabic,
                 onSetupComplete: (success) async {
                   if (widget.user != null) {
-                    final String fullName = widget.user?['name'] ?? '';
-                    final String firstName = fullName.split(' ')[0];
+                    print('\n=== DEBUGGING USER DATA ===');
+                    print('Raw user data:');
+                    const JsonEncoder encoder = JsonEncoder.withIndent('  ');
+                    print(encoder.convert(widget.user));
+                    
+                    // Extract user name with detailed logging
+                    final String fullName = widget.user?['name'] ?? widget.user?['full_name'] ?? widget.user?['userName'] ?? '';
+                    print('Full name from data: $fullName');
+                    
+                    final List<String> nameParts = fullName.split(' ');
+                    print('Name parts: ${nameParts.join(', ')}');
+                    
+                    final String firstName = nameParts.isNotEmpty ? nameParts[0] : '';
+                    final String lastName = nameParts.length > 1 ? nameParts.last : '';
+                    print('Extracted names:');
+                    print('- First name: $firstName');
+                    print('- Last name: $lastName');
 
                     final prefs = await SharedPreferences.getInstance();
-                    final isSessionActive = prefs.getBool('isSessionActive') ?? false;
+                    print('\nCurrent stored user data:');
+                    final storedUserData = prefs.getString('user_data');
+                    if (storedUserData != null) {
+                      print(encoder.convert(json.decode(storedUserData)));
+                    } else {
+                      print('No stored user data found');
+                    }
 
-                    await _authService.storeUserData({
+                    print('\n=== INITIALIZING SESSION ===');
+                    // Initialize session
+                    final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
+                    sessionProvider.resetManualSignOff();
+                    await sessionProvider.initializeSession();
+                    print('✅ Session initialized successfully');
+
+                    // Prepare complete user data with all possible name fields
+                    final Map<String, dynamic> completeUserData = {
                       ...widget.user ?? {},
+                      'name': fullName,
+                      'full_name': fullName,
+                      'userName': fullName,
                       'firstName': firstName,
-                      'isSessionActive': isSessionActive,
-                    });
+                      'first_name': firstName,
+                      'lastName': lastName,
+                      'last_name': lastName,
+                      'fullName': fullName,
+                      'isSessionActive': true,
+                    };
+
+                    // Store complete user data
+                    await _authService.storeUserData(completeUserData);
+                    print('\n✅ Complete user data stored:');
+                    print(encoder.convert(completeUserData));
+                    print('=== USER DATA PREPARATION COMPLETE ===\n');
 
                     Navigator.pushReplacement(
                       context,
@@ -382,11 +426,7 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
                         builder: (context) => MainPage(
                           isArabic: widget.isArabic,
                           onLanguageChanged: (bool value) {},
-                          userData: {
-                            ...widget.user ?? {},
-                            'firstName': firstName,
-                            'isSessionActive': isSessionActive,
-                          },
+                          userData: completeUserData,
                           initialRoute: '',
                           isDarkMode: Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
                         ),
@@ -453,20 +493,6 @@ class _MPINSetupScreenState extends State<MPINSetupScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            if (widget.showSteps) ...[
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildStepCircle(1, true),
-                  _buildStepLine(true),
-                  _buildStepCircle(2, true),
-                  _buildStepLine(false),
-                  _buildStepCircle(3, false),
-                ],
-              ),
-              const SizedBox(height: 40),
-            ],
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
