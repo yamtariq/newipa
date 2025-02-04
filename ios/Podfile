@@ -31,8 +31,8 @@ flutter_ios_podfile_setup
 
 # Ensure DKImagePickerController is correctly installed
 
-pod 'DKImagePickerController/PhotoGallery', '~> 5.3.3'
-pod 'DKImagePickerController', '~> 5.3.3'
+
+pod 'DKImagePickerController', '~> 4.3'
 
 
 target 'Runner' do
