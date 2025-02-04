@@ -9047,3 +9047,55 @@ VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6);
 2025-02-04 12:06:26.206 +03:00 [INF] Executed action NayifatAPI.Controllers.ProxyController.ForwardRequest (NayifatAPI) in 3041.3966ms
 2025-02-04 12:06:26.208 +03:00 [INF] Executed endpoint 'NayifatAPI.Controllers.ProxyController.ForwardRequest (NayifatAPI)'
 2025-02-04 12:06:26.210 +03:00 [INF] Request finished HTTP/1.1 POST http://0fcd-51-252-155-185.ngrok-free.app/api/proxy/forward?url=https://icreditdept.com/api/testasp/test_local_generate_otp.php - 200 57 application/json 3055.3242ms
+2025-02-04 12:08:45.692 +03:00 [INF] Request starting HTTP/1.1 POST http://0fcd-51-252-155-185.ngrok-free.app/api/proxy/forward?url=https://icreditdept.com/api/testasp/test_local_generate_otp.php - application/json; charset=utf-8 87
+2025-02-04 12:08:45.695 +03:00 [INF] Executing endpoint 'NayifatAPI.Controllers.ProxyController.ForwardRequest (NayifatAPI)'
+2025-02-04 12:08:45.696 +03:00 [INF] Route matched with {action = "ForwardRequest", controller = "Proxy"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] ForwardRequest() on controller NayifatAPI.Controllers.ProxyController (NayifatAPI).
+2025-02-04 12:08:45.699 +03:00 [INF] Start processing HTTP request POST https://icreditdept.com/api/testasp/test_local_generate_otp.php
+2025-02-04 12:08:45.700 +03:00 [INF] Sending HTTP request POST https://icreditdept.com/api/testasp/test_local_generate_otp.php
+2025-02-04 12:08:48.681 +03:00 [INF] Received HTTP response headers after 2979.8934ms - 200
+2025-02-04 12:08:48.683 +03:00 [INF] End processing HTTP request after 2983.4482ms - 200
+2025-02-04 12:08:48.683 +03:00 [INF] Raw response length: 200
+2025-02-04 12:08:48.684 +03:00 [INF] Response content: {"success":true,"errors":[],"result":{"nationalId":"1064448614","otp":880133,"expiryDate":"2025-02-04 12:13:47","successMsg":"Success","errCode":0,"errMsg":null},"type":"N","message":null,"code":null}
+2025-02-04 12:08:48.684 +03:00 [INF] Executing ContentResult with HTTP Response ContentType of application/json
+2025-02-04 12:08:48.685 +03:00 [INF] Executed action NayifatAPI.Controllers.ProxyController.ForwardRequest (NayifatAPI) in 2987.2432ms
+2025-02-04 12:08:48.687 +03:00 [INF] Executed endpoint 'NayifatAPI.Controllers.ProxyController.ForwardRequest (NayifatAPI)'
+2025-02-04 12:08:48.688 +03:00 [INF] Request finished HTTP/1.1 POST http://0fcd-51-252-155-185.ngrok-free.app/api/proxy/forward?url=https://icreditdept.com/api/testasp/test_local_generate_otp.php - 200 200 application/json 2995.6697ms
+2025-02-04 12:08:58.782 +03:00 [INF] Request starting HTTP/1.1 POST http://0fcd-51-252-155-185.ngrok-free.app/api/proxy/forward?url=https://icreditdept.com/api/testasp/test_local_verify_otp.php - application/json; charset=utf-8 147
+2025-02-04 12:08:58.791 +03:00 [INF] Executing endpoint 'NayifatAPI.Controllers.ProxyController.ForwardRequest (NayifatAPI)'
+2025-02-04 12:08:58.791 +03:00 [INF] Route matched with {action = "ForwardRequest", controller = "Proxy"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] ForwardRequest() on controller NayifatAPI.Controllers.ProxyController (NayifatAPI).
+2025-02-04 12:08:58.793 +03:00 [INF] Start processing HTTP request POST https://icreditdept.com/api/testasp/test_local_verify_otp.php
+2025-02-04 12:08:58.794 +03:00 [INF] Sending HTTP request POST https://icreditdept.com/api/testasp/test_local_verify_otp.php
+2025-02-04 12:08:59.778 +03:00 [INF] Received HTTP response headers after 983.3256ms - 200
+2025-02-04 12:08:59.780 +03:00 [INF] End processing HTTP request after 987.4119ms - 200
+2025-02-04 12:08:59.782 +03:00 [INF] Raw response length: 57
+2025-02-04 12:08:59.783 +03:00 [INF] Response content: {"success":false,"message":"Missing required parameters"}
+2025-02-04 12:08:59.783 +03:00 [INF] Executing ContentResult with HTTP Response ContentType of application/json
+2025-02-04 12:08:59.784 +03:00 [INF] Executed action NayifatAPI.Controllers.ProxyController.ForwardRequest (NayifatAPI) in 990.9646ms
+2025-02-04 12:08:59.785 +03:00 [INF] Executed endpoint 'NayifatAPI.Controllers.ProxyController.ForwardRequest (NayifatAPI)'
+2025-02-04 12:08:59.786 +03:00 [INF] Request finished HTTP/1.1 POST http://0fcd-51-252-155-185.ngrok-free.app/api/proxy/forward?url=https://icreditdept.com/api/testasp/test_local_verify_otp.php - 200 57 application/json 1003.5178ms
+2025-02-04 12:10:46.433 +03:00 [INF] Request starting HTTP/1.1 POST http://0fcd-51-252-155-185.ngrok-free.app/api/proxy/forward?url=https://icreditdept.com/api/testasp/test_local_generate_otp.php - application/json; charset=utf-8 87
+2025-02-04 12:10:46.684 +03:00 [INF] Executing endpoint 'NayifatAPI.Controllers.ProxyController.ForwardRequest (NayifatAPI)'
+2025-02-04 12:10:46.686 +03:00 [INF] Route matched with {action = "ForwardRequest", controller = "Proxy"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] ForwardRequest() on controller NayifatAPI.Controllers.ProxyController (NayifatAPI).
+2025-02-04 12:10:46.688 +03:00 [INF] Start processing HTTP request POST https://icreditdept.com/api/testasp/test_local_generate_otp.php
+2025-02-04 12:10:46.701 +03:00 [INF] Sending HTTP request POST https://icreditdept.com/api/testasp/test_local_generate_otp.php
+2025-02-04 12:10:49.146 +03:00 [INF] Received HTTP response headers after 2444.2416ms - 200
+2025-02-04 12:10:49.148 +03:00 [INF] End processing HTTP request after 2459.0806ms - 200
+2025-02-04 12:10:49.149 +03:00 [INF] Raw response length: 200
+2025-02-04 12:10:49.149 +03:00 [INF] Response content: {"success":true,"errors":[],"result":{"nationalId":"1064448614","otp":598037,"expiryDate":"2025-02-04 12:15:48","successMsg":"Success","errCode":0,"errMsg":null},"type":"N","message":null,"code":null}
+2025-02-04 12:10:49.150 +03:00 [INF] Executing ContentResult with HTTP Response ContentType of application/json
+2025-02-04 12:10:49.150 +03:00 [INF] Executed action NayifatAPI.Controllers.ProxyController.ForwardRequest (NayifatAPI) in 2462.3332ms
+2025-02-04 12:10:49.152 +03:00 [INF] Executed endpoint 'NayifatAPI.Controllers.ProxyController.ForwardRequest (NayifatAPI)'
+2025-02-04 12:10:49.153 +03:00 [INF] Request finished HTTP/1.1 POST http://0fcd-51-252-155-185.ngrok-free.app/api/proxy/forward?url=https://icreditdept.com/api/testasp/test_local_generate_otp.php - 200 200 application/json 2719.8206ms
+2025-02-04 12:11:00.227 +03:00 [INF] Request starting HTTP/1.1 POST http://0fcd-51-252-155-185.ngrok-free.app/api/proxy/forward?url=https://icreditdept.com/api/testasp/test_local_verify_otp.php - application/json; charset=utf-8 53
+2025-02-04 12:11:00.232 +03:00 [INF] Executing endpoint 'NayifatAPI.Controllers.ProxyController.ForwardRequest (NayifatAPI)'
+2025-02-04 12:11:00.232 +03:00 [INF] Route matched with {action = "ForwardRequest", controller = "Proxy"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] ForwardRequest() on controller NayifatAPI.Controllers.ProxyController (NayifatAPI).
+2025-02-04 12:11:00.234 +03:00 [INF] Start processing HTTP request POST https://icreditdept.com/api/testasp/test_local_verify_otp.php
+2025-02-04 12:11:00.235 +03:00 [INF] Sending HTTP request POST https://icreditdept.com/api/testasp/test_local_verify_otp.php
+2025-02-04 12:11:01.197 +03:00 [INF] Received HTTP response headers after 961.7587ms - 200
+2025-02-04 12:11:01.203 +03:00 [INF] End processing HTTP request after 969.6487ms - 200
+2025-02-04 12:11:01.208 +03:00 [INF] Raw response length: 202
+2025-02-04 12:11:01.208 +03:00 [INF] Response content: {"success":true,"errors":[],"result":{"nationalId":"1064448614","otp":"598037","verifiedFlag":true,"successMsg":"Verified successfully.","errCode":0,"errMsg":null},"type":"N","message":null,"code":null}
+2025-02-04 12:11:01.210 +03:00 [INF] Executing ContentResult with HTTP Response ContentType of application/json
+2025-02-04 12:11:01.210 +03:00 [INF] Executed action NayifatAPI.Controllers.ProxyController.ForwardRequest (NayifatAPI) in 976.8905ms
+2025-02-04 12:11:01.211 +03:00 [INF] Executed endpoint 'NayifatAPI.Controllers.ProxyController.ForwardRequest (NayifatAPI)'
+2025-02-04 12:11:01.213 +03:00 [INF] Request finished HTTP/1.1 POST http://0fcd-51-252-155-185.ngrok-free.app/api/proxy/forward?url=https://icreditdept.com/api/testasp/test_local_verify_otp.php - 200 202 application/json 985.0899ms

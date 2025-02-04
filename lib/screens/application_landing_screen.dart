@@ -353,8 +353,19 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
           if (response.statusCode != 200) {
             throw Exception('Failed to submit loan application');
           }
+
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => LoanApplicationDetailsScreen(
+                  isArabic: widget.isArabic,
+                ),
+              ),
+            );
+          }
         } else {
-          // Card application - following same pattern as loan application
+          // Card application
           final cardData = {
             'national_id': _idNumberController.text,
             'application_number': "0",
@@ -385,15 +396,31 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
           if (response.statusCode != 200) {
             throw Exception('Failed to submit card application');
           }
-        }
 
-        if (mounted) {
-          await _showResultDialog(true);
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CardApplicationDetailsScreen(
+                  isArabic: widget.isArabic,
+                ),
+              ),
+            );
+          }
         }
       } catch (e) {
         print('Error submitting application: $e');
         if (mounted) {
-          await _showResultDialog(false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                widget.isArabic
+                    ? 'حدث خطأ أثناء تقديم الطلب'
+                    : 'Error submitting application'
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
         }
       } finally {
         if (mounted) {
