@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\yamta\\StudioProjects\\nayifat_app_2025_new\\nayifatapi\\NayifatAPI.csproj": {}
+    "C:\\Users\\yamta\\StudioProjects\\nayifat_app_2025_new\\NayifatAPI\\NayifatAPI.csproj": {}
   },
   "projects": {
-    "C:\\Users\\yamta\\StudioProjects\\nayifat_app_2025_new\\nayifatapi\\NayifatAPI.csproj": {
+    "C:\\Users\\yamta\\StudioProjects\\nayifat_app_2025_new\\NayifatAPI\\NayifatAPI.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\yamta\\StudioProjects\\nayifat_app_2025_new\\nayifatapi\\NayifatAPI.csproj",
+        "projectUniqueName": "C:\\Users\\yamta\\StudioProjects\\nayifat_app_2025_new\\NayifatAPI\\NayifatAPI.csproj",
         "projectName": "NayifatAPI",
-        "projectPath": "C:\\Users\\yamta\\StudioProjects\\nayifat_app_2025_new\\nayifatapi\\NayifatAPI.csproj",
+        "projectPath": "C:\\Users\\yamta\\StudioProjects\\nayifat_app_2025_new\\NayifatAPI\\NayifatAPI.csproj",
         "packagesPath": "C:\\Users\\yamta\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\yamta\\StudioProjects\\nayifat_app_2025_new\\nayifatapi\\obj\\",
+        "outputPath": "C:\\Users\\yamta\\StudioProjects\\nayifat_app_2025_new\\NayifatAPI\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

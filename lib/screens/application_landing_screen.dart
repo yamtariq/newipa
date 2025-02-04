@@ -339,12 +339,12 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
           };
 
           print('\n=== LOAN APPLICATION API CALL ===');
-          print('URL: ${Constants.apiBaseUrl}${Constants.endpointUpdateLoanApplication}');
+          print('URL: ${Constants.apiBaseUrl}/proxy/forward?url=${Constants.proxyBaseUrl}/update_loan_application.php');
           print('Headers: ${jsonEncode(Constants.defaultHeaders)}');
           print('Payload: ${jsonEncode(loanData)}');
 
           final response = await http.post(
-            Uri.parse('${Constants.apiBaseUrl}${Constants.endpointUpdateLoanApplication}'),
+            Uri.parse('${Constants.apiBaseUrl}/proxy/forward?url=${Constants.proxyBaseUrl}/update_loan_application.php'),
             headers: Constants.defaultHeaders,
             body: jsonEncode(loanData),
           );
