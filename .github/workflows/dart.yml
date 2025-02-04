@@ -7,36 +7,50 @@ jobs:
   build-ios:
     runs-on: macos-latest
     steps:
+      # Check out your repository.
       - uses: actions/checkout@v3
       
+      # Set up Flutter (stable channel, x64 architecture).
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           architecture: x64
 
+      # Fetch Flutter packages.
       - run: flutter pub get
 
+      # Clean up existing iOS build artifacts.
       - run: rm -rf Podfile.lock Pods/ .symlinks Flutter/Flutter.podspec
         working-directory: ios
 
+      # Install CocoaPods.
       - run: gem install cocoapods
+
+      # Update the CocoaPods repo.
       - run: pod repo update
         working-directory: ios
+
+      # Install pods with repo update.
       - run: pod install --repo-update
         working-directory: ios
 
+      # Build the iOS project without code signing.
       - run: flutter build ios --release --no-codesign
 
+      # Create the Payload directory in the build output.
       - run: mkdir Payload
         working-directory: build/ios/iphoneos
 
-      - run: mv Runner.app/ Payload
+      # Move the Runner.app into the Payload directory.
+      - run: mv Runner.app Payload
         working-directory: build/ios/iphoneos
 
+      # Zip the Payload folder into an IPA.
       - name: Zip output
         run: zip -qq -r -9 FlutterIpaExport.ipa Payload
         working-directory: build/ios/iphoneos
 
+      # Upload the IPA to a GitHub Release.
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
