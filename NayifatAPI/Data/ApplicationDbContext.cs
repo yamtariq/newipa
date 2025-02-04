@@ -24,6 +24,8 @@ namespace NayifatAPI.Data
         public DbSet<NotificationTemplate> NotificationTemplates { get; set; }
         public DbSet<LoanApplication> LoanApplications { get; set; }
         public DbSet<CardApplication> CardApplications { get; set; }
+        public DbSet<LeadAppCard> LeadAppCards { get; set; }
+        public DbSet<LeadAppLoan> LeadAppLoans { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -70,6 +72,55 @@ namespace NayifatAPI.Data
                 
                 entity.Property(e => e.SalaryDakhli)
                     .HasColumnType("decimal(18,2)");
+            });
+
+            // Lead Applications configuration
+            modelBuilder.Entity<LeadAppCard>(entity =>
+            {
+                entity.ToTable("lead_apps_cards");
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.NationalId);
+                
+                entity.Property(e => e.NationalId)
+                    .HasColumnName("national_id");
+                
+                entity.Property(e => e.Name)
+                    .HasColumnName("name");
+                
+                entity.Property(e => e.Phone)
+                    .HasColumnName("phone");
+                
+                entity.Property(e => e.Status)
+                    .HasColumnName("status")
+                    .HasDefaultValue("PENDING");
+                
+                entity.Property(e => e.StatusTimestamp)
+                    .HasColumnName("status_timestamp")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            });
+
+            modelBuilder.Entity<LeadAppLoan>(entity =>
+            {
+                entity.ToTable("lead_apps_loans");
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.NationalId);
+                
+                entity.Property(e => e.NationalId)
+                    .HasColumnName("national_id");
+                
+                entity.Property(e => e.Name)
+                    .HasColumnName("name");
+                
+                entity.Property(e => e.Phone)
+                    .HasColumnName("phone");
+                
+                entity.Property(e => e.Status)
+                    .HasColumnName("status")
+                    .HasDefaultValue("PENDING");
+                
+                entity.Property(e => e.StatusTimestamp)
+                    .HasColumnName("status_timestamp")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
             });
 
             // CustomerDevice configuration

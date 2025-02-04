@@ -1057,23 +1057,19 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                               Expanded(
                                 child: ElevatedButton(
                                   onPressed: () async {
-                                    final isSignedIn =
-                                        Provider.of<SessionProvider>(context,
-                                                listen: false)
-                                            .isSignedIn;
-                                    if (isSignedIn) {
-                                      // For signed-in users, navigate to the original application screens
+                                    final hasActiveSession = Provider.of<SessionProvider>(context, listen: false).hasActiveSession;
+                                    if (hasActiveSession) {
+                                      // For users with active session
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) =>
-                                              LoanApplicationStartScreen(
-                                                isArabic: widget.isArabic,
-                                              ),
+                                          builder: (context) => LoanApplicationStartScreen(
+                                            isArabic: widget.isArabic,
+                                          ),
                                         ),
                                       );
                                     } else {
-                                      // For non-signed-in users, show enhanced dialog
+                                      // For users without active session, shows dialog with options
                                       showDialog(
                                         context: context,
                                         builder: (BuildContext context) {
@@ -1296,23 +1292,19 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                               Expanded(
                                 child: ElevatedButton(
                                   onPressed: () async {
-                                    final isSignedIn =
-                                        Provider.of<SessionProvider>(context,
-                                                listen: false)
-                                            .isSignedIn;
-                                    if (isSignedIn) {
-                                      // For signed-in users, navigate to the original application screens
+                                    final hasActiveSession = Provider.of<SessionProvider>(context, listen: false).hasActiveSession;
+                                    if (hasActiveSession) {
+                                      // For users with active session
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) =>
-                                              CardApplicationStartScreen(
-                                                isArabic: widget.isArabic,
-                                              ),
+                                          builder: (context) => CardApplicationStartScreen(
+                                            isArabic: widget.isArabic,
+                                          ),
                                         ),
                                       );
                                     } else {
-                                      // For non-signed-in users, show enhanced dialog
+                                      // For users without active session, shows dialog with options
                                       showDialog(
                                         context: context,
                                         builder: (BuildContext context) {

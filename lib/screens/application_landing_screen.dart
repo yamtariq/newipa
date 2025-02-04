@@ -14,6 +14,7 @@ import '../screens/main_page.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
 import '../widgets/otp_dialog.dart';
+import 'package:flutter/rendering.dart' as ui;
 
 class ApplicationLandingScreen extends StatefulWidget {
   final bool isArabic;
@@ -87,7 +88,7 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
         },
         body: jsonEncode(Constants.otpGenerateRequestBody(
           _idNumberController.text,
-          _phoneController.text,
+          '966${_phoneController.text}',  // Add country code prefix
           purpose: 'application'
         )),
       );
@@ -241,7 +242,7 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
                       },
                       body: jsonEncode(Constants.otpGenerateRequestBody(
                         _idNumberController.text,
-                        _phoneController.text,
+                        '966${_phoneController.text}',  // Add country code prefix
                         purpose: 'application'
                       )),
                     );
@@ -309,11 +310,11 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
           return;
         }
 
+        // Create application data with PascalCase for API request
         final applicationData = {
-          'name': _nameController.text,
-          'id_number': _idNumberController.text,
-          'phone': _phoneController.text,
-          'application_no': "0",
+          'NationalId': _idNumberController.text,
+          'Name': _nameController.text,
+          'Phone': '966${_phoneController.text}'  // Add country code prefix
         };
 
         // Store data in secure storage first
@@ -324,29 +325,15 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
 
         if (widget.isLoanApplication) {
           // Loan application
-          final loanData = {
-            'national_id': _idNumberController.text,
-            'application_no': "0",
-            'customerDecision': 'pending',
-            'loan_amount': 0,
-            'loan_purpose': 'N/A',
-            'loan_tenure': 0,
-            'interest_rate': 0,
-            'status': 'pending',
-            'remarks': 'N/A',
-            'noteUser': 'CUSTOMER',
-            'note': 'N/A'
-          };
-
           print('\n=== LOAN APPLICATION API CALL ===');
-          print('URL: ${Constants.apiBaseUrl}/proxy/forward?url=${Constants.proxyBaseUrl}/update_loan_application.php');
+          print('URL: ${Constants.apiBaseUrl}${Constants.endpointCreateLoanLead}');
           print('Headers: ${jsonEncode(Constants.defaultHeaders)}');
-          print('Payload: ${jsonEncode(loanData)}');
+          print('Payload: ${jsonEncode(applicationData)}');
 
           final response = await http.post(
-            Uri.parse('${Constants.apiBaseUrl}/proxy/forward?url=${Constants.proxyBaseUrl}/update_loan_application.php'),
+            Uri.parse('${Constants.apiBaseUrl}${Constants.endpointCreateLoanLead}'),
             headers: Constants.defaultHeaders,
-            body: jsonEncode(loanData),
+            body: jsonEncode(applicationData),
           );
 
           print('Response Status: ${response.statusCode}');
@@ -354,42 +341,39 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
           print('=== END LOAN APPLICATION API CALL ===\n');
 
           if (response.statusCode != 200) {
-            throw Exception('Failed to submit loan application');
+            final errorData = jsonDecode(response.body);
+            throw Exception(errorData['error'] ?? 'Failed to submit loan application');
           }
 
           if (mounted) {
-            Navigator.pushReplacement(
+            // Show success dialog before navigation
+            await _showResultDialog(true);
+            
+            Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(
-                builder: (context) => LoanApplicationDetailsScreen(
+                builder: (context) => MainPage(
                   isArabic: widget.isArabic,
+                  onLanguageChanged: (bool value) {},
+                  userData: {},
+                  initialRoute: '',
+                  isDarkMode: Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
                 ),
               ),
+              (route) => false,
             );
           }
         } else {
           // Card application
-          final cardData = {
-            'national_id': _idNumberController.text,
-            'application_number': "0",
-            'customerDecision': 'pending',
-            'card_type': 'N/A',
-            'card_limit': 0,
-            'status': 'pending',
-            'remarks': 'N/A',
-            'noteUser': 'CUSTOMER',
-            'note': 'N/A'
-          };
-
           print('\n=== CARD APPLICATION API CALL ===');
-          print('URL: ${Constants.apiBaseUrl}${Constants.endpointUpdateCardApplication}');
+          print('URL: ${Constants.apiBaseUrl}${Constants.endpointCreateCardLead}');
           print('Headers: ${jsonEncode(Constants.defaultHeaders)}');
-          print('Payload: ${jsonEncode(cardData)}');
+          print('Payload: ${jsonEncode(applicationData)}');
 
           final response = await http.post(
-            Uri.parse('${Constants.apiBaseUrl}${Constants.endpointUpdateCardApplication}'),
+            Uri.parse('${Constants.apiBaseUrl}${Constants.endpointCreateCardLead}'),
             headers: Constants.defaultHeaders,
-            body: jsonEncode(cardData),
+            body: jsonEncode(applicationData),
           );
 
           print('Response Status: ${response.statusCode}');
@@ -397,33 +381,34 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
           print('=== END CARD APPLICATION API CALL ===\n');
 
           if (response.statusCode != 200) {
-            throw Exception('Failed to submit card application');
+            final errorData = jsonDecode(response.body);
+            throw Exception(errorData['error'] ?? 'Failed to submit card application');
           }
 
           if (mounted) {
-            Navigator.pushReplacement(
+            // Show success dialog before navigation
+            await _showResultDialog(true);
+            
+            Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(
-                builder: (context) => CardApplicationDetailsScreen(
+                builder: (context) => MainPage(
                   isArabic: widget.isArabic,
+                  onLanguageChanged: (bool value) {},
+                  userData: {},
+                  initialRoute: '',
+                  isDarkMode: Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
                 ),
               ),
+              (route) => false,
             );
           }
         }
       } catch (e) {
         print('Error submitting application: $e');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                widget.isArabic
-                    ? 'حدث خطأ أثناء تقديم الطلب'
-                    : 'Error submitting application'
-              ),
-              backgroundColor: Colors.red,
-            ),
-          );
+          // Show error dialog instead of snackbar
+          await _showResultDialog(false, errorMessage: e.toString().replaceAll('Exception: ', ''));
         }
       } finally {
         if (mounted) {
@@ -435,7 +420,7 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
     }
   }
 
-  Future<void> _showResultDialog(bool isSuccess) async {
+  Future<void> _showResultDialog(bool isSuccess, {String? errorMessage}) async {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final primaryColor = Color(themeProvider.isDarkMode 
         ? Constants.darkPrimaryColor 
@@ -478,7 +463,7 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Lottie Animation
+                // Icon/Animation
                 Container(
                   width: 200,
                   height: 200,
@@ -490,13 +475,33 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
                       width: 1,
                     ),
                   ),
-                  child: Lottie.asset(
-                    'assets/animations/celebration.json',
-                    repeat: isSuccess,
-                    reverse: isSuccess,
-                  ),
+                  child: isSuccess 
+                    ? Lottie.asset(
+                        'assets/animations/celebration.json',
+                        repeat: true,
+                        reverse: true,
+                      )
+                    : Icon(
+                        Icons.error_outline,
+                        size: 80,
+                        color: Colors.red[700],
+                      ),
                 ),
                 const SizedBox(height: 24),
+                
+                // Title
+                Text(
+                  isSuccess
+                      ? (widget.isArabic ? 'تم تقديم طلبك بنجاح' : 'Application Submitted Successfully')
+                      : (widget.isArabic ? 'خطأ' : 'Error'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: isSuccess ? Colors.green : Colors.red[700],
+                  ),
+                ),
+                const SizedBox(height: 16),
                 
                 // Message
                 Text(
@@ -505,63 +510,53 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
                           ? 'تم تقديم طلبك بنجاح'
                           : 'Your application has been submitted successfully')
                       : (widget.isArabic
-                          ? 'حدث خطأ أثناء تقديم طلبك'
-                          : 'There was an error submitting your application'),
+                          ? errorMessage?.replaceAll('Exception: ', '') ?? 'حدث خطأ أثناء تقديم طلبك'
+                          : errorMessage?.replaceAll('Exception: ', '') ?? 'There was an error submitting your application'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
                     color: textColor,
                   ),
                 ),
                 const SizedBox(height: 24),
-                // OK Button
-                Container(
+                
+                // Button
+                SizedBox(
                   width: double.infinity,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
-                    color: primaryColor,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Color(themeProvider.isDarkMode 
-                            ? Constants.darkPrimaryShadowColor 
-                            : Constants.lightPrimaryShadowColor),
-                        blurRadius: 12,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
                   child: ElevatedButton(
                     onPressed: () {
-                      Navigator.of(context).pop(); // Close dialog
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => MainPage(
-                            isArabic: widget.isArabic,
-                            onLanguageChanged: (bool value) {},
-                            userData: {},
-                            initialRoute: '',
-                            isDarkMode: Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
+                      Navigator.of(context).pop();
+                      if (isSuccess) {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => MainPage(
+                              isArabic: widget.isArabic,
+                              onLanguageChanged: (bool value) {},
+                              userData: {},
+                              initialRoute: '',
+                              isDarkMode: Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
+                            ),
                           ),
-                        ),
-                        (route) => false,
-                      );
+                          (route) => false,
+                        );
+                      }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
+                      backgroundColor: isSuccess ? primaryColor : Colors.red[700],
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(Constants.buttonBorderRadius),
                       ),
                     ),
                     child: Text(
-                      widget.isArabic ? 'حسناً' : 'OK',
+                      isSuccess 
+                        ? (widget.isArabic ? 'متابعة' : 'Continue')
+                        : (widget.isArabic ? 'حسناً' : 'OK'),
                       style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
                         color: surfaceColor,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
@@ -613,7 +608,7 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
             },
             body: jsonEncode(Constants.otpGenerateRequestBody(
               _idNumberController.text,
-              _phoneController.text,
+              '966${_phoneController.text}',  // Add country code prefix
               purpose: 'application'
             )),
           );
@@ -849,7 +844,7 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
                                           color: textColor,
                                         ),
                                         keyboardType: TextInputType.phone,
-                                        maxLength: 10,
+                                        maxLength: 9,
                                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                                         decoration: InputDecoration(
                                           label: _buildLabel(widget.isArabic ? 'رقم الهاتف' : 'Phone Number'),
@@ -871,10 +866,38 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
                                           filled: true,
                                           fillColor: surfaceColor,
                                           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                                          prefixText: widget.isArabic ? '' : '+966 ',
-                                          prefixStyle: TextStyle(color: textColor),
+                                          suffixIcon: widget.isArabic
+                                              ? Container(
+                                                  width: 50,
+                                                  alignment: Alignment.centerLeft,
+                                                  padding: const EdgeInsets.only(left: 8),
+                                                  child: Directionality(
+                                                    textDirection: ui.TextDirection.ltr,
+                                                    child: Text(
+                                                      '+966 ',
+                                                      textAlign: TextAlign.left,
+                                                      style: TextStyle(
+                                                        color: textColor,
+                                                        fontSize: 16,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                )
+                                              : null,
+                                          prefix: !widget.isArabic
+                                              ? Text(
+                                                  '+966 ',
+                                                  textAlign: TextAlign.left,
+                                                  style: TextStyle(
+                                                    color: textColor,
+                                                    fontSize: 16,
+                                                  ),
+                                                )
+                                              : null,
                                           counterText: '',
                                         ),
+                                        textAlign: TextAlign.left,
+                                        textDirection: ui.TextDirection.ltr,
                                         validator: (value) {
                                           if (value == null || value.isEmpty) {
                                             return widget.isArabic
@@ -883,8 +906,8 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
                                           }
                                           if (value.length != 9) {
                                             return widget.isArabic
-                                                ? 'رقم الهاتف يجب أن يكون 10 أرقام'
-                                                : 'Phone number must be 10 digits';
+                                                ? 'رقم الهاتف يجب أن يكون 9 أرقام'
+                                                : 'Phone number must be 9 digits';
                                           }
                                           if (!value.startsWith('5')) {
                                             return widget.isArabic

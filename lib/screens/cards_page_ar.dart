@@ -376,129 +376,128 @@ class _CardsPageArState extends State<CardsPageAr> {
     }
 
     return Container(
-      height: 250 + (_cards.length - 1) * 70.0,
+      height: 400 + (_cards.length - 1) * 70.0,
       margin: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Stack(
         children: List.generate(_cards.length, (index) {
           final actualIndex = (_selectedCardIndex + index) % _cards.length;
           final card = _cards[actualIndex];
           
-          final cardType = card['type']?.toString() ?? 'بطاقة ائتمان';
-          final cardNumber = card['number']?.toString() ?? '**** **** **** ****';
           final cardStatus = card['status']?.toString() ?? 'نشط';
           
-          final List<Color> cardColors = cardType.toLowerCase().contains('gold') || cardType.contains('ذهبية')
-              ? [const Color(0xFF1A1A1A), const Color(0xFF333333)]
-              : cardType.toLowerCase().contains('platinum') || cardType.contains('بلاتينية')
-                  ? [const Color(0xFFE5E5E5), const Color(0xFFC0C0C0)]
-                  : [const Color(0xFF1A1A1A), const Color(0xFF333333)];
-
-          final Color shadowColor = cardType.toLowerCase().contains('platinum') || cardType.contains('بلاتينية')
-              ? const Color(0xFFC0C0C0)
-              : Colors.black;
-
           final bool isClickable = index > 0;
 
           return AnimatedPositioned(
             duration: const Duration(milliseconds: 500),
             curve: Curves.easeOutBack,
-            top: index * 70.0,
+            top: index * 50.0,
             left: _isCardAnimating[index] ? -MediaQuery.of(context).size.width : 0,
             right: 0,
-            child: GestureDetector(
-              onTap: isClickable ? () => _selectCard(index) : null,
-              child: Container(
-                height: 200,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: cardColors,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+            child: Container(
+              width: MediaQuery.of(context).size.width - 32, // Full width minus margins
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  GestureDetector(
+                    onTap: isClickable ? () => _selectCard(index) : null,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: MediaQuery.of(context).size.width * 0.45,
+                          height: 280,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.25),
+                                blurRadius: 24,
+                                offset: const Offset(0, 12),
+                                spreadRadius: -8,
+                              ),
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.15),
+                                blurRadius: 12,
+                                offset: const Offset(0, 6),
+                                spreadRadius: -4,
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
+                            child: AspectRatio(
+                              aspectRatio: 0.63,
+                              child: Image.asset(
+                                'assets/images/platinum.jpg',
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
-                  boxShadow: [
-                    BoxShadow(
-                      color: shadowColor.withOpacity(0.4),
-                      blurRadius: 20,
-                      offset: const Offset(0, 15),
-                      spreadRadius: -5,
-                    ),
-                    BoxShadow(
-                      color: shadowColor.withOpacity(0.2),
-                      blurRadius: 10,
-                      offset: const Offset(0, 8),
-                      spreadRadius: -2,
-                    ),
-                    BoxShadow(
-                      color: shadowColor.withOpacity(0.1),
-                      blurRadius: 5,
-                      offset: const Offset(0, 3),
-                      spreadRadius: 0,
-                    ),
-                  ],
-                ),
-                child: Stack(
-                  children: [
-                    Positioned(
-                      top: 20,
-                      right: 20,
-                      child: SvgPicture.asset(
-                        'assets/images/nayifat-logo.svg',
-                        height: 30,
-                        colorFilter: ColorFilter.mode(
-                          Colors.white,
-                          BlendMode.srcIn,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      top: 20,
-                      left: 20,
-                      child: Text(
-                        cardType,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 60,
-                      left: 20,
-                      child: Text(
-                        cardNumber,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          letterSpacing: 2,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 20,
-                      left: 20,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(15),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.2),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: textColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              cardStatus,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: textColor,
+                              ),
+                            ),
                           ),
-                        ),
-                        child: Text(
-                          cardStatus,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
+                          const SizedBox(height: 24),
+                          Text(
+                            'الحد المتاح',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: textColor.withOpacity(0.7),
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 4),
+                          Text(
+                            card['available_limit']?.toString() ?? ' 0.00 ريال',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: textColor,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'حد البطاقة',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: textColor.withOpacity(0.7),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            card['card_limit']?.toString() ?? ' 0.00 ريال',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
+                              color: textColor,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  
+                  
+                ],
               ),
             ),
           );

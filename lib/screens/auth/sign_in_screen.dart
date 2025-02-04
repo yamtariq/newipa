@@ -270,11 +270,14 @@ class _SignInScreenState extends State<SignInScreen> {
         }
       });
 
-      // If startWithBiometric is true and biometrics are available, trigger it
-      if (widget.startWithBiometric && _isBiometricsAvailable) {
-        Future.delayed(const Duration(milliseconds: 500), () {
-          _authenticateWithBiometrics();
-        });
+      // If device is registered and biometrics are enabled, trigger it automatically
+      if (isDeviceRegistered && _isBiometricsAvailable && !widget.startWithPassword) {
+        final isBiometricEnabled = await _authService.isBiometricEnabled();
+        if (isBiometricEnabled) {
+          Future.delayed(const Duration(milliseconds: 500), () {
+            _authenticateWithBiometrics();
+          });
+        }
       }
 
       print('Auth Status Check:');
@@ -1388,6 +1391,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
                       // Authentication Methods
                       if (!_isPasswordMode) ...[
+                        // Show biometric option first if available
                         if (_isBiometricsAvailable) ...[
                           FutureBuilder<bool>(
                             future: _authService.isBiometricEnabled(),

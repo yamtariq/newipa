@@ -2,7 +2,7 @@ class Constants {
   // API Base URLs
   static const bool useNewApi = true; // Feature flag for easy switching
   static String get apiBaseUrl => useNewApi
-      ? 'https://0fcd-51-252-155-185.ngrok-free.app/api'
+      ? 'https://45f9-51-252-155-185.ngrok-free.app/api'
       : 'https://icreditdept.com/api';
   static String get authBaseUrl => '$apiBaseUrl/auth';
   static String get masterFetchUrl => '$apiBaseUrl/content/fetch';
@@ -149,6 +149,13 @@ class Constants {
   // Old: static const String endpointReplaceDevice = '/replace_device.php';
   static const String endpointReplaceDevice = '/device/replace';
   // Used in: AuthService (auth_service.dart) - replaceDevice()
+
+  // Lead Application Endpoints
+  static const String endpointCreateCardLead = '/lead/card/create';
+  // Used in: LeadApplicationService - createCardLead()
+
+  static const String endpointCreateLoanLead = '/lead/loan/create';
+  // Used in: LeadApplicationService - createLoanLead()
 
   // User Registration
   // Old: static const String endpointUserRegistration = '/user_registration.php';

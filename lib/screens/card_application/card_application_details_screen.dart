@@ -195,30 +195,41 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+        allowCompression: true,
+        withData: true,
+        onFileLoading: (FilePickerStatus status) {
+          if (status == FilePickerStatus.picking) {
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (BuildContext context) {
+                return const Center(child: CircularProgressIndicator());
+              },
+            );
+          } else {
+            Navigator.of(context).pop();
+          }
+        },
       );
 
       if (result != null) {
+        final file = result.files.single;
+        // Check file size (max 10MB)
+        if (file.size > 10 * 1024 * 1024) {
+          _showError('File size must be less than 10MB');
+          return;
+        }
+
         setState(() {
-          _uploadedFiles[field] = result.files.single.name;
+          _uploadedFiles[field] = file.name;
           print('File picked successfully. Updated uploaded files: $_uploadedFiles');
-          // Only reset salary changed flag for salary document
-          if (field == 'salary') {
-            _salaryChanged = false;
-          }
         });
       } else {
-        print('No file was picked');
-        // If no file was picked for salary, reset the salary to previous value
-        if (field == 'salary' && _salaryChanged) {
-          setState(() {
-            _salaryChanged = false;
-            // Reset salary to previous value if needed
-          });
-        }
+        print('User canceled file picking');
       }
     } catch (e) {
       print('Error picking file: $e');
-      _showError('Error picking file: $e');
+      _showError('Error picking file: ${e.toString()}');
     }
   }
 
