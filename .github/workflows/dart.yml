@@ -16,10 +16,12 @@ jobs:
           architecture: x64
       - run: flutter pub get
       
-
       - run: pod repo update
         working-directory: ios
-
+      
+      - run: pod install --repo-update
+        working-directory: ios
+      
       - run: flutter build ios --release --no-codesign
 
       - run: mkdir Payload
