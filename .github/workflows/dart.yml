@@ -19,6 +19,9 @@ jobs:
       # Fetch Flutter packages.
       - run: flutter pub get
 
+      # Clean any existing build artifacts.
+      - run: flutter clean
+
       # Clean up existing iOS build artifacts.
       - run: rm -rf Podfile.lock Pods/ .symlinks Flutter/Flutter.podspec
         working-directory: ios
