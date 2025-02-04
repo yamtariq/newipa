@@ -138,6 +138,9 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
         
         if (data['success'] == true) {
           print('✅ OTP verified successfully');
+          if (mounted) {
+            Navigator.of(context).pop(true);  // Close OTP dialog with success
+          }
           return data;
         }
         
