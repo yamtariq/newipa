@@ -78,7 +78,7 @@ jobs:
               end
             end
           end
-EOF
+
 
       - name: Clean iOS
         run: |
