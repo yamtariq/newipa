@@ -321,32 +321,71 @@ class NotificationWorker(
             .setVibrate(longArrayOf(1000, 1000, 1000))
             .setOnlyAlertOnce(false)
 
-        // 💡 Handle large icon if provided
-        notification["largeIconUrl"]?.let { iconUrl ->
+        // 💡 Handle images with proper error handling and fallbacks
+        var hasLargeIcon = false
+        var hasBigPicture = false
+
+        // First try to set large icon
+        val largeIconUrl = notification["largeIconUrl"]?.takeIf { it.isNotBlank() }
+        if (!largeIconUrl.isNullOrBlank() && (largeIconUrl.startsWith("http://") || largeIconUrl.startsWith("https://"))) {
             try {
-                Log.d(TAG, "Step 8.5.1: Setting large icon from URL: $iconUrl")
-                val iconBitmap = getBitmapFromUrl(iconUrl)
+                Log.d(TAG, "Step 8.5.1: Setting large icon from URL: $largeIconUrl")
+                val iconBitmap = getBitmapFromUrl(largeIconUrl)
                 if (iconBitmap != null) {
                     builder.setLargeIcon(iconBitmap)
+                    hasLargeIcon = true
+                    Log.d(TAG, "Step 8.5.2: Large icon set successfully")
+                } else {
+                    Log.e(TAG, "Step 8.5.3: Failed to load large icon")
+                    // Set default icon from resources
+                    builder.setLargeIcon(android.graphics.BitmapFactory.decodeResource(context.resources, R.mipmap.launcher_icon))
+                    hasLargeIcon = true
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error loading large icon: ${e.message}")
+                Log.e(TAG, "Step 8.5.4: Error setting large icon: ${e.message}")
+                // Set default icon from resources
+                builder.setLargeIcon(android.graphics.BitmapFactory.decodeResource(context.resources, R.mipmap.launcher_icon))
+                hasLargeIcon = true
             }
+        } else {
+            Log.d(TAG, "Step 8.5.1.1: Using default large icon")
+            builder.setLargeIcon(android.graphics.BitmapFactory.decodeResource(context.resources, R.mipmap.launcher_icon))
+            hasLargeIcon = true
         }
 
-        // 💡 Handle big picture if provided
-        notification["bigPictureUrl"]?.let { imageUrl ->
+        // Then try to set big picture
+        val bigPictureUrl = notification["bigPictureUrl"]?.takeIf { it.isNotBlank() }
+        if (!bigPictureUrl.isNullOrBlank() && (bigPictureUrl.startsWith("http://") || bigPictureUrl.startsWith("https://"))) {
             try {
-                Log.d(TAG, "Step 8.5.2: Setting big picture from URL: $imageUrl")
-                val imageBitmap = getBitmapFromUrl(imageUrl)
+                Log.d(TAG, "Step 8.5.5: Setting big picture from URL: $bigPictureUrl")
+                val imageBitmap = getBitmapFromUrl(bigPictureUrl)
                 if (imageBitmap != null) {
-                    builder.setStyle(NotificationCompat.BigPictureStyle()
+                    val bigPictureStyle = NotificationCompat.BigPictureStyle()
                         .bigPicture(imageBitmap)
-                        .bigLargeIcon(null)) // Hide large icon when expanded
+                        
+                    // If we have a large icon, hide it when expanded
+                    if (hasLargeIcon) {
+                        bigPictureStyle.bigLargeIcon(null as android.graphics.Bitmap?)
+                    }
+                    
+                    builder.setStyle(bigPictureStyle)
+                    hasBigPicture = true
+                    Log.d(TAG, "Step 8.5.6: Big picture set successfully")
+                } else {
+                    Log.e(TAG, "Step 8.5.7: Failed to load big picture")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error loading big picture: ${e.message}")
+                Log.e(TAG, "Step 8.5.8: Error setting big picture: ${e.message}")
             }
+        } else {
+            Log.d(TAG, "Step 8.5.5.1: No valid big picture URL provided")
+        }
+
+        // If no big picture was set, use BigTextStyle as fallback
+        if (!hasBigPicture) {
+            builder.setStyle(NotificationCompat.BigTextStyle()
+                .bigText(notification["body"]))
+            Log.d(TAG, "Step 8.5.9: Using BigTextStyle as fallback")
         }
 
         // Set the pending intent if available
@@ -361,18 +400,78 @@ class NotificationWorker(
         Log.d(TAG, "Step 8.7: Notification displayed successfully")
     }
 
-    // 💡 Helper function to load images from URLs
+    // 💡 Helper function to load images from URLs with improved error handling and caching
     private fun getBitmapFromUrl(imageUrl: String): android.graphics.Bitmap? {
         return try {
+            Log.d(TAG, "Step Image 1: Starting image download from: $imageUrl")
             val url = URL(imageUrl)
             val connection = url.openConnection() as HttpsURLConnection
-            connection.doInput = true
+            connection.apply {
+                connectTimeout = 15000 // 15 seconds
+                readTimeout = 15000
+                doInput = true
+                requestMethod = "GET"
+                setRequestProperty("User-Agent", "Nayifat-Android-App")
+            }
+
+            Log.d(TAG, "Step Image 2: Connection configured, starting download")
             connection.connect()
-            val input = connection.inputStream
-            android.graphics.BitmapFactory.decodeStream(input)
+
+            if (connection.responseCode == HttpsURLConnection.HTTP_OK) {
+                val input = connection.inputStream
+                val options = android.graphics.BitmapFactory.Options().apply {
+                    // Decode bounds first
+                    inJustDecodeBounds = true
+                }
+                
+                // Read bounds
+                android.graphics.BitmapFactory.decodeStream(input, null, options)
+                input.close()
+
+                // Calculate sample size
+                options.apply {
+                    inJustDecodeBounds = false
+                    inSampleSize = calculateInSampleSize(options, 512, 512) // Target size for notification
+                }
+
+                // Reopen connection for actual download
+                connection.disconnect()
+                val newConnection = url.openConnection() as HttpsURLConnection
+                newConnection.apply {
+                    connectTimeout = 15000
+                    readTimeout = 15000
+                    doInput = true
+                }
+
+                Log.d(TAG, "Step Image 3: Downloading and decoding image")
+                val bitmap = android.graphics.BitmapFactory.decodeStream(newConnection.inputStream, null, options)
+                Log.d(TAG, "Step Image 4: Image downloaded successfully: ${bitmap != null}")
+                bitmap
+            } else {
+                Log.e(TAG, "Step Image Error: Server returned code: ${connection.responseCode}")
+                null
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Error loading image from URL: $e")
+            Log.e(TAG, "Step Image Error: Failed to load image: ${e.message}")
+            e.printStackTrace()
             null
         }
+    }
+
+    // 💡 Helper function to calculate optimal sample size for image loading
+    private fun calculateInSampleSize(options: android.graphics.BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+        val (height: Int, width: Int) = options.run { outHeight to outWidth }
+        var inSampleSize = 1
+
+        if (height > reqHeight || width > reqWidth) {
+            val halfHeight: Int = height / 2
+            val halfWidth: Int = width / 2
+
+            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+
+        return inSampleSize
     }
 } 

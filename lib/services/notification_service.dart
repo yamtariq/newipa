@@ -296,10 +296,33 @@ class NotificationService {
           
           // Transform notifications to include image URLs
           final transformedNotifications = notifications.map((notification) {
+            // 💡 Get image URLs with proper validation
+            String? bigPictureUrl = notification['bigPictureUrl'] ?? 
+                                  notification['BigPictureUrl'] ?? 
+                                  notification['image_url'] ?? 
+                                  notification['ImageUrl'];
+            
+            String? largeIconUrl = notification['largeIconUrl'] ?? 
+                                 notification['LargeIconUrl'] ?? 
+                                 notification['icon_url'] ?? 
+                                 notification['IconUrl'];
+
+            // Validate URLs
+            if (bigPictureUrl != null && !bigPictureUrl.startsWith('http')) {
+              bigPictureUrl = null;
+            }
+            if (largeIconUrl != null && !largeIconUrl.startsWith('http')) {
+              largeIconUrl = null;
+            }
+
+            debugPrint('Processing notification images:');
+            debugPrint('Big Picture URL: $bigPictureUrl');
+            debugPrint('Large Icon URL: $largeIconUrl');
+
             return {
               ...notification,
-              'bigPictureUrl': notification['bigPictureUrl'] ?? notification['image_url'], // 💡 Support both formats
-              'largeIconUrl': notification['largeIconUrl'] ?? notification['icon_url'],    // 💡 Support both formats
+              'bigPictureUrl': bigPictureUrl,
+              'largeIconUrl': largeIconUrl,
             };
           }).toList();
           

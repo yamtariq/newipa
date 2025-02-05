@@ -26,10 +26,30 @@ namespace NayifatAPI.Data
         public DbSet<CardApplication> CardApplications { get; set; }
         public DbSet<LeadAppCard> LeadAppCards { get; set; }
         public DbSet<LeadAppLoan> LeadAppLoans { get; set; }
+        public DbSet<BankCustomer> BankCustomers { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            // BankCustomer configuration
+            modelBuilder.Entity<BankCustomer>(entity =>
+            {
+                entity.ToTable("bank_customers");
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.RequestId).IsUnique();
+                entity.HasIndex(e => e.NationalId);
+                entity.HasIndex(e => e.ApplicationId);
+                
+                entity.Property(e => e.EligibleAmount)
+                    .HasColumnType("decimal(18,2)");
+                
+                entity.Property(e => e.EligibleEmi)
+                    .HasColumnType("decimal(18,2)");
+                
+                entity.Property(e => e.CreatedAt)
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            });
 
             // Customer configuration
             modelBuilder.Entity<Customer>(entity =>
