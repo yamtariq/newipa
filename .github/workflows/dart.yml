@@ -7,7 +7,7 @@ jobs:
   build-ios:
     runs-on: macos-latest
     steps:
-      # 1. Check out the repository.
+      # 1. Check out your repository.
       - uses: actions/checkout@v3
       
       # 2. Set up Flutter (stable channel, x64 architecture).
@@ -38,31 +38,27 @@ jobs:
       - run: pod repo update
         working-directory: ios
 
-      # 8. Patch the Podfile to remove SWIFT_OBJC_BRIDGING_HEADER settings.
-      - name: Patch Podfile to remove SWIFT_OBJC_BRIDGING_HEADER
-        run: sed -i '' '/SWIFT_OBJC_BRIDGING_HEADER/d' ios/Podfile
-
-      # 9. Install pods with repo update.
+      # 8. Install pods with repo update.
       - run: pod install --repo-update
         working-directory: ios
 
-      # 10. Build the iOS project without code signing.
+      # 9. Build the iOS project without code signing.
       - run: flutter build ios --release --no-codesign
 
-      # 11. Create the Payload directory in the build output.
+      # 10. Create the Payload directory in the build output.
       - run: mkdir Payload
         working-directory: build/ios/iphoneos
 
-      # 12. Move the Runner.app into the Payload directory.
+      # 11. Move the Runner.app into the Payload directory.
       - run: mv Runner.app Payload
         working-directory: build/ios/iphoneos
 
-      # 13. Zip the Payload folder into an IPA.
+      # 12. Zip the Payload folder into an IPA.
       - name: Zip output
         run: zip -qq -r -9 FlutterIpaExport.ipa Payload
         working-directory: build/ios/iphoneos
 
-      # 14. Upload the IPA to a GitHub Release.
+      # 13. Upload the IPA to a GitHub Release.
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
