@@ -14,16 +14,8 @@ jobs:
           channel: 'stable'
           architecture: x64
 
-      # Configure Xcode build settings
-      - name: Configure Build Settings
-        run: |
-          cd ios
-          echo "SWIFT_OBJC_BRIDGING_HEADER=''" >> Flutter/Release.xcconfig
-          echo "SWIFT_OBJC_INTERFACE_HEADER_NAME=''" >> Flutter/Release.xcconfig
-          echo "DEFINES_MODULE=NO" >> Flutter/Release.xcconfig
-          echo "CLANG_ENABLE_MODULES=NO" >> Flutter/Release.xcconfig
-
-      # Update Podfile
+      # (Removed bridging-header overrides)
+      # Update Podfile to add use_frameworks!
       - name: Update Podfile
         run: |
           cd ios
@@ -33,7 +25,6 @@ jobs:
           cat Podfile >> Podfile.new
           mv Podfile.new Podfile
 
-      # Clean iOS but keep Generated.xcconfig intact by running flutter clean last
       - name: Clean iOS
         run: |
           cd ios
@@ -42,20 +33,16 @@ jobs:
           cd ..
           flutter clean
 
-      # Re-generate Generated.xcconfig
       - name: Get Flutter dependencies
         run: flutter pub get
 
-      # Install CocoaPods
       - run: gem install cocoapods
 
-      # Install and update pods
       - name: Pod Install
         run: |
           cd ios
           pod install --repo-update
 
-      # Build iOS
       - name: Build iOS
         run: |
           flutter build ios --release --no-codesign
