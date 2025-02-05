@@ -17,17 +17,13 @@ jobs:
           ruby-version: '3.2.2'
           bundler-cache: true
       
-      - name: Setup CocoaPods directories 💡
-        run: |
-          mkdir -p ~/.cocoapods/repos
-          mkdir -p ios/Pods
-      
-      - name: Cache CocoaPods
+      - name: Cache CocoaPods 💡
         uses: actions/cache@v3
         with:
           path: |
             ios/Pods
             ~/.cocoapods
+            ~/Library/Caches/CocoaPods
           key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile') }}-${{ hashFiles('pubspec.lock') }}
           restore-keys: |
             ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile') }}-
@@ -36,7 +32,9 @@ jobs:
       - name: Cache Pods Specs 💡
         uses: actions/cache@v3
         with:
-          path: ~/.cocoapods/repos
+          path: |
+            ~/.cocoapods/repos
+            ~/Library/Caches/CocoaPods/Specs
           key: ${{ runner.os }}-pods-specs-${{ hashFiles('ios/Podfile.lock') }}
           restore-keys: |
             ${{ runner.os }}-pods-specs-
@@ -52,27 +50,31 @@ jobs:
       - name: Flutter version
         run: flutter --version
       
-      - name: Cache Flutter dependencies
+      - name: Cache Flutter dependencies 💡
         uses: actions/cache@v3
         with:
           path: |
             ~/.pub-cache
-            **/.dart_tool
-            **/.flutter-plugins
-            **/.flutter-plugins-dependencies
-            **/build
-          key: ${{ runner.os }}-flutter-${{ hashFiles('**/pubspec.lock') }}
+            .dart_tool
+            .flutter-plugins
+            .flutter-plugins-dependencies
+            build
+            ios/Flutter/Flutter.framework
+            ios/Flutter/Flutter.podspec
+          key: ${{ runner.os }}-flutter-${{ hashFiles('pubspec.lock') }}
           restore-keys: |
             ${{ runner.os }}-flutter-
       
       - name: Clean workspace 💡
         run: |
-          rm -rf ios/Pods
-          rm -rf ios/Podfile.lock
-          rm -rf ios/.symlinks
-          rm -rf ios/Flutter/Flutter.framework
-          rm -rf ios/Flutter/Flutter.podspec
-          flutter clean
+          if [ ! -f "ios/Pods/Manifest.lock" ]; then
+            rm -rf ios/Pods
+            rm -rf ios/Podfile.lock
+            rm -rf ios/.symlinks
+            rm -rf ios/Flutter/Flutter.framework
+            rm -rf ios/Flutter/Flutter.podspec
+            flutter clean
+          fi
           
       - name: Install Flutter dependencies
         run: |
