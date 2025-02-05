@@ -216,6 +216,8 @@ class NotificationService {
             'route': notification['route'],
             'data': additionalData,
           }),
+          bigPictureUrl: notification['bigPictureUrl'],
+          largeIconUrl: notification['largeIconUrl'],
         );
       }
       debugPrint('Finished processing notifications');
@@ -291,10 +293,20 @@ class NotificationService {
         if (data['success'] == true && data['data'] != null) {
           final notifications = List<Map<String, dynamic>>.from(data['data']['notifications']);
           debugPrint('Found ${notifications.length} notifications');
-          if (notifications.isNotEmpty) {
-            debugPrint('Notifications: $notifications');
+          
+          // Transform notifications to include image URLs
+          final transformedNotifications = notifications.map((notification) {
+            return {
+              ...notification,
+              'bigPictureUrl': notification['bigPictureUrl'] ?? notification['image_url'], // 💡 Support both formats
+              'largeIconUrl': notification['largeIconUrl'] ?? notification['icon_url'],    // 💡 Support both formats
+            };
+          }).toList();
+          
+          if (transformedNotifications.isNotEmpty) {
+            debugPrint('Notifications with images: $transformedNotifications');
           }
-          return notifications;
+          return transformedNotifications;
         }
       }
       return [];
@@ -313,6 +325,8 @@ class NotificationService {
     String? route,
     bool? isArabic,
     Map<String, dynamic>? additionalData,
+    String? bigPictureUrl,
+    String? largeIconUrl,
   }) async {
     try {
       final response = await http.post(
@@ -331,6 +345,8 @@ class NotificationService {
           },
           if (route != null) 'route': route,
           if (additionalData != null) 'additionalData': additionalData,
+          if (bigPictureUrl != null) 'bigPictureUrl': bigPictureUrl,
+          if (largeIconUrl != null) 'largeIconUrl': largeIconUrl,
         }),
       );
 
@@ -350,6 +366,8 @@ class NotificationService {
         },
         if (route != null) 'route': route,
         if (additionalData != null) 'additionalData': additionalData,
+        if (bigPictureUrl != null) 'bigPictureUrl': bigPictureUrl,
+        if (largeIconUrl != null) 'largeIconUrl': largeIconUrl,
       })}');
 
       if (response.statusCode == 200) {
@@ -367,11 +385,13 @@ class NotificationService {
 
   /// Example usage:
   /// 
-  /// // Send to a single user
+  /// // Send to a single user with image
   /// await sendNotification(
   ///   nationalId: "1000000013",
   ///   title: "New Offer",
-  ///   body: "Check out our latest offer"
+  ///   body: "Check out our latest offer",
+  ///   bigPictureUrl: "https://example.com/offer-image.jpg",
+  ///   largeIconUrl: "https://example.com/icon.png"
   /// );
   /// 
   /// // Send to multiple users
@@ -381,7 +401,7 @@ class NotificationService {
   ///   body: "System will be down for maintenance"
   /// );
   /// 
-  /// // Send to users based on filters
+  /// // Send to users based on filters with image
   /// await sendNotification(
   ///   filters: {
   ///     "salary_range": {"min": 5000, "max": 10000},
@@ -390,7 +410,8 @@ class NotificationService {
   ///     "language": "ar"
   ///   },
   ///   title: "Special Offer",
-  ///   body: "Exclusive offer for qualified customers"
+  ///   body: "Exclusive offer for qualified customers",
+  ///   bigPictureUrl: "https://example.com/special-offer.jpg"
   /// );
 
   @pragma('vm:entry-point')
@@ -483,12 +504,16 @@ class NotificationService {
     required String title,
     required String body,
     String? payload,
+    String? bigPictureUrl,
+    String? largeIconUrl,
   }) async {
     try {
       debugPrint('Step S1: Creating local notification...');
       debugPrint('Step S2: Title: $title');
       debugPrint('Step S3: Body: $body');
       debugPrint('Step S4: Raw Payload: $payload');
+      if (bigPictureUrl != null) debugPrint('Step S4.1: Big Picture URL: $bigPictureUrl');
+      if (largeIconUrl != null) debugPrint('Step S4.2: Large Icon URL: $largeIconUrl');
 
       Map<String, dynamic> payloadData;
       String? route;
@@ -528,7 +553,7 @@ class NotificationService {
           title: title,
           body: body,
           payload: {'data': encodedPayload},
-          notificationLayout: NotificationLayout.Default,
+          notificationLayout: bigPictureUrl != null ? NotificationLayout.BigPicture : NotificationLayout.Default,
           displayOnForeground: true,
           displayOnBackground: true,
           wakeUpScreen: true,
@@ -536,8 +561,8 @@ class NotificationService {
           criticalAlert: true,
           category: NotificationCategory.Message,
           autoDismissible: false,
-          largeIcon: 'resource://drawable/notification_icon',
-          bigPicture: 'asset://assets/images/nayifatlogocircle-nobg.png',
+          largeIcon: largeIconUrl ?? 'resource://drawable/notification_icon',
+          bigPicture: bigPictureUrl ?? 'asset://assets/images/nayifatlogocircle-nobg.png',
         ),
       );
 

@@ -161,16 +161,19 @@ class ContentUpdateService extends ChangeNotifier {
       for (var page in serverTimestamps.keys) {
         final pageData = serverTimestamps[page] as Map<String, dynamic>;
         for (var keyName in pageData.keys) {
-          final serverTimestamp = DateTime.parse(pageData[keyName]);
+          final contentLastUpdateTime = DateTime.parse(pageData[keyName]);
           final storedKey = '${page}_${keyName}';
-          final storedTime = storedTimestamps[storedKey];
+          final lastCheckTime = storedTimestamps[storedKey];
 
-          if (storedTime == null || serverTimestamp.isAfter(storedTime)) {
-            _log('TTT_Update needed for $storedKey');
+          // Only update if content was updated after our last check
+          if (lastCheckTime == null || contentLastUpdateTime.isAfter(lastCheckTime)) {
+            _log('TTT_Update needed for $storedKey - Content updated: ${contentLastUpdateTime.toIso8601String()}');
             needsUpdate.add({
               'page': page,
               'keyName': keyName,
             });
+            // Update timestamp for this specific content
+            await prefs.setString('${_lastUpdateKey}_$storedKey', contentLastUpdateTime.toIso8601String());
           }
         }
       }
@@ -216,7 +219,7 @@ class ContentUpdateService extends ChangeNotifier {
 
       try {
         // Create temporary storage for new content
-        final tempCache = <String, dynamic>{};
+        final tempCache = Map<String, dynamic>.from(_memoryCache);
         
         // Check if update is needed
         bool shouldUpdate = force;
@@ -228,14 +231,13 @@ class ContentUpdateService extends ChangeNotifier {
           _log('TTT_Starting content update');
           final success = await _updateAllContent(tempCache);
 
-          if (success && tempCache.isNotEmpty) {
+          if (success) {
             _log('TTT_Update successful, saving new content');
             // Backup current cache in case save fails
             final backupCache = Map<String, dynamic>.from(_memoryCache);
             
             try {
-              // Update memory cache
-              _memoryCache.clear();
+              // Update memory cache while preserving existing content
               _memoryCache.addAll(tempCache);
               
               // Try to save to persistent storage
@@ -322,9 +324,10 @@ class ContentUpdateService extends ChangeNotifier {
               updateSuccess = false;
             }
           }
-        } else if (keyName == 'contact_details') {
+        } else if (keyName.contains('contact_details')) {
           if (content['contact'] != null) {
             tempCache[keyName] = content['contact'];
+            _log('TTT_Saving contact details for key: $keyName');
           }
         } else if (keyName.endsWith('_ad')) {
           if (content['ads'] != null) {
@@ -339,6 +342,7 @@ class ContentUpdateService extends ChangeNotifier {
         if (content['last_updated'] != null) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('${_lastUpdateKey}_${update['page']}_${keyName}', content['last_updated']);
+          _log('TTT_Saved timestamp for ${update['page']}_${keyName}: ${content['last_updated']}');
         }
       }
 

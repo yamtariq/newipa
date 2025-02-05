@@ -223,13 +223,24 @@ class NotificationWorker(
                 else -> ""
             }
 
+            // 💡 Get image URLs with fallbacks
+            val bigPictureUrl = notif.optString("big_picture_url") ?: 
+                               notif.optString("bigPictureUrl") ?: 
+                               notif.optString("image_url")
+
+            val largeIconUrl = notif.optString("large_icon_url") ?: 
+                              notif.optString("largeIconUrl") ?: 
+                              notif.optString("icon_url")
+
             notifications.add(mapOf(
                 "id" to (notif.optString("id") ?: System.currentTimeMillis().toString()),
                 "title" to title,
                 "body" to body,
                 "route" to notif.optString("route", ""),
                 "created_at" to notif.optString("created_at", ""),
-                "expires_at" to notif.optString("expires_at", "")
+                "expires_at" to notif.optString("expires_at", ""),
+                "bigPictureUrl" to bigPictureUrl,  // 💡 Added
+                "largeIconUrl" to largeIconUrl     // 💡 Added
             ))
         }
         
@@ -299,7 +310,7 @@ class NotificationWorker(
             null
         }
 
-        // Create notification
+        // Create notification builder
         Log.d(TAG, "Step 8.5: Building notification with title: ${notification["title"]}")
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
@@ -309,6 +320,34 @@ class NotificationWorker(
             .setAutoCancel(true)
             .setVibrate(longArrayOf(1000, 1000, 1000))
             .setOnlyAlertOnce(false)
+
+        // 💡 Handle large icon if provided
+        notification["largeIconUrl"]?.let { iconUrl ->
+            try {
+                Log.d(TAG, "Step 8.5.1: Setting large icon from URL: $iconUrl")
+                val iconBitmap = getBitmapFromUrl(iconUrl)
+                if (iconBitmap != null) {
+                    builder.setLargeIcon(iconBitmap)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading large icon: ${e.message}")
+            }
+        }
+
+        // 💡 Handle big picture if provided
+        notification["bigPictureUrl"]?.let { imageUrl ->
+            try {
+                Log.d(TAG, "Step 8.5.2: Setting big picture from URL: $imageUrl")
+                val imageBitmap = getBitmapFromUrl(imageUrl)
+                if (imageBitmap != null) {
+                    builder.setStyle(NotificationCompat.BigPictureStyle()
+                        .bigPicture(imageBitmap)
+                        .bigLargeIcon(null)) // Hide large icon when expanded
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading big picture: ${e.message}")
+            }
+        }
 
         // Set the pending intent if available
         pendingIntent?.let {
@@ -320,5 +359,20 @@ class NotificationWorker(
         Log.d(TAG, "Step 8.6: Displaying notification with ID: $notificationId")
         notificationManager.notify(notificationId, builder.build())
         Log.d(TAG, "Step 8.7: Notification displayed successfully")
+    }
+
+    // 💡 Helper function to load images from URLs
+    private fun getBitmapFromUrl(imageUrl: String): android.graphics.Bitmap? {
+        return try {
+            val url = URL(imageUrl)
+            val connection = url.openConnection() as HttpsURLConnection
+            connection.doInput = true
+            connection.connect()
+            val input = connection.inputStream
+            android.graphics.BitmapFactory.decodeStream(input)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error loading image from URL: $e")
+            null
+        }
     }
 } 

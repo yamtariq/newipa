@@ -461,6 +461,12 @@ namespace NayifatAPI.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("BigPictureUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("LargeIconUrl")
+                        .HasColumnType("nvarchar(max)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("NotificationId");

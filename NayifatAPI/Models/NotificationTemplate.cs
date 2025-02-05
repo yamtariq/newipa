@@ -37,5 +37,12 @@ namespace NayifatAPI.Models
         
         [Column("expiry_at")]
         public DateTime? ExpiryAt { get; set; }
+
+        // 💡 Added image URL fields
+        [Column("big_picture_url")]
+        public string? BigPictureUrl { get; set; }  // For large notification image
+        
+        [Column("large_icon_url")]
+        public string? LargeIconUrl { get; set; }   // For notification icon
     }
 } 

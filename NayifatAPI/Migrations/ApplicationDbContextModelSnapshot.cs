@@ -50,7 +50,7 @@ namespace NayifatAPI.Migrations
 
                     b.HasKey("Key");
 
-                    b.ToTable("ApiKeys", (string)null);
+                    b.ToTable("ApiKeys");
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.AuthLog", b =>
@@ -94,7 +94,66 @@ namespace NayifatAPI.Migrations
 
                     b.HasIndex("NationalId", "CreatedAt");
 
-                    b.ToTable("AuthLogs", (string)null);
+                    b.ToTable("AuthLogs");
+                });
+
+            modelBuilder.Entity("NayifatAPI.Models.CardApplication", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("card_id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ApplicationNo")
+                        .HasColumnType("int")
+                        .HasColumnName("application_no");
+
+                    b.Property<decimal>("CardLimit")
+                        .HasColumnType("decimal(18,2)")
+                        .HasColumnName("card_limit");
+
+                    b.Property<string>("CardType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("card_type");
+
+                    b.Property<string>("NationalId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)")
+                        .HasColumnName("national_id");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("note");
+
+                    b.Property<string>("NoteUser")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("noteUser");
+
+                    b.Property<string>("Remarks")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("remarks");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime>("StatusDate")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("status_date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NationalId");
+
+                    b.ToTable("card_application_details");
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.CitizenAddressListItem", b =>
@@ -147,7 +206,7 @@ namespace NayifatAPI.Migrations
 
                     b.HasIndex("YakeenCitizenAddressId");
 
-                    b.ToTable("CitizenAddressListItem", (string)null);
+                    b.ToTable("CitizenAddressListItem");
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.Customer", b =>
@@ -267,7 +326,7 @@ namespace NayifatAPI.Migrations
 
                     b.HasKey("NationalId");
 
-                    b.ToTable("Customers", (string)null);
+                    b.ToTable("Customers");
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.CustomerDevice", b =>
@@ -324,10 +383,212 @@ namespace NayifatAPI.Migrations
                     b.HasIndex("NationalId", "DeviceId")
                         .IsUnique();
 
-                    b.ToTable("Customer_Devices", (string)null);
+                    b.ToTable("Customer_Devices");
+                });
+
+            modelBuilder.Entity("NayifatAPI.Models.LeadAppCard", b =>
+                {
+                    b.Property<int>("id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("id"));
+
+                    b.Property<string>("name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("national_id")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("national_id");
+
+                    b.Property<string>("phone")
+                        .IsRequired()
+                        .HasMaxLength(15)
+                        .HasColumnType("nvarchar(15)")
+                        .HasColumnName("phone");
+
+                    b.Property<string>("status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasDefaultValue("PENDING")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime>("status_timestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasColumnName("status_timestamp")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("id");
+
+                    b.HasIndex("national_id");
+
+                    b.ToTable("lead_apps_cards", (string)null);
+                });
+
+            modelBuilder.Entity("NayifatAPI.Models.LeadAppLoan", b =>
+                {
+                    b.Property<int>("id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("id"));
+
+                    b.Property<string>("name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("national_id")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("national_id");
+
+                    b.Property<string>("phone")
+                        .IsRequired()
+                        .HasMaxLength(15)
+                        .HasColumnType("nvarchar(15)")
+                        .HasColumnName("phone");
+
+                    b.Property<string>("status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasDefaultValue("PENDING")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime>("status_timestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasColumnName("status_timestamp")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("id");
+
+                    b.HasIndex("national_id");
+
+                    b.ToTable("lead_apps_loans", (string)null);
+                });
+
+            modelBuilder.Entity("NayifatAPI.Models.LoanApplication", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("loan_id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)")
+                        .HasColumnName("loan_amount");
+
+                    b.Property<int>("ApplicationNo")
+                        .HasColumnType("int")
+                        .HasColumnName("application_no");
+
+                    b.Property<string>("CustomerDecision")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("customerDecision");
+
+                    b.Property<decimal?>("InterestRate")
+                        .HasColumnType("decimal(5,2)")
+                        .HasColumnName("interest_rate");
+
+                    b.Property<string>("NationalId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)")
+                        .HasColumnName("national_id");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("note");
+
+                    b.Property<string>("NoteUser")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("noteUser");
+
+                    b.Property<string>("Purpose")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("loan_purpose");
+
+                    b.Property<string>("Remarks")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("remarks");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime>("StatusDate")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("status_date");
+
+                    b.Property<int?>("Tenure")
+                        .HasColumnType("int")
+                        .HasColumnName("loan_tenure");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NationalId");
+
+                    b.ToTable("loan_application_details");
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.MasterConfig", b =>
+                {
+                    b.Property<int>("ConfigId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("config_id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ConfigId"));
+
+                    b.Property<string>("KeyName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)")
+                        .HasColumnName("key_name");
+
+                    b.Property<DateTime>("LastUpdated")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("last_updated");
+
+                    b.Property<string>("Page")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)")
+                        .HasColumnName("page");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("value");
+
+                    b.HasKey("ConfigId");
+
+                    b.HasIndex("Page", "KeyName")
+                        .IsUnique();
+
+                    b.ToTable("master_config", (string)null);
+                });
+
+            modelBuilder.Entity("NayifatAPI.Models.NotificationTemplate", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -335,35 +596,64 @@ namespace NayifatAPI.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("AdditionalData")
+                        .HasColumnType("json")
+                        .HasColumnName("additional_data");
+
+                    b.Property<string>("BigPictureUrl")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("big_picture_url");
+
+                    b.Property<string>("Body")
+                        .HasColumnType("text");
+
+                    b.Property<string>("BodyAr")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("body_ar");
+
+                    b.Property<string>("BodyEn")
+                        .HasColumnType("text")
+                        .HasColumnName("body_en");
+
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
+                    b.Property<DateTime?>("ExpiryAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("expiry_at");
 
-                    b.Property<string>("KeyName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                    b.Property<string>("LargeIconUrl")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("large_icon_url");
 
-                    b.Property<string>("Page")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                    b.Property<string>("Route")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
 
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
+                    b.Property<string>("TargetCriteria")
+                        .HasColumnType("json")
+                        .HasColumnName("target_criteria");
 
-                    b.Property<string>("Value")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<string>("Title")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("TitleAr")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("title_ar");
+
+                    b.Property<string>("TitleEn")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("title_en");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Page");
-
-                    b.HasIndex("Page", "KeyName")
-                        .IsUnique();
-
-                    b.ToTable("master_config", (string)null);
+                    b.ToTable("notification_templates", (string)null);
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.OtpCode", b =>
@@ -412,59 +702,29 @@ namespace NayifatAPI.Migrations
 
                     b.HasIndex("NationalId", "Type", "IsUsed");
 
-                    b.ToTable("OTP_Codes", (string)null);
+                    b.ToTable("OTP_Codes");
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.UserNotification", b =>
                 {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Data")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsRead")
-                        .HasColumnType("bit");
+                    b.Property<string>("NationalId")
+                        .HasColumnType("nvarchar(450)")
+                        .HasColumnName("national_id");
 
                     b.Property<DateTime>("LastUpdated")
-                        .HasColumnType("datetime2");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasColumnName("last_updated")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                    b.Property<string>("Message")
+                    b.Property<string>("Notifications")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("notifications");
 
-                    b.Property<string>("NationalId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                    b.HasKey("NationalId");
 
-                    b.Property<string>("NotificationId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("NotificationType")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("ReadAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("NotificationId");
-
-                    b.HasIndex("NationalId", "IsRead");
-
-                    b.ToTable("User_Notifications", (string)null);
+                    b.ToTable("user_notifications");
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.YakeenCitizenAddress", b =>
@@ -497,7 +757,7 @@ namespace NayifatAPI.Migrations
 
                     b.HasIndex("IqamaNumber");
 
-                    b.ToTable("YakeenCitizenAddress", (string)null);
+                    b.ToTable("YakeenCitizenAddress");
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.YakeenCitizenInfo", b =>
@@ -625,7 +885,7 @@ namespace NayifatAPI.Migrations
 
                     b.HasIndex("IqamaNumber");
 
-                    b.ToTable("YakeenCitizenInfo", (string)null);
+                    b.ToTable("YakeenCitizenInfo");
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.AuthLog", b =>
@@ -635,6 +895,17 @@ namespace NayifatAPI.Migrations
                         .HasForeignKey("NationalId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("NayifatAPI.Models.CardApplication", b =>
+                {
+                    b.HasOne("NayifatAPI.Models.Customer", "Customer")
+                        .WithMany("CardApplications")
+                        .HasForeignKey("NationalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
                 });
 
             modelBuilder.Entity("NayifatAPI.Models.CitizenAddressListItem", b =>
@@ -652,6 +923,17 @@ namespace NayifatAPI.Migrations
                 {
                     b.HasOne("NayifatAPI.Models.Customer", "Customer")
                         .WithMany("Devices")
+                        .HasForeignKey("NationalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("NayifatAPI.Models.LoanApplication", b =>
+                {
+                    b.HasOne("NayifatAPI.Models.Customer", "Customer")
+                        .WithMany("LoanApplications")
                         .HasForeignKey("NationalId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -681,7 +963,11 @@ namespace NayifatAPI.Migrations
                 {
                     b.Navigation("AuthLogs");
 
+                    b.Navigation("CardApplications");
+
                     b.Navigation("Devices");
+
+                    b.Navigation("LoanApplications");
 
                     b.Navigation("Notifications");
 

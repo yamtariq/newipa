@@ -185,7 +185,17 @@ namespace NayifatAPI.Controllers
             {
                 // Log the incoming request
                 _logger.LogInformation("Received notification request: {@Request}", 
-                    new { request.Title, request.TitleEn, request.TitleAr, request.Filters, request.NationalId, request.NationalIds });
+                    new { 
+                        request.Title, 
+                        request.TitleEn, 
+                        request.TitleAr, 
+                        request.Filters, 
+                        request.NationalId, 
+                        request.NationalIds,
+                        // 💡 Add logging for image URLs
+                        request.BigPictureUrl,
+                        request.LargeIconUrl
+                    });
 
                 // Validate request
                 bool isMultiLanguage = !string.IsNullOrEmpty(request.TitleEn) && 
@@ -230,6 +240,8 @@ namespace NayifatAPI.Controllers
                     TitleAr = isMultiLanguage ? request.TitleAr : null,
                     BodyAr = isMultiLanguage ? request.BodyAr : null,
                     Route = request.Route,
+                    BigPictureUrl = request.BigPictureUrl,
+                    LargeIconUrl = request.LargeIconUrl,
                     AdditionalData = request.AdditionalData != null ? 
                         JsonSerializer.Serialize(request.AdditionalData) : null,
                     TargetCriteria = JsonSerializer.Serialize(new Dictionary<string, object>
@@ -243,6 +255,16 @@ namespace NayifatAPI.Controllers
                     CreatedAt = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Arab Standard Time")),
                     ExpiryAt = request.ExpiryAt ?? TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Arab Standard Time")).AddDays(30)
                 };
+
+                // 💡 Log template values before saving
+                _logger.LogInformation("Template values before saving: {@Template}", 
+                    new { 
+                        template.Title,
+                        template.TitleEn,
+                        template.TitleAr,
+                        template.BigPictureUrl,
+                        template.LargeIconUrl
+                    });
 
                 _context.NotificationTemplates.Add(template);
                 await _context.SaveChangesAsync();
@@ -989,6 +1011,13 @@ namespace NayifatAPI.Controllers
         
         [JsonPropertyName("body_ar")]
         public string? BodyAr { get; set; }
+
+        // 💡 Add image URL properties
+        [JsonPropertyName("big_picture_url")]
+        public string? BigPictureUrl { get; set; }
+        
+        [JsonPropertyName("large_icon_url")]
+        public string? LargeIconUrl { get; set; }
 
         // Target users (one will be used)
         [JsonPropertyName("national_id")]
