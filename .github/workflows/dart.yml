@@ -9,7 +9,7 @@ jobs:
     steps:
       # 1. Check out the repository.
       - uses: actions/checkout@v3
-      
+
       # 2. Set up Flutter (stable channel, x64 architecture).
       - uses: subosito/flutter-action@v2
         with:
@@ -42,23 +42,37 @@ jobs:
       - run: pod install --repo-update
         working-directory: ios
 
-      # 9. Build the iOS project without code signing.
+      # 9. Remove any existing bridging headers if not needed.
+      - name: Remove bridging headers if not needed
+        run: |
+          if [ -f ios/Runner-Bridging-Header.h ]; then
+            echo "Removing bridging header file..."
+            rm ios/Runner-Bridging-Header.h
+          fi
+
+      # 10. Clean the project to remove any stale build artifacts.
+      - run: flutter clean
+
+      # 11. Fetch Flutter packages again after cleaning.
+      - run: flutter pub get
+
+      # 12. Build the iOS project without code signing.
       - run: flutter build ios --release --no-codesign
 
-      # 10. Create the Payload directory in the build output.
+      # 13. Create the Payload directory in the build output.
       - run: mkdir Payload
         working-directory: build/ios/iphoneos
 
-      # 11. Move the Runner.app into the Payload directory.
+      # 14. Move the Runner.app into the Payload directory.
       - run: mv Runner.app Payload
         working-directory: build/ios/iphoneos
 
-      # 12. Zip the Payload folder into an IPA.
+      # 15. Zip the Payload folder into an IPA.
       - name: Zip output
         run: zip -qq -r -9 FlutterIpaExport.ipa Payload
         working-directory: build/ios/iphoneos
 
-      # 13. Upload the IPA to a GitHub Release.
+      # 16. Upload the IPA to a GitHub Release.
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
