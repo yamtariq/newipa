@@ -5,216 +5,38 @@ on:
 
 jobs:
   build-ios:
+    name: 🎉 iOS Build
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      
-      - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.2.2'
-          bundler-cache: true
-      
-      - name: Cache CocoaPods 💡
-        uses: actions/cache@v3
-        with:
-          path: |
-            ios/Pods
-            ~/.cocoapods
-            ~/Library/Caches/CocoaPods
-          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile') }}-${{ hashFiles('pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile') }}-
-            ${{ runner.os }}-pods-
-      
-      - name: Cache Pods Specs 💡
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cocoapods/repos
-            ~/Library/Caches/CocoaPods/Specs
-          key: ${{ runner.os }}-pods-specs-${{ hashFiles('ios/Podfile.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pods-specs-
-            ${{ runner.os }}-pods-
-      
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+
+      - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           architecture: x64
-          cache: true
+      - run: flutter pub get
       
-      - name: Flutter version
-        run: flutter --version
-      
-      - name: Cache Flutter dependencies 💡
-        uses: actions/cache@v3
+
+      - run: pod repo update
+        working-directory: ios
+
+      - run: flutter build ios --release --no-codesign
+
+      - run: mkdir Payload
+        working-directory: build/ios/iphoneos
+
+      - run: mv Runner.app/ Payload
+        working-directory: build/ios/iphoneos
+
+      - name: Zip output
+        run: zip -qq -r -9 FlutterIpaExport.ipa Payload
+        working-directory: build/ios/iphoneos
+
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
         with:
-          path: |
-            ~/.pub-cache
-            .dart_tool
-            .flutter-plugins
-            .flutter-plugins-dependencies
-            build
-            ios/Flutter/Flutter.framework
-            ios/Flutter/Flutter.podspec
-          key: ${{ runner.os }}-flutter-${{ hashFiles('pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-flutter-
-      
-      - name: Clean workspace 💡
-        run: |
-          if [ ! -f "ios/Pods/Manifest.lock" ]; then
-            rm -rf ios/Pods
-            rm -rf ios/Podfile.lock
-            rm -rf ios/.symlinks
-            rm -rf ios/Flutter/Flutter.framework
-            rm -rf ios/Flutter/Flutter.podspec
-            flutter clean
-          fi
-          
-      - name: Install Flutter dependencies
-        run: |
-          flutter pub get
-          flutter precache --ios
-        
-      - name: Install CocoaPods
-        run: |
-          gem uninstall cocoapods --all --ignore-dependencies
-          gem install cocoapods -v 1.15.2
-          pod setup
-          pod repo update
-          
-      - name: Update Podfile
-        run: |
-          cat > ios/Podfile << 'EOF'
-          platform :ios, '14.0'
-          
-          install! 'cocoapods', :disable_input_output_paths => true
-          
-          project 'Runner', {
-            'Debug' => :debug,
-            'Profile' => :release,
-            'Release' => :release,
-          }
-          
-          def flutter_root
-            generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
-            unless File.exist?(generated_xcode_build_settings_path)
-              raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
-            end
-          
-            File.foreach(generated_xcode_build_settings_path) do |line|
-              matches = line.match(/FLUTTER_ROOT\=(.*)/)
-              return matches[1].strip if matches
-            end
-          
-            raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Generated.xcconfig, then run flutter pub get"
-          end
-          
-          require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
-          
-          flutter_ios_podfile_setup
-          
-          target 'Runner' do
-            use_frameworks!
-            use_modular_headers!
-          
-            pod 'DKImagePickerController', '~> 4.3'
-            pod 'PhoneNumberKit', '~> 3.3.4', :modular_headers => true
-          
-            flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-          end
-          
-          post_install do |installer|
-            installer.pods_project.targets.each do |target|
-              flutter_additional_ios_build_settings(target)
-              target.build_configurations.each do |config|
-                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
-                config.build_settings['DEFINES_MODULE'] = 'YES'
-                config.build_settings['SWIFT_VERSION'] = '5.0'
-                config.build_settings['ENABLE_BITCODE'] = 'NO'
-                config.build_settings['APPLICATION_EXTENSION_API_ONLY'] = 'NO'
-                config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'NO'
-                config.build_settings['SWIFT_OBJC_BRIDGING_HEADER'] = nil
-                config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
-                config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
-                config.build_settings['VALID_ARCHS'] = 'arm64 x86_64'
-                config.build_settings['FRAMEWORK_SEARCH_PATHS'] = ['$(inherited)', '$(PLATFORM_DIR)/Developer/Library/Frameworks']
-                config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
-                
-                # Additional settings for Xcode 15
-                config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
-                config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
-              end
-            end
-          end
-          EOF
-          
-      - name: Set Xcode version
-        run: sudo xcode-select -s /Applications/Xcode.app
-        
-      - name: Pod Install with Logging 💡
-        run: |
-          cd ios
-          pod install --verbose 2>&1 | tee pod_install.log
-          if [ ${PIPESTATUS[0]} -ne 0 ]; then
-            echo "Pod install failed. Check pod_install.log for details"
-            exit 1
-          fi
-        env:
-          LANG: en_US.UTF-8
-          
-      - name: Upload Pod Install Logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pod-install-logs
-          path: ios/pod_install.log
-          
-      - name: Build iOS with Logging 💡
-        run: |
-          flutter build ios --release --no-codesign --verbose 2>&1 | tee build.log
-          if [ ${PIPESTATUS[0]} -ne 0 ]; then
-            echo "Build failed. Check build.log for details"
-            exit 1
-          fi
-        env:
-          DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
-          FLUTTER_BUILD_NUMBER: ${{ github.run_number }}
-          
-      - name: Upload Build Logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs
-          path: build.log
-          
-      - name: Create IPA
-        if: success()
-        run: |
-          cd build/ios/iphoneos
-          mkdir Payload
-          mv Runner.app Payload/
-          zip -r FlutterIpaExport.ipa Payload
-          
-      - name: Upload IPA
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-build
-          path: build/ios/iphoneos/FlutterIpaExport.ipa
-          
-      - name: Create Release
-        if: success() && startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: build/ios/iphoneos/FlutterIpaExport.ipa
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: v1.0.${{ github.run_number }}
-          name: Release v1.0.${{ github.run_number }}
-          draft: false
-          prerelease: false
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: build/ios/iphoneos/FlutterIpaExport.ipa
+          tag: v1.0
+          overwrite: true
+          body: "This is first release"
