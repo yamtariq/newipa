@@ -1,4 +1,4 @@
-name: iOS-ipa-build
+name: iOS-ipa-build 
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ jobs:
   build-ios:
     runs-on: macos-latest
     steps:
-      # 1. Check out your repository.
+      # 1. Check out the repository.
       - uses: actions/checkout@v3
       
       # 2. Set up Flutter (stable channel, x64 architecture).
