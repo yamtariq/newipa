@@ -48,12 +48,31 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-flutter-
       
+      - name: Clean workspace 💡
+        run: |
+          rm -rf ios/Pods
+          rm -rf ios/Podfile.lock
+          rm -rf ios/.symlinks
+          rm -rf ios/Flutter/Flutter.framework
+          rm -rf ios/Flutter/Flutter.podspec
+          flutter clean
+          
+      - name: Install Flutter dependencies
+        run: |
+          flutter pub get
+          flutter precache --ios
+        
+      - name: Install CocoaPods
+        run: |
+          gem uninstall cocoapods --all --ignore-dependencies
+          gem install cocoapods -v 1.15.2
+          pod repo update
+          
       - name: Update Podfile
         run: |
           cat > ios/Podfile << 'EOF'
           platform :ios, '14.0'
           
-          # Prevent Cocoapods from embedding a second Flutter framework and causing an error with the new Xcode build system.
           install! 'cocoapods', :disable_input_output_paths => true
           
           project 'Runner', {
@@ -104,72 +123,74 @@ jobs:
                 config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
                 config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
                 config.build_settings['VALID_ARCHS'] = 'arm64 x86_64'
-                
-                # Fix for Xcode 15
                 config.build_settings['FRAMEWORK_SEARCH_PATHS'] = ['$(inherited)', '$(PLATFORM_DIR)/Developer/Library/Frameworks']
-                
-                # M1 compatibility
                 config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
+                
+                # Additional settings for Xcode 15
+                config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+                config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
               end
             end
           end
           EOF
-
-      - name: Clean iOS build
-        run: |
-          cd ios
-          rm -rf Pods Podfile.lock
-          rm -rf ~/Library/Developer/Xcode/DerivedData/*
-          cd ..
-          flutter clean
-        
-      - name: Install Flutter dependencies
-        run: flutter pub get
-        
-      - name: Install CocoaPods
-        run: |
-          gem install cocoapods -v 1.15.2
-          pod repo update
-          
-      - name: Pod Install
-        run: |
-          cd ios
-          rm -rf Pods Podfile.lock
-          pod install --repo-update --verbose
-        env:
-          LANG: en_US.UTF-8
           
       - name: Set Xcode version
         run: sudo xcode-select -s /Applications/Xcode.app
         
-      - name: Build iOS 💡
+      - name: Pod Install with Logging 💡
         run: |
-          flutter build ios --release --no-codesign --verbose
+          cd ios
+          pod install --verbose 2>&1 | tee pod_install.log
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+            echo "Pod install failed. Check pod_install.log for details"
+            exit 1
+          fi
+        env:
+          LANG: en_US.UTF-8
+          
+      - name: Upload Pod Install Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pod-install-logs
+          path: ios/pod_install.log
+          
+      - name: Build iOS with Logging 💡
+        run: |
+          flutter build ios --release --no-codesign --verbose 2>&1 | tee build.log
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+            echo "Build failed. Check build.log for details"
+            exit 1
+          fi
         env:
           DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
           FLUTTER_BUILD_NUMBER: ${{ github.run_number }}
           
-      - name: Create Payload directory
-        run: mkdir Payload
-        working-directory: build/ios/iphoneos
-        
-      - name: Move app to Payload
-        run: mv Runner.app Payload/
-        working-directory: build/ios/iphoneos
-        
+      - name: Upload Build Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: build.log
+          
       - name: Create IPA
-        run: zip -r FlutterIpaExport.ipa Payload
-        working-directory: build/ios/iphoneos
-        
+        if: success()
+        run: |
+          cd build/ios/iphoneos
+          mkdir Payload
+          mv Runner.app Payload/
+          zip -r FlutterIpaExport.ipa Payload
+          
       - name: Upload IPA
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: ios-build
           path: build/ios/iphoneos/FlutterIpaExport.ipa
           
       - name: Create Release
+        if: success() && startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
         with:
           files: build/ios/iphoneos/FlutterIpaExport.ipa
           token: ${{ secrets.GITHUB_TOKEN }}
