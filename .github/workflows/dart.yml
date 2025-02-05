@@ -23,7 +23,16 @@ jobs:
           echo "" >> Podfile.new
           echo "use_frameworks!" >> Podfile.new
           cat Podfile >> Podfile.new
+          echo "" >> Podfile.new
+          echo "post_install do |installer|" >> Podfile.new
+          echo "  installer.pods_project.targets.each do |target|" >> Podfile.new
+          echo "    target.build_configurations.each do |config|" >> Podfile.new
+          echo "      config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'NO'" >> Podfile.new
+          echo "    end" >> Podfile.new
+          echo "  end" >> Podfile.new
+          echo "end" >> Podfile.new
           mv Podfile.new Podfile
+
 
       - name: Clean iOS
         run: |
