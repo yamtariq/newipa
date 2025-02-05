@@ -1,8 +1,6 @@
-name: nayifat_app_2025_new
+name: nayifat_app
 description: Nayifat App 2025
-
 publish_to: 'none'
-
 version: 1.0.0+1
 
 environment:
@@ -26,11 +24,11 @@ dependencies:
       url: https://github.com/ahmedoid/hijri_picker
       ref: master
   http: ^1.1.0
-  intl: ^0.19.0
+  intl: ^0.19.0  # Downgraded for stability
   intl_phone_number_input: ^0.7.4
   local_auth: ^2.1.7
-  shared_preferences: ^2.2.2
-  url_launcher: ^6.2.1
+  shared_preferences: ^2.2.4  # Updated
+  url_launcher: ^6.3.0  # Updated
   video_player: ^2.8.2
   flutter_secure_storage: ^9.0.0
   encrypt: ^5.0.3
@@ -47,17 +45,15 @@ dependencies:
   jhijri: ^1.0.0
   flutter_holo_date_picker: ^2.0.0
   dio: ^5.4.0
-  
-  
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
   flutter_launcher_icons: ^0.13.1
-  flutter_native_splash: ^2.3.9
+  flutter_native_splash: ^2.4.4  # Updated
   mockito: ^5.4.4
-  build_runner: ^2.4.8
+  build_runner: ^2.4.11  # Updated
   test: ^1.24.0
 
 flutter:
@@ -70,7 +66,6 @@ flutter:
           weight: 700
         - asset: assets/fonts/Roboto-Medium.ttf
           weight: 500
-
   assets:
     - assets/images/
     - assets/videos/
