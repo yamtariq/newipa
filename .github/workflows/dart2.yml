@@ -17,12 +17,29 @@ jobs:
           ruby-version: '3.2.2'
           bundler-cache: true
       
+      - name: Setup CocoaPods directories 💡
+        run: |
+          mkdir -p ~/.cocoapods/repos
+          mkdir -p ios/Pods
+      
       - name: Cache CocoaPods
         uses: actions/cache@v3
         with:
-          path: ios/Pods
-          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock') }}
+          path: |
+            ios/Pods
+            ~/.cocoapods
+          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile') }}-${{ hashFiles('pubspec.lock') }}
           restore-keys: |
+            ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile') }}-
+            ${{ runner.os }}-pods-
+      
+      - name: Cache Pods Specs 💡
+        uses: actions/cache@v3
+        with:
+          path: ~/.cocoapods/repos
+          key: ${{ runner.os }}-pods-specs-${{ hashFiles('ios/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-specs-
             ${{ runner.os }}-pods-
       
       - name: Setup Flutter
@@ -66,6 +83,7 @@ jobs:
         run: |
           gem uninstall cocoapods --all --ignore-dependencies
           gem install cocoapods -v 1.15.2
+          pod setup
           pod repo update
           
       - name: Update Podfile
