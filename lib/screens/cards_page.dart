@@ -62,7 +62,7 @@ class _CardsPageState extends State<CardsPage> {
       List<dynamic> cards = [];
       String? status;
       
-      if (sessionProvider.isSignedIn) {
+      if (sessionProvider.hasActiveSession) {
         cards = await _cardService.getUserCards();
         status = await _cardService.getCurrentApplicationStatus(isArabic: false);
       }
@@ -186,7 +186,7 @@ class _CardsPageState extends State<CardsPage> {
                     children: [
                       _buildHeader(primaryColor),
                       _buildAdvertBanner(),
-                      if (Provider.of<SessionProvider>(context).isSignedIn) ...[
+                      if (Provider.of<SessionProvider>(context).hasActiveSession) ...[
                         _buildApplyNowButton(),
                         _buildApplicationStatus(primaryColor),
                         _buildCardsList(primaryColor),
@@ -271,7 +271,7 @@ class _CardsPageState extends State<CardsPage> {
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: sessionProvider.isSignedIn ? () {
+        onPressed: sessionProvider.hasActiveSession ? () {
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -291,7 +291,7 @@ class _CardsPageState extends State<CardsPage> {
           ),
         ),
         child: Text(
-          sessionProvider.isSignedIn ? 'Apply for Card' : 'Sign in to Apply',
+          sessionProvider.hasActiveSession ? 'Apply for Card' : 'Sign in to Apply',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,

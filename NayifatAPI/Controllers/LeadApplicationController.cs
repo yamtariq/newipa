@@ -51,7 +51,7 @@ namespace NayifatAPI.Controllers
                 // Check for existing application
                 _logger.LogInformation("Checking for existing applications...");
                 var existingApp = await _context.LeadAppCards
-                    .Where(l => l.NationalId == request.NationalId && l.Status == "PENDING")
+                    .Where(l => l.national_id == request.NationalId && l.status == "PENDING")
                     .FirstOrDefaultAsync();
 
                 if (existingApp != null)
@@ -63,26 +63,26 @@ namespace NayifatAPI.Controllers
                 _logger.LogInformation("Creating new lead application...");
                 var leadApp = new LeadAppCard
                 {
-                    NationalId = request.NationalId,
-                    Name = request.Name,
-                    Phone = request.Phone,
-                    Status = "PENDING",
-                    StatusTimestamp = DateTime.UtcNow
+                    national_id = request.NationalId,
+                    name = request.Name,
+                    phone = request.Phone,
+                    status = "PENDING",
+                    status_timestamp = DateTime.UtcNow
                 };
 
                 _context.LeadAppCards.Add(leadApp);
                 _logger.LogInformation("Saving to database...");
                 await _context.SaveChangesAsync();
-                _logger.LogInformation($"Successfully created lead application with ID: {leadApp.Id}");
+                _logger.LogInformation($"Successfully created lead application with ID: {leadApp.id}");
 
                 return Success(new
                 {
-                    id = leadApp.Id,
-                    national_id = leadApp.NationalId,
-                    name = leadApp.Name,
-                    phone = leadApp.Phone,
-                    status = leadApp.Status,
-                    status_timestamp = leadApp.StatusTimestamp
+                    id = leadApp.id,
+                    national_id = leadApp.national_id,
+                    name = leadApp.name,
+                    phone = leadApp.phone,
+                    status = leadApp.status,
+                    status_timestamp = leadApp.status_timestamp
                 });
             }
             catch (Exception ex)
@@ -126,7 +126,7 @@ namespace NayifatAPI.Controllers
                 // Check for existing application
                 _logger.LogInformation("Checking for existing applications...");
                 var existingApp = await _context.LeadAppLoans
-                    .Where(l => l.NationalId == request.NationalId && l.Status == "PENDING")
+                    .Where(l => l.national_id == request.NationalId && l.status == "PENDING")
                     .FirstOrDefaultAsync();
 
                 if (existingApp != null)
@@ -138,26 +138,26 @@ namespace NayifatAPI.Controllers
                 _logger.LogInformation("Creating new lead application...");
                 var leadApp = new LeadAppLoan
                 {
-                    NationalId = request.NationalId,
-                    Name = request.Name,
-                    Phone = request.Phone,
-                    Status = "PENDING",
-                    StatusTimestamp = DateTime.UtcNow
+                    national_id = request.NationalId,
+                    name = request.Name,
+                    phone = request.Phone,
+                    status = "PENDING",
+                    status_timestamp = DateTime.UtcNow
                 };
 
                 _context.LeadAppLoans.Add(leadApp);
                 _logger.LogInformation("Saving to database...");
                 await _context.SaveChangesAsync();
-                _logger.LogInformation($"Successfully created lead application with ID: {leadApp.Id}");
+                _logger.LogInformation($"Successfully created lead application with ID: {leadApp.id}");
 
                 return Success(new
                 {
-                    id = leadApp.Id,
-                    national_id = leadApp.NationalId,
-                    name = leadApp.Name,
-                    phone = leadApp.Phone,
-                    status = leadApp.Status,
-                    status_timestamp = leadApp.StatusTimestamp
+                    id = leadApp.id,
+                    national_id = leadApp.national_id,
+                    name = leadApp.name,
+                    phone = leadApp.phone,
+                    status = leadApp.status,
+                    status_timestamp = leadApp.status_timestamp
                 });
             }
             catch (Exception ex)

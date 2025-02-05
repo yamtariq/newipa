@@ -5,9 +5,12 @@ import 'auth_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../utils/constants.dart';
 import '../services/content_update_service.dart';
+import 'package:dio/dio.dart';
 
 class LoanService {
   final _secureStorage = const FlutterSecureStorage();
+  final _authService = AuthService();
+  final _dio = Dio();
   
   Future<Map<String, dynamic>> getLoanDecision({
     required double salary,
@@ -116,24 +119,65 @@ class LoanService {
         remainingAmount: 97500,
         nextPaymentDate: DateTime.now().add(const Duration(days: 15)),
       ),
-      Loan(
-        id: "L002",
-        amount: 50000,
-        monthlyPayment: 1500,
-        tenureMonths: 36,
-        startDate: DateTime.now().subtract(const Duration(days: 180)),
-        endDate: DateTime.now().add(const Duration(days: 900)),
-        status: "Active",
-        interestRate: 11.75,
-        remainingAmount: 42000,
-        nextPaymentDate: DateTime.now().add(const Duration(days: 10)),
-      ),
     ];
   }
 
   Future<String> getCurrentApplicationStatus({bool isArabic = false}) async {
-    // Dummy application status with language support
-    return isArabic ? "قيد المراجعة" : "Under process";
+    try {
+      final userDataStr = await _secureStorage.read(key: 'user_data');
+      print('DEBUG - User Data String: $userDataStr'); // Debug log
+
+      if (userDataStr == null) {
+        print('DEBUG - No user data found in storage'); // Debug log
+        return isArabic ? 'لا توجد طلبات نشطة' : 'No active applications';
+      }
+
+      final userData = jsonDecode(userDataStr);
+      final nationalId = userData['nationalId'];
+      print('DEBUG - National ID: $nationalId'); // Debug log
+
+      if (nationalId == null) {
+        print('DEBUG - No national ID found in user data'); // Debug log
+        return isArabic ? 'لا توجد طلبات نشطة' : 'No active applications';
+      }
+
+      final url = '${Constants.apiBaseUrl}/loan-application/latest-status/$nationalId';
+      print('DEBUG - API URL: $url'); // Debug log
+      print('DEBUG - Headers: ${Constants.defaultHeaders}'); // Debug log
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: Constants.defaultHeaders,
+      );
+      
+      print('DEBUG - Response Status Code: ${response.statusCode}'); // Debug log
+      print('DEBUG - Response Body: ${response.body}'); // Debug log
+      
+      if (response.statusCode != 200) {
+        throw Exception('Failed to get application status: ${response.statusCode}');
+      }
+
+      final data = jsonDecode(response.body);
+      final status = data['data']['status'] as String;
+      print('DEBUG - Parsed Status: $status'); // Debug log
+
+      // Map the status to user-friendly messages
+      switch (status.toUpperCase()) {
+        case 'PENDING':
+          return isArabic ? 'قيد المراجعة' : 'Under Review';
+        case 'APPROVED':
+          return isArabic ? 'تمت الموافقة' : 'Approved';
+        case 'REJECTED':
+          return isArabic ? 'مرفوض' : 'Rejected';
+        case 'NO_APPLICATIONS':
+          return isArabic ? 'لا توجد طلبات نشطة' : 'No active applications';
+        default:
+          return isArabic ? 'حالة غير معروفة' : 'Unknown Status';
+      }
+    } catch (e) {
+      print('DEBUG - Error getting application status: $e'); // Debug log
+      return isArabic ? 'لا توجد طلبات نشطة' : 'No active applications';
+    }
   }
 
   Future<Map<String, dynamic>> getLoanAd({bool isArabic = false}) async {

@@ -209,7 +209,16 @@ namespace NayifatAPI.Controllers
                     return Error("No target users found for the given criteria", 400);
                 }
 
-                _logger.LogInformation("Found {Count} target users for notification", targetUsers.Count);
+                // 💡 Special handling for "all" target
+                bool isAllUsers = targetUsers.Count == 1 && targetUsers[0] == "all";
+                if (isAllUsers)
+                {
+                    _logger.LogInformation("Processing notification for all users");
+                }
+                else
+                {
+                    _logger.LogInformation("Found {Count} target users for notification", targetUsers.Count);
+                }
 
                 // Create notification template
                 var template = new NotificationTemplate
@@ -223,8 +232,14 @@ namespace NayifatAPI.Controllers
                     Route = request.Route,
                     AdditionalData = request.AdditionalData != null ? 
                         JsonSerializer.Serialize(request.AdditionalData) : null,
-                    TargetCriteria = request.Filters != null ? 
-                        JsonSerializer.Serialize(request.Filters) : null,
+                    TargetCriteria = JsonSerializer.Serialize(new Dictionary<string, object>
+                    {
+                        ["Customers.national_id"] = new Dictionary<string, string>
+                        {
+                            ["operator"] = "=",
+                            ["value"] = isAllUsers ? "all" : request.Filters?["Customers.national_id"]?.ToString() ?? ""
+                        }
+                    }),
                     CreatedAt = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Arab Standard Time")),
                     ExpiryAt = request.ExpiryAt ?? TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Arab Standard Time")).AddDays(30)
                 };
@@ -234,14 +249,96 @@ namespace NayifatAPI.Controllers
 
                 _logger.LogInformation("Created notification template with ID: {TemplateId}", template.Id);
 
-                // Log template creation
-                await _auditLog.LogAsync(request.NationalId ?? targetUsers.First(), "notification_sent", new
+                // 💡 Log template creation with special handling for "all" target
+                if (isAllUsers)
                 {
-                    template_id = template.Id,
-                    recipient_count = targetUsers.Count,
-                    target_criteria = request.Filters,
-                    timestamp = template.CreatedAt
-                });
+                    try
+                    {
+                        // Get first admin user or any user from Customers table for audit log
+                        var adminUser = await _context.Customers.FirstOrDefaultAsync();
+                        if (adminUser != null)
+                        {
+                            await _auditLog.LogAsync(adminUser.NationalId, "notification_sent", new
+                            {
+                                template_id = template.Id,
+                                recipient_count = -1, // -1 indicates "all users"
+                                target_criteria = new Dictionary<string, object>
+                                {
+                                    ["Customers.national_id"] = new Dictionary<string, string>
+                                    {
+                                        ["operator"] = "=",
+                                        ["value"] = "all"
+                                    }
+                                },
+                                timestamp = template.CreatedAt,
+                                is_broadcast = true
+                            });
+
+                            // Create notification reference for "all" target
+                            var allNotificationRef = new
+                            {
+                                template_id = template.Id,
+                                status = "unread",
+                                created_at = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Arab Standard Time")),
+                                read_at = (DateTime?)null,
+                                expires_at = template.ExpiryAt,
+                                target = "all"
+                            };
+
+                            // Create or update user_notifications entry for "all" target
+                            var userNotif = await _context.UserNotifications
+                                .FirstOrDefaultAsync(un => un.NationalId == "all");
+
+                            var notifications = new List<object>();
+                            if (userNotif != null && !string.IsNullOrEmpty(userNotif.Notifications))
+                            {
+                                try
+                                {
+                                    notifications = JsonSerializer.Deserialize<List<object>>(userNotif.Notifications) ?? new List<object>();
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger.LogError(ex, "Error deserializing notifications for all users");
+                                    notifications = new List<object>();
+                                }
+                            }
+
+                            notifications.Insert(0, allNotificationRef);
+                            if (notifications.Count > 50)
+                            {
+                                notifications = notifications.Take(50).ToList();
+                            }
+
+                            var serializedNotifications = JsonSerializer.Serialize(notifications);
+
+                            if (userNotif == null)
+                            {
+                                await _context.Database.ExecuteSqlRawAsync(
+                                    "INSERT INTO user_notifications (national_id, notifications, last_updated) VALUES ({0}, {1}, {2})",
+                                    "all", serializedNotifications, TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Arab Standard Time")));
+                                _logger.LogInformation("Created new UserNotification entry for all users");
+                            }
+                            else
+                            {
+                                await _context.Database.ExecuteSqlRawAsync(
+                                    "UPDATE user_notifications SET notifications = {0}, last_updated = {1} WHERE national_id = {2}",
+                                    serializedNotifications, TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Arab Standard Time")), "all");
+                                _logger.LogInformation("Updated existing UserNotification for all users");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error processing all-users notification. Template ID: {TemplateId}", template.Id);
+                    }
+
+                    return Success(new
+                    {
+                        status = "success",
+                        message = "Successfully created notification for all users",
+                        template_id = template.Id
+                    });
+                }
 
                 // Create notification reference
                 var notificationRef = new
@@ -435,29 +532,67 @@ namespace NayifatAPI.Controllers
                 switch (op.ToUpper())
                 {
                     case "=":
+                        // 💡 Special handling for national_id field
+                        if (column.ToLower() == "national_id")
+                        {
+                            return query.Where(c => c.NationalId == val.ToString());
+                        }
                         return query.Where(c => EF.Property<string>(c, column) == val.ToString());
                     
                     case "!=":
+                        // 💡 Special handling for national_id field
+                        if (column.ToLower() == "national_id")
+                        {
+                            return query.Where(c => c.NationalId != val.ToString());
+                        }
                         return query.Where(c => EF.Property<string>(c, column) != val.ToString());
                     
                     case ">":
                         if (decimal.TryParse(val.ToString(), out decimal gtValue))
+                        {
+                            // 💡 Special handling for national_id field
+                            if (column.ToLower() == "national_id")
+                            {
+                                return query.Where(c => string.Compare(c.NationalId, val.ToString()) > 0);
+                            }
                             return query.Where(c => EF.Property<decimal>(c, column) > gtValue);
+                        }
                         break;
                     
                     case "<":
                         if (decimal.TryParse(val.ToString(), out decimal ltValue))
+                        {
+                            // 💡 Special handling for national_id field
+                            if (column.ToLower() == "national_id")
+                            {
+                                return query.Where(c => string.Compare(c.NationalId, val.ToString()) < 0);
+                            }
                             return query.Where(c => EF.Property<decimal>(c, column) < ltValue);
+                        }
                         break;
                     
                     case ">=":
                         if (decimal.TryParse(val.ToString(), out decimal gteValue))
+                        {
+                            // 💡 Special handling for national_id field
+                            if (column.ToLower() == "national_id")
+                            {
+                                return query.Where(c => string.Compare(c.NationalId, val.ToString()) >= 0);
+                            }
                             return query.Where(c => EF.Property<decimal>(c, column) >= gteValue);
+                        }
                         break;
                     
                     case "<=":
                         if (decimal.TryParse(val.ToString(), out decimal lteValue))
+                        {
+                            // 💡 Special handling for national_id field
+                            if (column.ToLower() == "national_id")
+                            {
+                                return query.Where(c => string.Compare(c.NationalId, val.ToString()) <= 0);
+                            }
                             return query.Where(c => EF.Property<decimal>(c, column) <= lteValue);
+                        }
                         break;
                     
                     case "LIKE":
@@ -469,6 +604,11 @@ namespace NayifatAPI.Controllers
                         var values = ParseInOperatorValues(val);
                         if (values.Any())
                         {
+                            // 💡 Special handling for national_id field
+                            if (column.ToLower() == "national_id")
+                            {
+                                return query.Where(c => values.Contains(c.NationalId));
+                            }
                             switch (column.ToLower())
                             {
                                 case "city":
@@ -623,6 +763,17 @@ namespace NayifatAPI.Controllers
                 request.NationalIds?.Any() == true ? "Multiple Users" :
                 request.Filters?.Any() == true ? "Filtered Users" : "Unknown");
 
+            // 💡 Special case: Check for "all" in national_id filter
+            if (request.Filters?.TryGetValue("Customers.national_id", out var nationalIdFilter) == true)
+            {
+                var filterObj = JsonSerializer.Deserialize<Dictionary<string, string>>(nationalIdFilter.ToString());
+                if (filterObj != null && filterObj.TryGetValue("value", out var value) && value.ToLower() == "all")
+                {
+                    _logger.LogInformation("Special case: Using 'all' as target without fetching IDs");
+                    return new List<string> { "all" }; // Return special "all" indicator
+                }
+            }
+
             // Case 1: Single user
             if (!string.IsNullOrEmpty(request.NationalId))
             {
@@ -697,87 +848,46 @@ namespace NayifatAPI.Controllers
                             var op = jsonElement.TryGetProperty("operator", out var opElement) ? 
                                 opElement.GetString() : "=";
                             
-                            // Handle BETWEEN operator which needs two values
-                            if (op?.ToUpper() == "BETWEEN" && jsonElement.TryGetProperty("value", out var valElement))
+                            // Handle regular operators
+                            if (jsonElement.TryGetProperty("value", out var regularValElement))
                             {
-                                if (valElement.ValueKind == JsonValueKind.Array)
-                                {
-                                    try
-                                    {
-                                        var values = valElement.EnumerateArray().ToList();
-                                        if (values.Count == 2)
-                                        {
-                                            // Remove table prefix if exists (e.g., "Customers.SalaryCustomer" -> "SalaryCustomer")
-                                            var actualFieldName = fieldName.Contains(".") ? fieldName.Split('.')[1] : fieldName;
-
-                                            // Try parsing as decimal first
-                                            if (decimal.TryParse(values[0].ToString(), out decimal decVal1) && 
-                                                decimal.TryParse(values[1].ToString(), out decimal decVal2))
-                                            {
-                                                localQuery = ApplyNumericFilter(localQuery, actualFieldName, "BETWEEN", decVal1, decVal2);
-                                                filterApplied = true;
-                                                _logger.LogInformation("Applied {Field} BETWEEN filter: {Val1} AND {Val2}", actualFieldName, decVal1, decVal2);
-                                            }
-                                            // If not decimal, try as integer
-                                            else if (int.TryParse(values[0].ToString(), out int intVal1) && 
-                                                     int.TryParse(values[1].ToString(), out int intVal2))
-                                            {
-                                                localQuery = ApplyIntFilter(localQuery, actualFieldName, "BETWEEN", intVal1, intVal2);
-                                                filterApplied = true;
-                                                _logger.LogInformation("Applied {Field} BETWEEN filter: {Val1} AND {Val2}", actualFieldName, intVal1, intVal2);
-                                            }
-                                        }
-                                        else
-                                        {
-                                            _logger.LogWarning("BETWEEN operator requires exactly 2 values, got {Count}", values.Count);
-                                        }
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        _logger.LogError(ex, "Error processing BETWEEN values for field {Field}", fieldName);
-                                    }
-                                }
-
-                                if (filterApplied)
-                                {
-                                    filterGroups.Add(localQuery);
-                                    _logger.LogInformation("Added filter group for field {Field}", fieldName);
-                                }
-                                continue;
-                            }
-
-                            // Handle regular operators (only if not BETWEEN)
-                            if (op?.ToUpper() != "BETWEEN")
-                            {
-                                var val = jsonElement.TryGetProperty("value", out var regularValElement) ? 
-                                    regularValElement.GetString() : null;
-
+                                var val = regularValElement.GetString();
                                 if (!string.IsNullOrEmpty(val))
                                 {
                                     // Remove table prefix if exists
                                     var actualFieldName = fieldName.Contains(".") ? fieldName.Split('.')[1] : fieldName;
                                     _logger.LogInformation("Processing filter: {Field} {Op} {Value}", actualFieldName, op, val);
 
-                                    // Try parsing as decimal first
-                                    if (decimal.TryParse(val, out decimal decimalValue))
+                                    // 💡 Special handling for national_id field
+                                    if (actualFieldName.ToLower() == "national_id")
                                     {
-                                        localQuery = ApplyNumericFilter(localQuery, actualFieldName, op!, decimalValue);
+                                        localQuery = query.Where(c => c.NationalId == val);
                                         filterApplied = true;
-                                        _logger.LogInformation("Applied {Field} numeric filter: {Op} {Value}", actualFieldName, op, decimalValue);
+                                        _logger.LogInformation("Applied national_id filter: {Op} {Value}", op, val);
                                     }
-                                    // Then try as integer
-                                    else if (int.TryParse(val, out int intValue))
-                                    {
-                                        localQuery = ApplyIntFilter(localQuery, actualFieldName, op!, intValue);
-                                        filterApplied = true;
-                                        _logger.LogInformation("Applied {Field} integer filter: {Op} {Value}", actualFieldName, op, intValue);
-                                    }
-                                    // If not numeric, treat as string
                                     else
                                     {
-                                        localQuery = ApplyStringFilter(localQuery, actualFieldName, op!, val);
-                                        filterApplied = true;
-                                        _logger.LogInformation("Applied {Field} string filter: {Op} {Value}", actualFieldName, op, val);
+                                        // Try parsing as decimal first
+                                        if (decimal.TryParse(val, out decimal decimalValue))
+                                        {
+                                            localQuery = ApplyNumericFilter(localQuery, actualFieldName, op!, decimalValue);
+                                            filterApplied = true;
+                                            _logger.LogInformation("Applied {Field} numeric filter: {Op} {Value}", actualFieldName, op, decimalValue);
+                                        }
+                                        // Then try as integer
+                                        else if (int.TryParse(val, out int intValue))
+                                        {
+                                            localQuery = ApplyIntFilter(localQuery, actualFieldName, op!, intValue);
+                                            filterApplied = true;
+                                            _logger.LogInformation("Applied {Field} integer filter: {Op} {Value}", actualFieldName, op, intValue);
+                                        }
+                                        // If not numeric, treat as string
+                                        else
+                                        {
+                                            localQuery = ApplyStringFilter(localQuery, actualFieldName, op!, val);
+                                            filterApplied = true;
+                                            _logger.LogInformation("Applied {Field} string filter: {Op} {Value}", actualFieldName, op, val);
+                                        }
                                     }
                                 }
                             }
@@ -791,6 +901,11 @@ namespace NayifatAPI.Controllers
                         {
                             switch (fieldName.ToLower())
                             {
+                                case "national_id":
+                                    localQuery = localQuery.Where(c => c.NationalId == strValue);
+                                    filterApplied = true;
+                                    _logger.LogInformation("Applied simple national_id filter: {Value}", strValue);
+                                    break;
                                 case "city":
                                     localQuery = localQuery.Where(c => c.City == strValue);
                                     filterApplied = true;

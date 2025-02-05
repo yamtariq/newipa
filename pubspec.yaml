@@ -46,6 +46,7 @@ dependencies:
   libphonenumber_plugin: ^0.3.3 
   jhijri: ^1.0.0
   flutter_holo_date_picker: ^2.0.0
+  dio: ^5.4.0
   
   
 

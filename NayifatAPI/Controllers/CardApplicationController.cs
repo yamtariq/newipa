@@ -187,6 +187,100 @@ namespace NayifatAPI.Controllers
                 return Error("Internal server error", 500);
             }
         }
+
+        [HttpGet("latest-status/{nationalId}")]
+        public async Task<IActionResult> GetLatestStatus(string nationalId)
+        {
+            if (!ValidateApiKey())
+            {
+                _logger.LogWarning("Invalid API key in GetLatestStatus request");
+                return Error("Invalid API key", 401);
+            }
+
+            try
+            {
+                _logger.LogInformation("CARDS_CHECK_START: Getting latest status for National ID: {NationalId}", nationalId);
+
+                // Get latest from lead_apps_cards
+                var leadAppQuery = _context.LeadAppCards
+                    .Where(l => l.national_id == nationalId)
+                    .OrderByDescending(l => l.status_timestamp);
+                
+                _logger.LogInformation("CARDS_CHECK_LEAD_SQL: {Query}", leadAppQuery.ToQueryString());
+                var latestLeadApp = await leadAppQuery.FirstOrDefaultAsync();
+
+                _logger.LogInformation("CARDS_CHECK_LEAD_RESULT: Found={Found}, Status={Status}, Timestamp={Timestamp}", 
+                    latestLeadApp != null,
+                    latestLeadApp?.status ?? "null", 
+                    latestLeadApp?.status_timestamp.ToString() ?? "null");
+
+                // Get latest from card_application_details
+                var cardAppQuery = _context.CardApplications
+                    .Where(c => c.NationalId == nationalId)
+                    .OrderByDescending(c => c.StatusDate);
+                
+                _logger.LogInformation("CARDS_CHECK_CARD_SQL: {Query}", cardAppQuery.ToQueryString());
+                var latestCardApp = await cardAppQuery.FirstOrDefaultAsync();
+
+                _logger.LogInformation("CARDS_CHECK_CARD_RESULT: Found={Found}, Status={Status}, Timestamp={Timestamp}", 
+                    latestCardApp != null,
+                    latestCardApp?.Status ?? "null", 
+                    latestCardApp?.StatusDate.ToString() ?? "null");
+
+                string status;
+                DateTime? statusTimestamp = null;
+
+                if (latestLeadApp == null && latestCardApp == null)
+                {
+                    _logger.LogInformation("CARDS_CHECK_DECISION: No applications found in either table");
+                    status = "NO_APPLICATIONS";
+                }
+                else if (latestLeadApp == null)
+                {
+                    status = latestCardApp.Status;
+                    statusTimestamp = latestCardApp.StatusDate;
+                    _logger.LogInformation("CARDS_CHECK_DECISION: Using Card App (Lead App not found). Status={Status}, Date={Date}", status, statusTimestamp);
+                }
+                else if (latestCardApp == null)
+                {
+                    status = latestLeadApp.status;
+                    statusTimestamp = latestLeadApp.status_timestamp;
+                    _logger.LogInformation("CARDS_CHECK_DECISION: Using Lead App (Card App not found). Status={Status}, Date={Date}", status, statusTimestamp);
+                }
+                else
+                {
+                    var leadAppTime = DateTime.SpecifyKind(latestLeadApp.status_timestamp, DateTimeKind.Utc);
+                    var cardAppTime = DateTime.SpecifyKind(latestCardApp.StatusDate, DateTimeKind.Utc);
+
+                    _logger.LogInformation("CARDS_CHECK_COMPARISON: Lead App Time={LeadTime}, Status={LeadStatus} | Card App Time={LoanTime}, Status={LoanStatus}", 
+                        leadAppTime, 
+                        latestLeadApp.status,
+                        cardAppTime,
+                        latestCardApp.Status);
+
+                    if (leadAppTime > cardAppTime)
+                    {
+                        status = latestLeadApp.status;
+                        statusTimestamp = leadAppTime;
+                        _logger.LogInformation("CARDS_CHECK_DECISION: Selected Lead App (more recent). Status={Status}, Date={Date}", status, statusTimestamp);
+                    }
+                    else
+                    {
+                        status = latestCardApp.Status;
+                        statusTimestamp = cardAppTime;
+                        _logger.LogInformation("CARDS_CHECK_DECISION: Selected Card App (more recent). Status={Status}, Date={Date}", status, statusTimestamp);
+                    }
+                }
+
+                _logger.LogInformation("CARDS_CHECK_FINAL: Returning Status={Status}, Timestamp={Timestamp}", status, statusTimestamp);
+                return Success(new { status, timestamp = statusTimestamp });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "CARDS_CHECK_ERROR: Failed to get latest application status for National ID: {NationalId}", nationalId);
+                return Error("Internal server error", 500);
+            }
+        }
     }
 
     public class InitialCardApplicationRequest

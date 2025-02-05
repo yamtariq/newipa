@@ -78,23 +78,30 @@ namespace NayifatAPI.Data
             modelBuilder.Entity<LeadAppCard>(entity =>
             {
                 entity.ToTable("lead_apps_cards");
-                entity.HasKey(e => e.Id);
-                entity.HasIndex(e => e.NationalId);
+                entity.HasKey(e => e.id);
+                entity.HasIndex(e => e.national_id);
                 
-                entity.Property(e => e.NationalId)
-                    .HasColumnName("national_id");
+                entity.Property(e => e.id)
+                    .HasColumnName("id");
                 
-                entity.Property(e => e.Name)
-                    .HasColumnName("name");
+                entity.Property(e => e.national_id)
+                    .HasColumnName("national_id")
+                    .HasMaxLength(20);
                 
-                entity.Property(e => e.Phone)
-                    .HasColumnName("phone");
+                entity.Property(e => e.name)
+                    .HasColumnName("name")
+                    .HasMaxLength(100);
                 
-                entity.Property(e => e.Status)
+                entity.Property(e => e.phone)
+                    .HasColumnName("phone")
+                    .HasMaxLength(15);
+                
+                entity.Property(e => e.status)
                     .HasColumnName("status")
+                    .HasMaxLength(50)
                     .HasDefaultValue("PENDING");
                 
-                entity.Property(e => e.StatusTimestamp)
+                entity.Property(e => e.status_timestamp)
                     .HasColumnName("status_timestamp")
                     .HasDefaultValueSql("CURRENT_TIMESTAMP");
             });
@@ -102,23 +109,30 @@ namespace NayifatAPI.Data
             modelBuilder.Entity<LeadAppLoan>(entity =>
             {
                 entity.ToTable("lead_apps_loans");
-                entity.HasKey(e => e.Id);
-                entity.HasIndex(e => e.NationalId);
+                entity.HasKey(e => e.id);
+                entity.HasIndex(e => e.national_id);
                 
-                entity.Property(e => e.NationalId)
-                    .HasColumnName("national_id");
+                entity.Property(e => e.id)
+                    .HasColumnName("id");
                 
-                entity.Property(e => e.Name)
-                    .HasColumnName("name");
+                entity.Property(e => e.national_id)
+                    .HasColumnName("national_id")
+                    .HasMaxLength(20);
                 
-                entity.Property(e => e.Phone)
-                    .HasColumnName("phone");
+                entity.Property(e => e.name)
+                    .HasColumnName("name")
+                    .HasMaxLength(100);
                 
-                entity.Property(e => e.Status)
+                entity.Property(e => e.phone)
+                    .HasColumnName("phone")
+                    .HasMaxLength(15);
+                
+                entity.Property(e => e.status)
                     .HasColumnName("status")
+                    .HasMaxLength(50)
                     .HasDefaultValue("PENDING");
                 
-                entity.Property(e => e.StatusTimestamp)
+                entity.Property(e => e.status_timestamp)
                     .HasColumnName("status_timestamp")
                     .HasDefaultValueSql("CURRENT_TIMESTAMP");
             });

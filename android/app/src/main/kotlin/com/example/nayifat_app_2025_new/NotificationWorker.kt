@@ -14,6 +14,8 @@ import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 import android.app.Notification
 import android.app.PendingIntent
+import org.json.JSONArray
+import android.content.SharedPreferences
 
 class NotificationWorker(
     private val context: Context,
@@ -21,7 +23,15 @@ class NotificationWorker(
 ) : Worker(context, params) {
 
     companion object {
-        private const val BASE_URL = "https://icreditdept.com/api"
+        private fun getApiBaseUrl(prefs: SharedPreferences): String {
+            val useNewApi = prefs.getBoolean("flutter.useNewApi", true)
+            return if (useNewApi) {
+                "https://45f9-51-252-155-185.ngrok-free.app/api"
+            } else {
+                "https://icreditdept.com/api"
+            }
+        }
+        private const val NOTIFICATIONS_ENDPOINT = "/notifications/list"
         private const val API_KEY = "7ca7427b418bdbd0b3b23d7debf69bf7"
         private const val TAG = "Tariq_NotificationWorker"
     }
@@ -31,6 +41,7 @@ class NotificationWorker(
         try {
             // Get national ID from SharedPreferences
             val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+            val baseUrl = getApiBaseUrl(prefs)
             Log.d(TAG, "Step 2: Checking SharedPreferences")
             Log.d(TAG, "Step 2.1: Available SharedPreferences keys:")
             prefs.all.forEach { (key, value) ->
@@ -41,14 +52,13 @@ class NotificationWorker(
             Log.d(TAG, "Step 3: National ID check - ${if (nationalId != null) "Found ID: $nationalId" else "No ID found"}")
             
             if (nationalId == null) {
-                Log.e(TAG, "Step 3.1: Error - No national ID in SharedPreferences")
-                return Result.success()
+                Log.d(TAG, "Step 3.1: No user-specific ID, checking 'all' notifications only")
             }
 
             // Fetch notifications from API
-            Log.d(TAG, "Step 4: Starting API call for ID: $nationalId")
+            Log.d(TAG, "Step 4: Starting API calls")
             val notifications = fetchNotifications(nationalId)
-            Log.d(TAG, "Step 7: API call complete - Found ${notifications.size} notifications")
+            Log.d(TAG, "Step 7: API calls complete - Found ${notifications.size} notifications")
 
             if (notifications.isNotEmpty()) {
                 Log.d(TAG, "Step 8: Processing ${notifications.size} notifications")
@@ -70,127 +80,160 @@ class NotificationWorker(
         }
     }
 
-    private fun fetchNotifications(nationalId: String): List<Map<String, String>> {
-        Log.d(TAG, "Step 4.1: Setting up API call")
-        val url = URL("$BASE_URL/get_notifications.php")
+    private fun fetchNotifications(nationalId: String?): List<Map<String, String>> {
+        Log.d(TAG, "Step 4.1: Setting up API calls")
+        val allNotifications = mutableListOf<Map<String, String>>()
+        val seenNotifications = getSeenNotifications()
+        
+        try {
+            // First, fetch "all" notifications
+            fetchFromApi("all", false)?.let { notifications ->
+                // Filter out already seen notifications
+                notifications.forEach { notification ->
+                    val id = notification["id"]
+                    if (id != null && !seenNotifications.contains(id)) {
+                        allNotifications.add(notification)
+                        // Add to seen notifications
+                        addToSeenNotifications(id)
+                    }
+                }
+            }
+
+            // Then, if we have a national ID, fetch user-specific notifications
+            if (!nationalId.isNullOrEmpty()) {
+                fetchFromApi(nationalId, true)?.let { notifications ->
+                    allNotifications.addAll(notifications)
+                }
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching notifications: ${e.message}")
+        }
+        
+        return allNotifications
+    }
+
+    private fun fetchFromApi(nationalId: String, markAsRead: Boolean): List<Map<String, String>>? {
+        Log.d(TAG, "Step 4.2: Fetching notifications for ID: $nationalId")
+        val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        val baseUrl = getApiBaseUrl(prefs)
+        val url = URL("$baseUrl$NOTIFICATIONS_ENDPOINT")
         val connection = url.openConnection() as HttpsURLConnection
         
         try {
             // Get language setting
-            val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
             val isArabic = prefs.getBoolean("flutter.isArabic", false)
-            Log.d(TAG, "Step 4.1.1: App language setting - isArabic: $isArabic")
+            Log.d(TAG, "Step 4.2.1: App language setting - isArabic: $isArabic")
 
-            Log.d(TAG, "Step 4.2: Configuring connection to: ${url}")
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
-            connection.setRequestProperty("api-key", API_KEY)
+            connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty("x-api-key", API_KEY)
             connection.doOutput = true
             connection.connectTimeout = 30000
             connection.readTimeout = 30000
 
             val requestBody = JSONObject().apply {
                 put("nationalId", nationalId)
-                put("mark_as_read", true)
+                put("markAsRead", markAsRead)
             }
-            Log.d(TAG, "Step 4.3: Request body prepared: ${requestBody}")
-            Log.d(TAG, "Step 4.4: Headers - api-key: ${connection.getRequestProperty("api-key")}")
 
-            Log.d(TAG, "Step 5: Sending API request")
             connection.outputStream.use { os ->
                 os.write(requestBody.toString().toByteArray())
             }
 
             val responseCode = connection.responseCode
-            Log.d(TAG, "Step 6.1: API Response code: $responseCode")
+            Log.d(TAG, "Step 4.3: API Response code: $responseCode")
 
-            val response = if (responseCode in 200..299) {
-                connection.inputStream.bufferedReader().use { it.readText() }
-            } else {
-                connection.errorStream.bufferedReader().use { it.readText() }
-            }
-            Log.d(TAG, "Step 6.2: API Response body: $response")
-
-            val jsonResponse = JSONObject(response)
-            Log.d(TAG, "Step 6.3: Response status: ${jsonResponse.optString("status")}")
-
-            if (jsonResponse.getString("status") == "success") {
-                val notificationsArray = jsonResponse.getJSONArray("notifications")
-                val notifications = mutableListOf<Map<String, String>>()
-
-                for (i in 0 until notificationsArray.length()) {
-                    val notif = notificationsArray.getJSONObject(i)
+            if (responseCode in 200..299) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonResponse = JSONObject(response)
+                
+                if (jsonResponse.optBoolean("success", false)) {
+                    val data = jsonResponse.optJSONObject("data")
+                    val notificationsArray = data?.optJSONArray("notifications")
                     
-                    // Get title based on language with more robust null checking
-                    val titleAr = notif.optString("title_ar")?.takeIf { it.isNotBlank() }
-                    val titleEn = notif.optString("title_en")?.takeIf { it.isNotBlank() }
-                    val titleGeneric = notif.optString("title")?.takeIf { it.isNotBlank() }
-                    
-                    val title = when {
-                        isArabic && !titleAr.isNullOrBlank() -> titleAr
-                        !isArabic && !titleEn.isNullOrBlank() -> titleEn
-                        !titleGeneric.isNullOrBlank() -> titleGeneric
-                        else -> "Nayifat Notification"
+                    if (notificationsArray != null) {
+                        return parseNotifications(notificationsArray, isArabic)
                     }
-
-                    // Get body based on language with more robust null checking
-                    val bodyAr = notif.optString("body_ar")?.takeIf { it.isNotBlank() }
-                    val bodyEn = notif.optString("body_en")?.takeIf { it.isNotBlank() }
-                    val bodyGeneric = notif.optString("body")?.takeIf { it.isNotBlank() }
-                    
-                    val body = when {
-                        isArabic && !bodyAr.isNullOrBlank() -> bodyAr
-                        !isArabic && !bodyEn.isNullOrBlank() -> bodyEn
-                        !bodyGeneric.isNullOrBlank() -> bodyGeneric
-                        else -> "You have a new notification"
-                    }
-
-                    // Enhanced debug logging
-                    Log.d(TAG, """
-                        Step 6.4.1: Notification content debug:
-                        Language Mode: ${if (isArabic) "Arabic" else "English"}
-                        Available Titles:
-                          - title_ar: ${titleAr ?: "NULL/EMPTY"}
-                          - title_en: ${titleEn ?: "NULL/EMPTY"}
-                          - title: ${titleGeneric ?: "NULL/EMPTY"}
-                        Selected Title: $title
-                        Available Bodies:
-                          - body_ar: ${bodyAr ?: "NULL/EMPTY"}
-                          - body_en: ${bodyEn ?: "NULL/EMPTY"}
-                          - body: ${bodyGeneric ?: "NULL/EMPTY"}
-                        Selected Body: $body
-                    """.trimIndent())
-
-                    // Verify content before adding to notifications list
-                    if (title.isBlank() || body.isBlank()) {
-                        Log.e(TAG, "Step 6.4.2: Warning - Empty title or body after processing")
-                        continue
-                    }
-
-                    notifications.add(mapOf(
-                        "id" to (notif.optString("id") ?: System.currentTimeMillis().toString()),
-                        "title" to title,
-                        "body" to body,
-                        "route" to notif.optString("route", ""),
-                        "created_at" to notif.optString("created_at", ""),
-                        "expires_at" to notif.optString("expires_at", "")
-                    ))
-                    Log.d(TAG, "Step 6.4.3: Successfully added notification: ID=${notif.optString("id")}, Title=$title")
                 }
-                Log.d(TAG, "Step 6.5: Successfully parsed ${notifications.size} notifications")
-                return notifications
-            } else {
-                Log.e(TAG, "Step 6.6: API returned non-success status: ${jsonResponse.optString("message", "Unknown error")}")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Step Error: API call failed: ${e.message}")
-            e.printStackTrace()
+            Log.e(TAG, "Error in API call: ${e.message}")
         } finally {
             connection.disconnect()
-            Log.d(TAG, "Step 6.7: API Connection closed")
+        }
+        return null
+    }
+
+    private fun getSeenNotifications(): Set<String> {
+        val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        try {
+            val storedValue = prefs.getString("flutter.seen_all_notifications", null)
+            if (storedValue != null) {
+                // Extract the JSON array part from the stored string
+                val jsonArrayStr = storedValue.substringAfter("!")
+                val jsonArray = JSONArray(jsonArrayStr)
+                return (0 until jsonArray.length())
+                    .map { jsonArray.getString(it) }
+                    .toSet()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing seen notifications: ${e.message}")
+        }
+        return setOf()
+    }
+
+    private fun addToSeenNotifications(id: String) {
+        val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        try {
+            val currentSeen = getSeenNotifications().toMutableSet()
+            currentSeen.add(id)
+            
+            // Create the JSON array string
+            val jsonArray = JSONArray(currentSeen.toList())
+            // Add the Flutter prefix and save
+            val valueToStore = "VGhpcyBpcyB0aGUgcHJlZml4IGZvciBhIGxpc3Qu!$jsonArray"
+            
+            prefs.edit().putString("flutter.seen_all_notifications", valueToStore).apply()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving seen notification: ${e.message}")
+        }
+    }
+
+    private fun parseNotifications(notificationsArray: JSONArray, isArabic: Boolean): List<Map<String, String>> {
+        val notifications = mutableListOf<Map<String, String>>()
+        
+        for (i in 0 until notificationsArray.length()) {
+            val notif = notificationsArray.getJSONObject(i)
+            
+            // Get title based on language
+            val title = when {
+                isArabic && !notif.optString("title_ar").isNullOrBlank() -> notif.optString("title_ar")
+                !isArabic && !notif.optString("title_en").isNullOrBlank() -> notif.optString("title_en")
+                !notif.optString("title").isNullOrBlank() -> notif.optString("title")
+                else -> "Nayifat Notification"
+            }
+
+            // Get body based on language
+            val body = when {
+                isArabic && !notif.optString("body_ar").isNullOrBlank() -> notif.optString("body_ar")
+                !isArabic && !notif.optString("body_en").isNullOrBlank() -> notif.optString("body_en")
+                !notif.optString("body").isNullOrBlank() -> notif.optString("body")
+                else -> ""
+            }
+
+            notifications.add(mapOf(
+                "id" to (notif.optString("id") ?: System.currentTimeMillis().toString()),
+                "title" to title,
+                "body" to body,
+                "route" to notif.optString("route", ""),
+                "created_at" to notif.optString("created_at", ""),
+                "expires_at" to notif.optString("expires_at", "")
+            ))
         }
         
-        return emptyList()
+        return notifications
     }
 
     private fun showNotification(notification: Map<String, String>) {

@@ -1,4 +1,6 @@
-- **Cross-Platform Consistency**  
+- IMPORTANT: NEVER change anything NOT related to what we are doing now! and please work in the simplest way possible , please add a commitment emoji (💡) to the code when you are applying this instruction specifically.
+
+**Cross-Platform Consistency**  
   Verify every feature on both Android and iOS.  
   Ensure parity in functionality and user experience.
 
@@ -13,7 +15,5 @@
   Demonstrate you followed these guidelines.
   Please never assume anything or any data, always check the codebase for the information you need and if not found then ask the user for the information you need. 
   Please always use the correct data type for the data you are working with.
-  IMPORTANT: NEVER change anything NOT related to what we are doing now! and please work in the simplest way possible , please add a commitment emoji (💡) to the code when you are applying this point specifically.
-
-
+  
 

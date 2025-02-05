@@ -203,6 +203,100 @@ namespace NayifatAPI.Controllers
                 return Error("Internal server error", 500);
             }
         }
+
+        [HttpGet("latest-status/{nationalId}")]
+        public async Task<IActionResult> GetLatestStatus(string nationalId)
+        {
+            if (!ValidateApiKey())
+            {
+                _logger.LogWarning("Invalid API key in GetLatestStatus request");
+                return Error("Invalid API key", 401);
+            }
+
+            try
+            {
+                _logger.LogInformation("LOANS_CHECK_START: Getting latest status for National ID: {NationalId}", nationalId);
+
+                // Get latest from lead_apps_loans
+                var leadAppQuery = _context.LeadAppLoans
+                    .Where(l => l.national_id == nationalId)
+                    .OrderByDescending(l => l.status_timestamp);
+                
+                _logger.LogInformation("LOANS_CHECK_LEAD_SQL: {Query}", leadAppQuery.ToQueryString());
+                var latestLeadApp = await leadAppQuery.FirstOrDefaultAsync();
+
+                _logger.LogInformation("LOANS_CHECK_LEAD_RESULT: Found={Found}, Status={Status}, Timestamp={Timestamp}", 
+                    latestLeadApp != null,
+                    latestLeadApp?.status ?? "null", 
+                    latestLeadApp?.status_timestamp.ToString() ?? "null");
+
+                // Get latest from loan_application_details
+                var loanAppQuery = _context.LoanApplications
+                    .Where(l => l.NationalId == nationalId)
+                    .OrderByDescending(l => l.StatusDate);
+                
+                _logger.LogInformation("LOANS_CHECK_LOAN_SQL: {Query}", loanAppQuery.ToQueryString());
+                var latestLoanApp = await loanAppQuery.FirstOrDefaultAsync();
+
+                _logger.LogInformation("LOANS_CHECK_LOAN_RESULT: Found={Found}, Status={Status}, Timestamp={Timestamp}", 
+                    latestLoanApp != null,
+                    latestLoanApp?.Status ?? "null", 
+                    latestLoanApp?.StatusDate.ToString() ?? "null");
+
+                string status;
+                DateTime? statusTimestamp = null;
+
+                if (latestLeadApp == null && latestLoanApp == null)
+                {
+                    _logger.LogInformation("LOANS_CHECK_DECISION: No applications found in either table");
+                    status = "NO_APPLICATIONS";
+                }
+                else if (latestLeadApp == null)
+                {
+                    status = latestLoanApp.Status;
+                    statusTimestamp = latestLoanApp.StatusDate;
+                    _logger.LogInformation("LOANS_CHECK_DECISION: Using Loan App (Lead App not found). Status={Status}, Date={Date}", status, statusTimestamp);
+                }
+                else if (latestLoanApp == null)
+                {
+                    status = latestLeadApp.status;
+                    statusTimestamp = latestLeadApp.status_timestamp;
+                    _logger.LogInformation("LOANS_CHECK_DECISION: Using Lead App (Loan App not found). Status={Status}, Date={Date}", status, statusTimestamp);
+                }
+                else
+                {
+                    var leadAppTime = DateTime.SpecifyKind(latestLeadApp.status_timestamp, DateTimeKind.Utc);
+                    var loanAppTime = DateTime.SpecifyKind(latestLoanApp.StatusDate, DateTimeKind.Utc);
+
+                    _logger.LogInformation("LOANS_CHECK_COMPARISON: Lead App Time={LeadTime}, Status={LeadStatus} | Loan App Time={LoanTime}, Status={LoanStatus}", 
+                        leadAppTime, 
+                        latestLeadApp.status,
+                        loanAppTime,
+                        latestLoanApp.Status);
+
+                    if (leadAppTime > loanAppTime)
+                    {
+                        status = latestLeadApp.status;
+                        statusTimestamp = leadAppTime;
+                        _logger.LogInformation("LOANS_CHECK_DECISION: Selected Lead App (more recent). Status={Status}, Date={Date}", status, statusTimestamp);
+                    }
+                    else
+                    {
+                        status = latestLoanApp.Status;
+                        statusTimestamp = loanAppTime;
+                        _logger.LogInformation("LOANS_CHECK_DECISION: Selected Loan App (more recent). Status={Status}, Date={Date}", status, statusTimestamp);
+                    }
+                }
+
+                _logger.LogInformation("LOANS_CHECK_FINAL: Returning Status={Status}, Timestamp={Timestamp}", status, statusTimestamp);
+                return Success(new { status, timestamp = statusTimestamp });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "LOANS_CHECK_ERROR: Failed to get latest application status for National ID: {NationalId}", nationalId);
+                return Error("Internal server error", 500);
+            }
+        }
     }
 
     public class InitialLoanApplicationRequest

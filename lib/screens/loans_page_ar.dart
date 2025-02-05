@@ -112,12 +112,13 @@ class _LoansPageArState extends State<LoansPageAr> {
         _isLoading = true;
       });
       
-      final isSignedIn = Provider.of<SessionProvider>(context, listen: false).isSignedIn;
+      final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
+      await sessionProvider.checkSession(); // Ensure session is up to date
       
       List<Loan> loans = [];
       String? status;
       
-      if (isSignedIn) {
+      if (sessionProvider.hasActiveSession) {
         loans = await _loanService.getUserLoans();
         status = await _loanService.getCurrentApplicationStatus(isArabic: true);
       }
@@ -171,7 +172,7 @@ class _LoansPageArState extends State<LoansPageAr> {
                       children: [
                         _buildHeader(primaryColor),
                         _buildAdvertBanner(),
-                        if (Provider.of<SessionProvider>(context).isSignedIn) ...[
+                        if (Provider.of<SessionProvider>(context).hasActiveSession) ...[
                           _buildApplyNowButton(),
                           _buildApplicationStatus(primaryColor),
                           _buildLoansList(primaryColor),
@@ -257,7 +258,7 @@ class _LoansPageArState extends State<LoansPageAr> {
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: sessionProvider.isSignedIn ? () {
+        onPressed: sessionProvider.hasActiveSession ? () {
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -277,7 +278,7 @@ class _LoansPageArState extends State<LoansPageAr> {
           ),
         ),
         child: Text(
-          sessionProvider.isSignedIn ? 'تقدم بطلب تمويل' : 'اكمل تسجيل الدخول للطلب',
+          sessionProvider.hasActiveSession ? 'تقدم بطلب تمويل' : 'اكمل تسجيل الدخول للطلب',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,

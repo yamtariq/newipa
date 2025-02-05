@@ -4,52 +4,64 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace NayifatAPI.Models
 {
+    [Table("lead_apps_cards")]
     public class LeadAppCard
     {
         [Key]
-        public int Id { get; set; }
+        [Column("id")]
+        public int id { get; set; }
 
         [Required]
         [StringLength(20)]
-        public string NationalId { get; set; } = string.Empty;
+        [Column("national_id")]
+        public string national_id { get; set; } = string.Empty;
 
         [Required]
         [StringLength(100)]
-        public string Name { get; set; } = string.Empty;
+        [Column("name")]
+        public string name { get; set; } = string.Empty;
 
         [Required]
         [StringLength(15)]
-        public string Phone { get; set; } = string.Empty;
+        [Column("phone")]
+        public string phone { get; set; } = string.Empty;
 
         [Required]
         [StringLength(50)]
-        public string Status { get; set; } = "PENDING";
+        [Column("status")]
+        public string status { get; set; } = "PENDING";
 
-        public DateTime StatusTimestamp { get; set; } = DateTime.UtcNow;
+        [Column("status_timestamp")]
+        public DateTime status_timestamp { get; set; } = DateTime.UtcNow;
     }
 
     public class LeadAppLoan
     {
         [Key]
-        public int Id { get; set; }
+        public int id { get; set; }
 
         [Required]
         [StringLength(20)]
-        public string NationalId { get; set; } = string.Empty;
+        [Column("national_id")]
+        public string national_id { get; set; } = string.Empty;
 
         [Required]
         [StringLength(100)]
-        public string Name { get; set; } = string.Empty;
+        [Column("name")]
+        public string name { get; set; } = string.Empty;
 
         [Required]
         [StringLength(15)]
-        public string Phone { get; set; } = string.Empty;
+        [Column("phone")]
+        public string phone { get; set; } = string.Empty;
 
         [Required]
         [StringLength(50)]
-        public string Status { get; set; } = "PENDING";
+        [Column("status")]
+        public string status { get; set; } = "PENDING";
 
-        public DateTime StatusTimestamp { get; set; } = DateTime.UtcNow;
+        [Column("status_timestamp")]
+        public DateTime status_timestamp { get; set; } = DateTime.UtcNow;
     }
 
     public class LeadApplicationRequest

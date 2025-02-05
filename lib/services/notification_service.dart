@@ -204,6 +204,11 @@ class NotificationService {
           additionalData['route'] = notification['route'];
         }
 
+        // Add any additional data from the notification
+        if (notification['additionalData'] != null) {
+          additionalData.addAll(Map<String, dynamic>.from(notification['additionalData']));
+        }
+
         await showNotification(
           title: title,
           body: body,
@@ -222,10 +227,45 @@ class NotificationService {
   Future<List<Map<String, dynamic>>> fetchNotifications(String nationalId) async {
     try {
       debugPrint('\n=== Fetching Notifications from API ===');
+      final List<Map<String, dynamic>> allNotifications = [];
+      final prefs = await SharedPreferences.getInstance();
+      final seenAllNotifications = prefs.getStringList('seen_all_notifications') ?? [];
+
+      // Fetch user-specific notifications
+      final userNotifications = await _fetchFromApi(nationalId, true);
+      allNotifications.addAll(userNotifications);
+
+      // Fetch "all" notifications
+      final allTargetedNotifications = await _fetchFromApi("all", false);
+      
+      // Filter out already seen "all" notifications and add new ones to seen list
+      final newAllNotifications = allTargetedNotifications.where((notification) {
+        final id = notification['id'].toString();
+        if (seenAllNotifications.contains(id)) return false;
+        seenAllNotifications.add(id);
+        return true;
+      }).toList();
+
+      // Save updated seen notifications
+      if (newAllNotifications.isNotEmpty) {
+        await prefs.setStringList('seen_all_notifications', seenAllNotifications);
+      }
+
+      allNotifications.addAll(newAllNotifications);
+      return allNotifications;
+    } catch (e, stackTrace) {
+      debugPrint('Error fetching notifications: $e');
+      debugPrint('Stack trace: $stackTrace');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchFromApi(String nationalId, bool markAsRead) async {
+    try {
       final url = '${Constants.apiBaseUrl}${Constants.endpointGetNotifications}';
       final body = {
-        'nationalId': nationalId == '' ? 'all' : nationalId,  // Use 'all' only if nationalId is empty
-        'mark_as_read': true,
+        'nationalId': nationalId,
+        'markAsRead': markAsRead,
       };
 
       debugPrint('API Request Details:');
@@ -248,30 +288,19 @@ class NotificationService {
         final data = jsonDecode(response.body);
         debugPrint('\nParsed Response Data: $data');
         
-        if (data['status'] == 'success') {
-          final notifications = List<Map<String, dynamic>>.from(data['notifications']);
+        if (data['success'] == true && data['data'] != null) {
+          final notifications = List<Map<String, dynamic>>.from(data['data']['notifications']);
           debugPrint('Found ${notifications.length} notifications');
           if (notifications.isNotEmpty) {
             debugPrint('Notifications: $notifications');
           }
           return notifications;
-        } else {
-          debugPrint('API returned non-success status: ${data["status"]}');
-          if (data['message'] != null) {
-            debugPrint('Error message: ${data["message"]}');
-          }
         }
-      } else {
-        debugPrint('API call failed with status code: ${response.statusCode}');
-        debugPrint('Error response: ${response.body}');
       }
       return [];
-    } catch (e, stackTrace) {
-      debugPrint('Error fetching notifications: $e');
-      debugPrint('Stack trace: $stackTrace');
+    } catch (e) {
+      debugPrint('Error in API call: $e');
       return [];
-    } finally {
-      debugPrint('=== API Call Complete ===\n');
     }
   }
 
@@ -290,13 +319,17 @@ class NotificationService {
         Uri.parse('${Constants.apiBaseUrl}${Constants.endpointSendNotification}'),
         headers: Constants.defaultHeaders,
         body: jsonEncode({
-          if (nationalId != null) 'national_id': nationalId,
-          if (nationalIds != null) 'national_ids': nationalIds,
+          if (nationalId != null) 'nationalId': nationalId,
+          if (nationalIds != null) 'nationalIds': nationalIds,
           if (filters != null) 'filters': filters,
-          'title': title,
-          'body': body,
+          if (isArabic == true) ...<String, String>{
+            'titleAr': title,
+            'bodyAr': body,
+          } else ...<String, String>{
+            'titleEn': title,
+            'bodyEn': body,
+          },
           if (route != null) 'route': route,
-          if (isArabic != null) 'isArabic': isArabic,
           if (additionalData != null) 'additionalData': additionalData,
         }),
       );
@@ -305,20 +338,24 @@ class NotificationService {
       debugPrint('URL: ${Constants.apiBaseUrl}${Constants.endpointSendNotification}');
       debugPrint('Headers: ${Constants.defaultHeaders}');
       debugPrint('Body: ${jsonEncode({
-        if (nationalId != null) 'national_id': nationalId,
-        if (nationalIds != null) 'national_ids': nationalIds,
+        if (nationalId != null) 'nationalId': nationalId,
+        if (nationalIds != null) 'nationalIds': nationalIds,
         if (filters != null) 'filters': filters,
-        'title': title,
-        'body': body,
+        if (isArabic == true) ...<String, String>{
+          'titleAr': title,
+          'bodyAr': body,
+        } else ...<String, String>{
+          'titleEn': title,
+          'bodyEn': body,
+        },
         if (route != null) 'route': route,
-        if (isArabic != null) 'isArabic': isArabic,
         if (additionalData != null) 'additionalData': additionalData,
       })}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         debugPrint('Response: ${response.body}');
-        return data['status'] == 'success';
+        return data['success'] == true;
       }
       debugPrint('Error response: ${response.body}');
       return false;
@@ -382,9 +419,8 @@ class NotificationService {
           
           // Normalize route
           if (route != null) {
-            // Remove leading slash if present
-            route = route.startsWith('/') ? route.substring(1) : route;
-            // Convert to lowercase for consistent matching
+            // Keep the leading slash if present, as it's required for the new API
+            // Only convert to lowercase for consistent matching
             route = route.toLowerCase();
             debugPrint('Step N5: Normalized Route: $route');
           }
@@ -407,17 +443,23 @@ class NotificationService {
               final navigationService = NavigationService();
               debugPrint('Step N10: Navigation Service initialized');
               
+              // Pass any additional data from the notification
+              final Map<String, dynamic> arguments = {
+                'fromNotification': true,
+                if (data != null) ...data,
+              };
+              
               navigationService.navigateToPage(
-                '/$route', // Add back the leading slash
+                route, // Route already has the leading slash
                 isArabic: isArabic,
-                arguments: {'fromNotification': true},
+                arguments: arguments,
               );
-              debugPrint('Step N11: Navigation command sent');
+              debugPrint('Step N11: Navigation command sent with arguments: $arguments');
             } else {
               debugPrint('Step N12: Navigator not available, storing route for later');
               // Store the route and language preference for when the app starts
               final prefs = await SharedPreferences.getInstance();
-              await prefs.setString('pending_notification_route', '/$route'); // Add back the leading slash
+              await prefs.setString('pending_notification_route', route);
               await prefs.setBool('pending_notification_is_arabic', isArabic);
               debugPrint('Step N13: Route stored in SharedPreferences');
             }
@@ -510,27 +552,51 @@ class NotificationService {
 
   static Future<bool> registerDevice(String userId) async {
     try {
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointRegisterDevice}'),
-        headers: Constants.defaultHeaders,
-        body: jsonEncode({
-          'user_id': userId,
-          'device_token': await _getDeviceToken(),
-          'platform': Platform.isAndroid ? 'android' : 'ios',
-        }),
-      );
+        final response = await http.post(
+            Uri.parse('${Constants.apiBaseUrl}${Constants.endpointRegisterDevice}'),
+            headers: Constants.deviceHeaders,
+            body: jsonEncode({
+                'userId': userId,
+                'deviceToken': await _getDeviceToken(),
+                'platform': Platform.isAndroid ? 'android' : 'ios',
+                'deviceInfo': await _getDeviceInfo(),
+            }),
+        );
 
-      if (response.statusCode == 200) {
-        print('Device registered successfully');
-        return true;
-      } else {
-        print('Failed to register device: ${response.body}');
-        return false;
-      }
+        if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            debugPrint('Device registered successfully');
+            return data['success'] == true;
+        } else {
+            debugPrint('Failed to register device: ${response.body}');
+            return false;
+        }
     } catch (e) {
-      print('Error registering device: $e');
-      return false;
+        debugPrint('Error registering device: $e');
+        return false;
     }
+  }
+
+  static Future<Map<String, dynamic>> _getDeviceInfo() async {
+    final deviceInfo = DeviceInfoPlugin();
+    if (Platform.isAndroid) {
+        final androidInfo = await deviceInfo.androidInfo;
+        return {
+            'model': androidInfo.model,
+            'manufacturer': androidInfo.manufacturer,
+            'androidVersion': androidInfo.version.release,
+            'sdkVersion': androidInfo.version.sdkInt.toString(),
+        };
+    } else if (Platform.isIOS) {
+        final iosInfo = await deviceInfo.iosInfo;
+        return {
+            'model': iosInfo.model,
+            'systemName': iosInfo.systemName,
+            'systemVersion': iosInfo.systemVersion,
+            'name': iosInfo.name,
+        };
+    }
+    return {};
   }
 
   static Future<String> _getDeviceToken() async {
