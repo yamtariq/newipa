@@ -1,5 +1,4 @@
 name: iOS-ipa-build
-
 on:
   workflow_dispatch:
 
@@ -7,72 +6,63 @@ jobs:
   build-ios:
     runs-on: macos-latest
     steps:
-      # 1. Check out the repository.
       - uses: actions/checkout@v3
-
-      # 2. Set up Flutter (stable channel, x64 architecture).
+      
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           architecture: x64
-
-      # 3. Fetch Flutter packages.
+          
       - run: flutter pub get
-
-      # 4. Ensure the Generated.xcconfig file exists.
+      
       - name: Ensure Generated.xcconfig exists
         run: |
           if [ ! -f ios/Flutter/Generated.xcconfig ]; then
             mkdir -p ios/Flutter
             echo "// Generated.xcconfig" > ios/Flutter/Generated.xcconfig
           fi
-
-      # 5. Clean up existing iOS build artifacts.
-      - run: rm -rf Podfile.lock Pods/ .symlinks Flutter/Flutter.podspec
+          
+      # Add this new step to configure build settings
+      - name: Configure iOS build settings
+        run: |
+          echo "SWIFT_VERSION=5.0" >> ios/Flutter/Release.xcconfig
+          echo "CLANG_ENABLE_MODULES=NO" >> ios/Flutter/Release.xcconfig
+          echo "DEFINES_MODULE=NO" >> ios/Flutter/Release.xcconfig
+          
+      - name: Clean iOS build
+        run: |
+          rm -rf Podfile.lock Pods/ .symlinks Flutter/Flutter.podspec
+          rm -rf ~/Library/Developer/Xcode/DerivedData/*
         working-directory: ios
-
-      # 6. Install CocoaPods.
+        
       - run: gem install cocoapods
-
-      # 7. Update the CocoaPods repo.
+      
+      # Modify Podfile configuration
+      - name: Update Podfile
+        run: |
+          echo "use_frameworks! :linkage => :static" > Podfile.tmp
+          cat Podfile >> Podfile.tmp
+          mv Podfile.tmp Podfile
+        working-directory: ios
+        
       - run: pod repo update
         working-directory: ios
-
-      # 8. Install pods with repo update.
+        
       - run: pod install --repo-update
         working-directory: ios
-
-      # 9. Remove any existing bridging headers if not needed.
-      - name: Remove bridging headers if not needed
-        run: |
-          if [ -f ios/Runner-Bridging-Header.h ]; then
-            echo "Removing bridging header file..."
-            rm ios/Runner-Bridging-Header.h
-          fi
-
-      # 10. Clean the project to remove any stale build artifacts.
-      - run: flutter clean
-
-      # 11. Fetch Flutter packages again after cleaning.
-      - run: flutter pub get
-
-      # 12. Build the iOS project without code signing.
+        
       - run: flutter build ios --release --no-codesign
-
-      # 13. Create the Payload directory in the build output.
+      
       - run: mkdir Payload
         working-directory: build/ios/iphoneos
-
-      # 14. Move the Runner.app into the Payload directory.
+        
       - run: mv Runner.app Payload
         working-directory: build/ios/iphoneos
-
-      # 15. Zip the Payload folder into an IPA.
+        
       - name: Zip output
         run: zip -qq -r -9 FlutterIpaExport.ipa Payload
         working-directory: build/ios/iphoneos
-
-      # 16. Upload the IPA to a GitHub Release.
+        
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
