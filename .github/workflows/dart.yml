@@ -1,4 +1,5 @@
 name: iOS-ipa-build
+
 on:
   workflow_dispatch:
 
@@ -12,9 +13,7 @@ jobs:
         with:
           channel: 'stable'
           architecture: x64
-          
-      - run: flutter pub get
-      
+
       # Configure Xcode build settings
       - name: Configure Build Settings
         run: |
@@ -23,7 +22,7 @@ jobs:
           echo "SWIFT_OBJC_INTERFACE_HEADER_NAME=''" >> Flutter/Release.xcconfig
           echo "DEFINES_MODULE=NO" >> Flutter/Release.xcconfig
           echo "CLANG_ENABLE_MODULES=NO" >> Flutter/Release.xcconfig
-          
+
       # Update Podfile
       - name: Update Podfile
         run: |
@@ -33,40 +32,44 @@ jobs:
           echo "use_frameworks!" >> Podfile.new
           cat Podfile >> Podfile.new
           mv Podfile.new Podfile
-          
-      # Clean iOS build
+
+      # Clean iOS but keep Generated.xcconfig intact by running flutter clean last
       - name: Clean iOS
         run: |
           cd ios
           rm -rf Pods Podfile.lock
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
+          cd ..
           flutter clean
-          
-      # Install and update pods
+
+      # Re-generate Generated.xcconfig
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      # Install CocoaPods
       - run: gem install cocoapods
-      
+
+      # Install and update pods
       - name: Pod Install
         run: |
           cd ios
           pod install --repo-update
-          
+
       # Build iOS
       - name: Build iOS
         run: |
-          flutter clean
-          flutter pub get
           flutter build ios --release --no-codesign
-      
+
       - run: mkdir Payload
         working-directory: build/ios/iphoneos
-        
+
       - run: mv Runner.app Payload
         working-directory: build/ios/iphoneos
-        
+
       - name: Zip output
         run: zip -qq -r -9 FlutterIpaExport.ipa Payload
         working-directory: build/ios/iphoneos
-        
+
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
