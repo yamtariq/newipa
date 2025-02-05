@@ -34,20 +34,17 @@ target 'Runner' do
   use_frameworks!
   use_modular_headers!
 
-  # Add DKImagePickerController inside the target.
   pod 'DKImagePickerController', '~> 4.3'
-
-  # Example: if your code needs PhoneNumberKit, you can keep it.
   pod 'PhoneNumberKit', '~> 3.3.4', :modular_headers => true
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end
 
 post_install do |installer|
-  # Call Flutter's default post_install hook.
-  flutter_post_install(installer)
+  # Call Flutter's default post_install hook only if defined.
+  flutter_post_install(installer) if defined?(flutter_post_install)
   
-  # Add your custom build settings.
+  # Custom build settings.
   installer.pods_project.targets.each do |target|
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
