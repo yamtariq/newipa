@@ -56,3 +56,16 @@ jobs:
         with:
           name: ios-build
           path: build/ios/iphoneos/app.ipa
+      - name: Generate Flutter Files
+  run: |
+    flutter clean
+    flutter pub get
+    # Force regeneration of critical iOS files
+    touch ios/Runner.xcodeproj/project.pbxproj
+
+    - name: Pod Install
+      working-directory: ios
+      run: |
+        pod install --verbose
+      env:
+        FLUTTER_ROOT: ${{ github.workspace }}/flutter
