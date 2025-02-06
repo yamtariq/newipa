@@ -25,5 +25,6 @@ namespace NayifatAPI.Models
         public string SuccessMsg { get; set; }
         public int ErrCode { get; set; }
         public string ErrMsg { get; set; }
+        public string Type { get; set; }
     }
 } 

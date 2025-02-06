@@ -15,8 +15,20 @@ jobs:
           flutter-version: '3.27.1'
           channel: stable
 
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.0'
+          bundler-cache: true
+
+      - name: Install CocoaPods
+        run: gem install cocoapods
+
       - name: Get Dependencies
         run: flutter pub get
+
+      - name: Pod Install
+        run: cd ios ; pod install ; cd ..
 
       - name: Build iOS App (no codesign)
         run: flutter build ios --release --no-codesign
