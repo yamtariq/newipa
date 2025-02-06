@@ -1,6 +1,6 @@
 # Add these lines at the TOP
 flutter_application_path = '../'
-load File.join(flutter_application_path, '.ios', 'Flutter', 'podhelper.rb')
+load File.join(flutter_application_path, 'ios', 'Flutter', 'podhelper.rb')
 
 platform :ios, '14.0'
 

@@ -27,8 +27,15 @@ jobs:
       - name: Get Dependencies
         run: flutter pub get
 
+      - name: Flutter Clean
+        run: flutter clean
+
+      - name: Flutter Precache
+        run: flutter precache --ios
+
       - name: Pod Install
-        run: cd ios && pod install && cd ..
+        working-directory: ios
+        run: pod install
 
       - name: Build iOS App (no codesign)
         run: flutter build ios --release --no-codesign
