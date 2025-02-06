@@ -4,7 +4,7 @@ on: push
 
 jobs:
   build_ios:
-    runs-on: macos-13 # Specific macOS version
+    runs-on: macos-13
     env:
       FLUTTER_ROOT: /Users/runner/hostedtoolcache/flutter/stable-3.27.1-arm64
 
@@ -17,6 +17,7 @@ jobs:
       with:
         flutter-version: '3.27.1'
         channel: stable
+        architecture: arm64
 
     - name: Setup Ruby and CocoaPods
       uses: ruby/setup-ruby@v1
@@ -28,20 +29,29 @@ jobs:
     - name: Install Latest CocoaPods
       run: sudo gem install cocoapods -v 1.15.2
 
-    - name: Clean Workspace
+    - name: Clean Workspace and iOS Build
       run: |
         flutter clean
-        rm -rf ios/Pods ios/Podfile.lock
-        pod cache clean --all
+        cd ios
+        rm -rf Pods Podfile.lock
+        rm -rf .symlinks/
+        cd ..
 
     - name: Get Dependencies
-      run: flutter pub get
+      run: |
+        flutter pub get
+        flutter pub cache repair
 
-    - name: Force Pod Install
+    - name: Pod Setup and Install
       working-directory: ios
-      run: pod install --repo-update --clean-install
+      run: |
+        pod deintegrate
+        pod setup
+        pod install --repo-update --clean-install
 
     - name: Build iOS App
-      run: flutter build ios --release --no-codesign --dart-define=CI=true
+      run: |
+        flutter precache --ios
+        flutter build ios --release --no-codesign --dart-define=CI=true
       env:
-        DEVELOPER_DIR: /Applications/Xcode_14.3.1.app # Specific Xcode version
+        DEVELOPER_DIR: /Applications/Xcode_14.3.1.app
