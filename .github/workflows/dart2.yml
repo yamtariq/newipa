@@ -6,7 +6,7 @@ jobs:
   build_ios:
     runs-on: macos-13
     env:
-      FLUTTER_ROOT: /Users/runner/hostedtoolcache/flutter/stable-3.27.1-arm64
+      FLUTTER_ROOT: /Users/runner/hostedtoolcache/flutter/stable-3.27.1-x64
 
     steps:
     - name: Checkout Code
@@ -17,7 +17,7 @@ jobs:
       with:
         flutter-version: '3.27.1'
         channel: stable
-        architecture: arm64
+        architecture: x64
 
     - name: Setup Ruby and CocoaPods
       uses: ruby/setup-ruby@v1
