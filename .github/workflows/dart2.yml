@@ -33,6 +33,18 @@ jobs:
       - name: Setup Flutter
         run: flutter pub get ; flutter precache
 
+      - name: Clean Pod Cache
+        run: |
+          rm -rf ios/Pods
+          rm -rf ios/Podfile.lock
+          rm -rf ~/.cocoapods/
+
+      - name: Update CocoaPods
+        run: sudo gem install cocoapods -v 1.14.2
+
+      - name: Repo Update
+        run: pod repo update
+
       - name: Pod Install
         run: cd ios ; rm -f Podfile.lock ; pod install ; cd ..
 
