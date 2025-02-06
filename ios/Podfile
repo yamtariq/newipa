@@ -1,22 +1,24 @@
+# Add these lines at the TOP
+flutter_application_path = '../'
+load File.join(flutter_application_path, '.ios', 'Flutter', 'podhelper.rb')
+
 platform :ios, '14.0'
 
 target 'Runner' do
-  # PROPER SYNTAX FOR COCOAPODS 1.14.3
+  # Third-party pods FIRST
   pod 'PhoneNumberKit', '~> 3.3.4', :modular_headers => true
   pod 'DKImagePickerController', '~> 4.3'
-  
-  # Flutter pods MUST come last
-  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  # Flutter pods LAST
+  install_all_flutter_pods(flutter_application_path)
 end
 
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     target.build_configurations.each do |config|
-      # Essential M1 CI fix
-      config.build_settings["EXCLUDED_ARCHS[sdk=iphonesimulator*]"] = "arm64"
-      # Required for Swift plugins
+      config.build_settings["EXCLUDED_ARCHS[sdk=iphonesimulator*]"] = "arm64" :cite[3]
       config.build_settings["CLANG_ENABLE_MODULES"] = "YES"
     end
   end
-  flutter_post_install(installer) if defined?(flutter_post_install)
+  flutter_post_install(installer) if defined?(flutter_post_install) :cite[4]
 end
