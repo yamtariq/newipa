@@ -1,76 +1,80 @@
-name: Build iOS Flutter App
+name: iOS-ipa-build
 
-on: push
+on:
+  workflow_dispatch:
 
 jobs:
-  build_ios:
-    runs-on: macos-13
-    
+  build-ios:
+    runs-on: macos-latest
+    env:
+      FLUTTER_ROOT: /Users/runner/hostedtoolcache/flutter/stable-3.27.1-x64
+      DEVELOPER_DIR: /Applications/Xcode_15.4.app/Contents/Developer
+
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
+      - uses: actions/checkout@v4
 
-    - name: Set up Flutter
-      uses: subosito/flutter-action@v2
-      with:
-        flutter-version: '3.27.1'
-        channel: stable
-        cache: true
-    
-    - name: Setup Xcode
-      uses: maxim-lobanov/setup-xcode@v1
-      with:
-        xcode-version: '14.3.1'
+      - name: Force Xcode 15.4
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
 
-    - name: Setup Ruby and CocoaPods
-      uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: '3.0'
-        bundler-cache: true
-    
-    - name: Install CocoaPods
-      run: |
-        gem install cocoapods -v 1.15.2
-        pod --version
+      - name: Cache Flutter SDK
+        uses: actions/cache@v4
+        with:
+          path: /Users/runner/hostedtoolcache/flutter/stable-3.27.1-x64
+          key: flutter-macos-stable-${{ runner.os }}-${{ hashFiles('pubspec.yaml') }}
+          restore-keys: |
+            flutter-macos-stable-${{ runner.os }}-
 
-    - name: Flutter Setup
-      run: |
-        flutter doctor -v
-        flutter --version
-        
-    - name: Clean and Setup iOS
-      run: |
-        flutter clean
-        flutter pub get
-        cd ios
-        rm -rf Pods Podfile.lock
-        rm -rf .symlinks/
-        cd ..
-        
-    - name: Generate iOS Files
-      run: |
-        flutter pub get
-        cd ios
-        pod cache clean --all
-        rm -rf ~/Library/Caches/CocoaPods
-        pod deintegrate
-        pod setup --verbose
-        pod install --verbose
-        cd ..
-        
-    - name: Prepare Flutter
-      run: |
-        flutter precache --ios --force
-        flutter pub get --verbose
-        
-    - name: Build iOS
-      run: |
-        export NO_FLIPPER=1
-        cd ios
-        pod install --repo-update
-        cd ..
-        flutter build ios --release --no-codesign --verbose
-      env:
-        DEVELOPER_DIR: /Applications/Xcode_14.3.1.app/Contents/Developer
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.1'
+          channel: stable
+
+      - name: Install Exact CocoaPods Version
+        run: |
+          sudo gem install cocoapods -v 1.14.3 --conservative
+          pod setup --verbose
+
+      - name: Clean Environment
+        run: |
+          flutter clean
+          rm -rf ios/Podfile.lock ios/Pods
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Pod Install with Retry
+        working-directory: ios
+        run: |
+          pod repo update
+          pod install --verbose
+
+      - name: Build iOS App
+        run: flutter build ios --release --no-codesign --target-platform=ios-arm64
+
+      - name: Create IPA
+        working-directory: build/ios/iphoneos
+        run: |
+          mkdir Payload
+          mv Runner.app Payload/
+          zip -qr app.ipa Payload
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build
+          path: build/ios/iphoneos/app.ipa
+
+      - name: Generate Flutter Files
+        run: |
+          flutter clean
+          flutter pub get
+          # Force regeneration of critical iOS files
+          touch ios/Runner.xcodeproj/project.pbxproj
+
+      - name: Pod Install
+        working-directory: ios
+        run: |
+          pod install --verbose
+        env:
+          FLUTTER_ROOT: ${{ github.workspace }}/flutter
