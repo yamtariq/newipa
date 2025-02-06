@@ -4,49 +4,44 @@ on: push
 
 jobs:
   build_ios:
-    runs-on: macos-latest
+    runs-on: macos-13 # Specific macOS version
+    env:
+      FLUTTER_ROOT: /Users/runner/hostedtoolcache/flutter/stable-3.27.1-arm64
+
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+    - name: Checkout Code
+      uses: actions/checkout@v3
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.27.1'
-          channel: stable
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.27.1'
+        channel: stable
 
-      - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.0'
-          bundler-cache: true
+    - name: Setup Ruby and CocoaPods
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.0'
+        bundler-cache: true
+        bundler: '2.4.21'
+        
+    - name: Install Latest CocoaPods
+      run: sudo gem install cocoapods -v 1.15.2
 
-      - name: Install CocoaPods
-        run: gem install cocoapods
+    - name: Clean Workspace
+      run: |
+        flutter clean
+        rm -rf ios/Pods ios/Podfile.lock
+        pod cache clean --all
 
-      - name: Get Dependencies
-        run: flutter pub get
+    - name: Get Dependencies
+      run: flutter pub get
 
-      - name: Flutter Clean
-        run: flutter clean
+    - name: Force Pod Install
+      working-directory: ios
+      run: pod install --repo-update --clean-install
 
-      - name: Setup Flutter
-        run: flutter pub get ; flutter precache
-
-      - name: Clean Pod Cache
-        run: |
-          rm -rf ios/Pods
-          rm -rf ios/Podfile.lock
-          rm -rf ~/.cocoapods/
-
-      - name: Update CocoaPods
-        run: sudo gem install cocoapods -v 1.14.2
-
-      - name: Repo Update
-        run: pod repo update
-
-      - name: Pod Install
-        run: cd ios ; rm -f Podfile.lock ; pod install ; cd ..
-
-      - name: Build iOS App (no codesign)
-        run: flutter build ios --release --no-codesign
+    - name: Build iOS App
+      run: flutter build ios --release --no-codesign --dart-define=CI=true
+      env:
+        DEVELOPER_DIR: /Applications/Xcode_14.3.1.app # Specific Xcode version
