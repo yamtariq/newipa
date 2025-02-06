@@ -26,7 +26,7 @@ class NotificationWorker(
         private fun getApiBaseUrl(prefs: SharedPreferences): String {
             val useNewApi = prefs.getBoolean("flutter.useNewApi", true)
             return if (useNewApi) {
-                "https://45f9-51-252-155-185.ngrok-free.app/api"
+                "https://eb3c-46-152-255-232.ngrok-free.app/api"
             } else {
                 "https://icreditdept.com/api"
             }
@@ -127,7 +127,6 @@ class NotificationWorker(
 
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
-            connection.setRequestProperty("Accept", "application/json")
             connection.setRequestProperty("x-api-key", API_KEY)
             connection.doOutput = true
             connection.connectTimeout = 30000

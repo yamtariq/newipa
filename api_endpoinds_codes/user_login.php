@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $api_key = $con->real_escape_string($headers['api-key']);
 
     // Validate the API key
-    $query = "SELECT * FROM API_Keys WHERE api_key = ? AND (expires_at IS NULL OR expires_at > ?)";
+    $query = "SELECT * FROM API_Keys WHERE api_Key = ? AND (expires_at IS NULL OR expires_at > ?)";
     $stmt = $con->prepare($query);
     $stmt->bind_param("ss", $api_key, $currentdate);
     $stmt->execute();

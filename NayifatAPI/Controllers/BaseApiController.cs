@@ -9,7 +9,7 @@ namespace NayifatAPI.Controllers
 {
     public class ApiKey
     {
-        public required string Key { get; set; }
+        public required string api_Key { get; set; }
         public string? Description { get; set; }
         public bool IsActive { get; set; }
         public DateTime? ExpiresAt { get; set; }
@@ -41,7 +41,7 @@ namespace NayifatAPI.Controllers
                 }
 
                 var apiKey = _context.ApiKeys
-                    .FirstOrDefault(k => k.Key == providedApiKey && k.IsActive);
+                    .FirstOrDefault(k => k.api_Key == providedApiKey && k.IsActive);
 
                 if (apiKey == null)
                 {

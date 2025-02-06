@@ -23,7 +23,7 @@ try {
     $apiKey = $headers['api-key'];
 
     // Validate API key
-    $apiKeyStmt = $con->prepare("SELECT * FROM API_Keys WHERE api_key = ? AND (expires_at IS NULL OR expires_at > NOW())");
+    $apiKeyStmt = $con->prepare("SELECT * FROM API_Keys WHERE api_Key = ? AND (expires_at IS NULL OR expires_at > NOW())");
     $apiKeyStmt->bind_param("s", $apiKey);
     $apiKeyStmt->execute();
     $apiKeyResult = $apiKeyStmt->get_result();

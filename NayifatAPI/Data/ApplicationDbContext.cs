@@ -253,8 +253,8 @@ namespace NayifatAPI.Data
             // ApiKey configuration
             modelBuilder.Entity<ApiKey>(entity =>
             {
-                entity.HasKey(e => e.Key);
-                entity.Property(e => e.Key)
+                entity.HasKey(e => e.api_Key);
+                entity.Property(e => e.api_Key)
                     .HasMaxLength(255);
                 entity.Property(e => e.Description)
                     .HasMaxLength(500);

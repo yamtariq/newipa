@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $api_key = $con->real_escape_string($headers['api-key']);
 
     // Validate the API key against the database
-    $query = "SELECT * FROM API_Keys WHERE api_key = ? AND (expires_at IS NULL OR expires_at > ?)";
+    $query = "SELECT * FROM API_Keys WHERE api_Key = ? AND (expires_at IS NULL OR expires_at > ?)";
     $stmt = $con->prepare($query);
     $current_time = date('Y-m-d H:i:s'); // PHP's current time in UTC
     $stmt->bind_param("ss", $api_key, $current_time);

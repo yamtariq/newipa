@@ -2,7 +2,7 @@ class Constants {
   // API Base URLs
   static const bool useNewApi = true; // Feature flag for easy switching
   static String get apiBaseUrl => useNewApi
-      ? 'https://45f9-51-252-155-185.ngrok-free.app/api'
+      ? 'https://eb3c-46-152-255-232.ngrok-free.app/api'
       : 'https://icreditdept.com/api';
   static String get authBaseUrl => '$apiBaseUrl/auth';
   static String get masterFetchUrl => '$apiBaseUrl/content/fetch';
@@ -17,10 +17,13 @@ class Constants {
 
   // Proxy Endpoints
   static const String proxyBaseUrl = 'https://icreditdept.com/api/testasp';
+//   static const String proxyOtpGenerateUrl = 'https://172.22.226.203:6445/api/otp/GetOtpt';
+//   static const String proxyOtpVerifyUrl = 'https://172.22.226.203:6445/api/otp/GetVerifyOtp';
   static String get proxyOtpGenerateUrl =>
       '$proxyBaseUrl/test_local_generate_otp.php';
   static String get proxyOtpVerifyUrl =>
       '$proxyBaseUrl/test_local_verify_otp.php';
+
 
   // API Key
   static const String apiKey = '7ca7427b418bdbd0b3b23d7debf69bf7';

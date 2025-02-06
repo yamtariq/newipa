@@ -35,14 +35,57 @@ class _LoanApplicationStartScreenState extends State<LoanApplicationStartScreen>
 
   Future<void> _loadUserData() async {
     try {
-      final userDataStr = await _secureStorage.read(key: 'user_data');
+      // 💡 First try secure storage
+      String? nationalId = await _secureStorage.read(key: 'national_id');
+      String? userDataStr = await _secureStorage.read(key: 'user_data');
+      Map<String, dynamic>? userData;
+      String? dateOfBirth;
+      
       if (userDataStr != null) {
-        final userData = json.decode(userDataStr);
-        setState(() {
-          _nationalId = userData['national_id'] ?? '';
-          _dateOfBirth = userData['dob'] ?? '';
-          _isLoading = false;
-        });
+        userData = json.decode(userDataStr) as Map<String, dynamic>;
+        dateOfBirth = userData?['dob']?.toString() ?? userData?['dateOfBirth']?.toString();
+      }
+      
+      // 💡 If not found in secure storage, try SharedPreferences
+      if (nationalId == null || userData == null) {
+        final prefs = await SharedPreferences.getInstance();
+        nationalId = prefs.getString('national_id');
+        
+        // Try to get DOB from registration data first
+        final registrationDataStr = prefs.getString('registration_data');
+        if (registrationDataStr != null) {
+          final registrationData = json.decode(registrationDataStr) as Map<String, dynamic>;
+          if (registrationData['userData'] != null) {
+            final userDataMap = registrationData['userData'] as Map<String, dynamic>;
+            dateOfBirth = userDataMap['dob']?.toString() ?? userDataMap['dateOfBirth']?.toString();
+          }
+        }
+        
+        // If not found in registration data, try user_data
+        if (dateOfBirth == null) {
+          final prefsUserData = prefs.getString('user_data');
+          if (prefsUserData != null) {
+            final parsedUserData = json.decode(prefsUserData) as Map<String, dynamic>;
+            dateOfBirth = parsedUserData['dob']?.toString() ?? parsedUserData['dateOfBirth']?.toString();
+          }
+        }
+      }
+      
+      setState(() {
+        _nationalId = nationalId ?? '';
+        _dateOfBirth = dateOfBirth ?? '';
+        _isLoading = false;
+      });
+      
+      // 💡 Sync data back to secure storage if it was found in SharedPreferences
+      if (nationalId != null && userDataStr == null) {
+        await _secureStorage.write(key: 'national_id', value: nationalId);
+        if (userData != null) {
+          await _secureStorage.write(key: 'user_data', value: json.encode({
+            ...userData,
+            'dob': dateOfBirth,
+          }));
+        }
       }
     } catch (e) {
       print('Error loading user data: $e');

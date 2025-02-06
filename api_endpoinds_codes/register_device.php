@@ -29,7 +29,7 @@ try {
 
         // Validate API key
         $api_key = $con->real_escape_string($headers['api-key']);
-        $query = "SELECT * FROM API_Keys WHERE api_key = ? AND (expires_at IS NULL OR expires_at > NOW())";
+        $query = "SELECT * FROM API_Keys WHERE api_Key = ? AND (expires_at IS NULL OR expires_at > NOW())";
         $stmt = $con->prepare($query);
         $stmt->bind_param("s", $api_key);
         $stmt->execute();

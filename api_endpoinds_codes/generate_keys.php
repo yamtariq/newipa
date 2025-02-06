@@ -7,7 +7,7 @@ function generateApiKey() {
 
 for ($i = 0; $i < 5; $i++) {
     $api_key = generateApiKey();
-    $stmt = $con->prepare("INSERT INTO API_Keys (api_key) VALUES (?)");
+    $stmt = $con->prepare("INSERT INTO API_Keys (api_Key) VALUES (?)");
     $stmt->bind_param("s", $api_key);
     $stmt->execute();
 }
