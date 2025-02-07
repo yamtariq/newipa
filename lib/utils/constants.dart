@@ -1,12 +1,18 @@
 class Constants {
   // API Base URLs
   static const bool useNewApi = true; // Feature flag for easy switching
+  
   static String get apiBaseUrl => useNewApi
-      ? 'https://eb3c-46-152-255-232.ngrok-free.app/api'
+      ? 'http://172.22.160.20:5264/api'  //'https://cbb7-78-95-59-4.ngrok-free.app/api'
       : 'https://icreditdept.com/api';
   static String get authBaseUrl => '$apiBaseUrl/auth';
   static String get masterFetchUrl => '$apiBaseUrl/content/fetch';
   static String get contentTimestampsUrl => '$apiBaseUrl/content/timestamps';
+  
+  
+  
+  // proxy link      $apiBaseUrl/proxy/forward?url=
+  
   // Used in: ContentUpdateService (content_update_service.dart) - For fetching all dynamic content:
   // - Loan ads: page=loans&key_name=loan_ad
   // - Card ads: page=cards&key_name=card_ad
@@ -17,13 +23,53 @@ class Constants {
 
   // Proxy Endpoints
   static const String proxyBaseUrl = 'https://icreditdept.com/api/testasp';
-//   static const String proxyOtpGenerateUrl = 'https://172.22.226.203:6445/api/otp/GetOtpt';
-//   static const String proxyOtpVerifyUrl = 'https://172.22.226.203:6445/api/otp/GetVerifyOtp';
-  static String get proxyOtpGenerateUrl =>
-      '$proxyBaseUrl/test_local_generate_otp.php';
-  static String get proxyOtpVerifyUrl =>
-      '$proxyBaseUrl/test_local_verify_otp.php';
+  static String get proxyOtpGenerateUrl => 'https://172.22.226.203:6445/api/otp/GetOtp';
+  static String get proxyOtpVerifyUrl => 'https://172.22.226.203:6445/api/otp/GetVerifyOtp';
+//   static String get proxyOtpGenerateUrl =>
+//       '$proxyBaseUrl/test_local_generate_otp.php';
+//   static String get proxyOtpVerifyUrl =>
+//       '$proxyBaseUrl/test_local_verify_otp.php';
 
+  // 💡 Add Dakhli salary endpoint
+  static String get dakhliSalaryEndpoint => '$apiBaseUrl/api/Proxy/dakhli/salary';
+
+  // 💡 Test Data (Development Only)
+  // 💡 Feature flag for using test data
+  static const bool useTestData = true; // Set to false in production
+  static const Map<String, dynamic> testUserData = {
+    'nationalId': '1064448614',
+    'dateOfBirth': '1975-09-04'
+  };
+
+  static const Map<String, dynamic> testDakhliResponse = {
+    "success": true,
+    "errors": [],
+    "result": {
+      "requestNumber": "afc4fc6d-8015-4e17-a3a5-ad611348531d",
+      "message": "Information Retreived from GOSI",
+      "employmentStatusInfo": [
+        {
+          "fullName": "طارق مبارك سعد اليامي",
+          "basicWage": "3407.0",
+          "housingAllowance": "852.0",
+          "otherAllowance": "0.0",
+          "employerName": "حلاق نون يامي للحلاقة",
+          "workingMonths": "282",
+          "employmentStatus": "نشيط"
+        },
+        {
+          "fullName": "طارق مبارك سعد اليامي",
+          "basicWage": "32593.0",
+          "housingAllowance": "8148.0",
+          "otherAllowance": "3259.0",
+          "employerName": "شركة النايفات للتمويل",
+          "workingMonths": "282",
+          "employmentStatus": "نشيط"
+        }
+      ]
+    },
+    "type": "P"
+  };
 
   // API Key
   static const String apiKey = '7ca7427b418bdbd0b3b23d7debf69bf7';
@@ -78,10 +124,20 @@ class Constants {
       '/Registration/register'; // New endpoint
   static const String endpointUserRegistration =
       endpointRegistration; // Alias for backward compatibility
+      
   static const String endpointGetGovernmentData =
-      '/Yakeen/getCitizenInfo/json'; // Correct Yakeen endpoint
+    'https://172.22.226.203:663/api/Yakeen/getCitizenInfo/json'; // 💡 Using proxy controller for Yakeen
+  static const String endpointGetGovernmentAddress =
+    'https://172.22.226.203:663/api/Yakeen/getCitizenAddressInfo/json'; // 💡 Yakeen address endpoint
 
-  /* ==========================================
+  
+  
+  // 💡 Yakeen API Endpoints
+  static const String endpointGetAlienInfo = 'https://172.22.226.203:663/api/Yakeen/getAlienInfoByIqama/json';
+  static const String endpointGetAlienAddress = 'https://172.22.226.203:663/api/Yakeen/getAlienAddressInfoByIqama/json';
+
+
+/* ==========================================
    * OLD PHP ENDPOINTS (FOR REFERENCE/FALLBACK)
    * ==========================================
    static const String endpointSignIn = '/signin.php';
@@ -486,6 +542,6 @@ class Constants {
       {
         'nationalId': nationalId.trim(),
         'otp': otp.trim(),
-        'userId': 1,
+        'userId': '1',
       };
 }

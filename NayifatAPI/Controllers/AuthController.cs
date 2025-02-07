@@ -11,7 +11,7 @@ namespace NayifatAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class AuthController : ApiBaseController
+    public class AuthController : BaseApiController
     {
         private readonly ILogger<AuthController> _logger;
 
@@ -106,7 +106,10 @@ namespace NayifatAPI.Controllers
                             family_name_ar = customer.FamilyNameAr,
                             email = customer.Email,
                             phone = customer.Phone,
-                            device_id = request.DeviceId
+                            device_id = request.DeviceId,
+                            date_of_birth = customer.DateOfBirth?.ToString("yyyy-MM-dd"),
+                            iban = customer.Iban,
+                            dependents = customer.Dependents
                         }
                     });
                 }

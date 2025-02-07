@@ -99,7 +99,8 @@ class NotificationService {
       });
 
       await AwesomeNotifications().initialize(
-        'resource://mipmap/launcher_icon', // Use the app icon for notifications
+        // 💡 Use platform-specific icon path
+        Platform.isIOS ? null : 'resource://drawable/notification_icon',
         [
           NotificationChannel(
             channelGroupKey: 'basic_channel_group',
@@ -114,7 +115,9 @@ class NotificationService {
             channelShowBadge: true,
             importance: NotificationImportance.High,
             criticalAlerts: true,
-            defaultRingtoneType: DefaultRingtoneType.Notification
+            defaultRingtoneType: DefaultRingtoneType.Notification,
+            // 💡 Add iOS-specific settings
+            soundSource: Platform.isIOS ? 'notification_sound' : null
           ),
         ],
         channelGroups: [
@@ -538,6 +541,17 @@ class NotificationService {
       if (bigPictureUrl != null) debugPrint('Step S4.1: Big Picture URL: $bigPictureUrl');
       if (largeIconUrl != null) debugPrint('Step S4.2: Large Icon URL: $largeIconUrl');
 
+      // 💡 Validate URLs before using them
+      String? validatedBigPictureUrl = bigPictureUrl;
+      String? validatedLargeIconUrl = largeIconUrl;
+
+      if (bigPictureUrl != null && !bigPictureUrl.startsWith('http')) {
+        validatedBigPictureUrl = null;
+      }
+      if (largeIconUrl != null && !largeIconUrl.startsWith('http')) {
+        validatedLargeIconUrl = null;
+      }
+
       Map<String, dynamic> payloadData;
       String? route;
       
@@ -576,7 +590,7 @@ class NotificationService {
           title: title,
           body: body,
           payload: {'data': encodedPayload},
-          notificationLayout: bigPictureUrl != null ? NotificationLayout.BigPicture : NotificationLayout.Default,
+          notificationLayout: validatedBigPictureUrl != null ? NotificationLayout.BigPicture : NotificationLayout.Default,
           displayOnForeground: true,
           displayOnBackground: true,
           wakeUpScreen: true,
@@ -584,8 +598,14 @@ class NotificationService {
           criticalAlert: true,
           category: NotificationCategory.Message,
           autoDismissible: false,
-          largeIcon: largeIconUrl ?? 'resource://drawable/notification_icon',
-          bigPicture: bigPictureUrl ?? 'asset://assets/images/nayifatlogocircle-nobg.png',
+          // 💡 Platform-specific icon handling
+          largeIcon: Platform.isIOS 
+              ? validatedLargeIconUrl 
+              : (validatedLargeIconUrl ?? 'resource://drawable/notification_icon'),
+          bigPicture: validatedBigPictureUrl,
+          // 💡 iOS-specific settings - using groupKey instead of threadIdentifier
+          groupKey: Platform.isIOS ? 'basic_channel' : null,
+          summary: Platform.isIOS ? title : null,
         ),
       );
 

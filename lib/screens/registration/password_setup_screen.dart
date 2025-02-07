@@ -10,12 +10,26 @@ import '../../utils/constants.dart';
 
 class PasswordSetupScreen extends StatefulWidget {
   final String nationalId;
+  final String email;
+  final String phone;
+  final String dateOfBirthHijri;
+  final String idExpiryDateHijri;
   final bool isArabic;
+  final String? sponsorId;
+  final Map<String, dynamic>? expatInfo;
+  final Map<String, dynamic>? expatAddress;
 
   const PasswordSetupScreen({
     Key? key,
     required this.nationalId,
-    this.isArabic = false,
+    required this.email,
+    required this.phone,
+    required this.dateOfBirthHijri,
+    required this.idExpiryDateHijri,
+    required this.isArabic,
+    this.sponsorId,
+    this.expatInfo,
+    this.expatAddress,
   }) : super(key: key);
 
   @override
@@ -320,22 +334,41 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Get stored registration data
-      final registrationData = await _registrationService.getStoredRegistrationData();
-      if (registrationData == null) {
-        throw Exception('Registration data not found');
-      }
-
-      // Update stored data with password
-      await _registrationService.storeRegistrationData(
-        nationalId: registrationData['national_id'],
-        password: _passwordController.text,
-        email: registrationData['email'],
-        phone: registrationData['phone'],
-        userData: registrationData['userData'],
+      // 💡 1. Get government data first
+      print('Getting government data...');
+      final governmentData = await _registrationService.getGovernmentData(
+        widget.nationalId,
+        dateOfBirthHijri: widget.dateOfBirthHijri,
+        idExpiryDate: widget.idExpiryDateHijri,
       );
 
-      // Navigate to MPIN setup
+      if (governmentData['status'] != 'success') {
+        throw Exception(governmentData['message']);
+      }
+
+      // 💡 2. Get address data
+      print('Getting address data...');
+      final addressData = await _registrationService.getGovernmentAddress(
+        widget.nationalId,
+        dateOfBirthHijri: widget.dateOfBirthHijri,
+      );
+
+      if (addressData['status'] != 'success') {
+        throw Exception(addressData['message']);
+      }
+
+      // 💡 3. Store all registration data
+      print('Storing registration data...');
+      await _registrationService.storeRegistrationData(
+        nationalId: widget.nationalId,
+        password: _passwordController.text,
+        email: widget.email,
+        phone: widget.phone,
+        userData: governmentData['data'],
+        addressData: addressData['data'],
+      );
+
+      // 💡 4. Navigate to MPIN setup
       if (mounted) {
         Navigator.pushReplacement(
           context,
@@ -350,10 +383,16 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
         );
       }
     } catch (e) {
+      print('Error in password setup: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString()),
+            content: Text(
+              widget.isArabic 
+                ? 'حدث خطأ أثناء التحقق من البيانات: ${e.toString()}'
+                : 'Error verifying data: ${e.toString()}',
+              style: const TextStyle(color: Colors.white),
+            ),
             backgroundColor: Colors.red,
           ),
         );

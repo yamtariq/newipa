@@ -18,6 +18,7 @@ dependencies:
   font_awesome_flutter: ^10.5.0
   flutter_svg: ^2.0.9
   flutter_animate: ^4.5.0
+  syncfusion_flutter_pdfviewer: ^26.1.41
   hijri: ^3.0.0
   hijri_picker:
     git:
@@ -38,7 +39,7 @@ dependencies:
   lottie: ^2.7.0
   file_picker: ^8.3.1
   provider: ^6.1.1
-  awesome_notifications: ^0.8.2
+  awesome_notifications: ^0.9.2
   path_provider: ^2.1.5
   permission_handler: ^11.0.1
   libphonenumber_plugin: ^0.3.3 

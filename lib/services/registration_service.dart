@@ -5,6 +5,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../utils/constants.dart';
+import 'dart:io';
 
 class RegistrationService {
   // Check if user exists and validate identity
@@ -22,7 +23,7 @@ class RegistrationService {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'X-API-Key': Constants.apiKey
+          'x-api-key': Constants.apiKey
         },
         body: json.encode({
           'nationalId': id,
@@ -81,79 +82,72 @@ class RegistrationService {
 
   // Generate OTP
   Future<Map<String, dynamic>> generateOTP(String nationalId, {String? mobileNo}) async {
+    HttpClient? client;
     try {
-      print('\n=== GENERATE OTP REQUEST ===');
-      final url = '${Constants.apiBaseUrl}/proxy/forward?url=${Constants.proxyOtpGenerateUrl}';
-      print('🌐 URL: $url');
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
       
       // Format phone number: Add 966 prefix and remove any existing prefix
       final formattedPhone = mobileNo != null 
           ? '966${mobileNo.replaceAll('+', '').replaceAll('966', '')}'
           : '';
       
-      final headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-API-Key': Constants.apiKey
-      };
-      print('📤 Headers: $headers');
+      final uri = Uri.parse(Constants.proxyOtpGenerateUrl);
+      final request = await client.postUrl(uri);
       
+      // Add headers
+      Constants.defaultHeaders.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+      
+      // Add body
       final requestBody = Constants.otpGenerateRequestBody(
         nationalId, 
         formattedPhone,
         purpose: 'Registration'
       );
-      print('📤 Request Body: ${json.encode(requestBody)}');
+      request.write(jsonEncode(requestBody));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
-      // Create a client that follows redirects
-      final client = http.Client();
-      try {
-        final response = await client.post(
-          Uri.parse(url),
-          headers: headers,
-          body: json.encode(requestBody),
-        );
+      print('\n=== GENERATE OTP RESPONSE ===');
+      print('📥 Status Code: ${response.statusCode}');
+      print('📥 Response Body: $responseBody');
 
-        print('\n=== GENERATE OTP RESPONSE ===');
-        print('📥 Status Code: ${response.statusCode}');
-        print('📥 Response Headers: ${response.headers}');
-        print('📥 Response Body: ${response.body}');
-
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          print('✅ Parsed Response Data: $data');
-          
-          if (data['success'] == true) {
-            print('✅ OTP Generation Successful');
-            final successResponse = {
-              'status': 'success',
-              'message': 'OTP sent successfully',
-              'message_ar': 'تم إرسال رمز التحقق بنجاح',
-              'data': data['result']
-            };
-            print('✅ Returning Success Response: $successResponse');
-            return successResponse;
-          }
-          
-          print('❌ OTP Generation Failed with Error: ${data['message']}');
-          final errorResponse = {
-            'status': 'error',
-            'message': data['message'] ?? 'Failed to generate OTP',
-            'message_ar': 'فشل في إرسال رمز التحقق'
+      if (response.statusCode == 200) {
+        final data = json.decode(responseBody);
+        print('✅ Parsed Response Data: $data');
+        
+        if (data['success'] == true) {
+          print('✅ OTP Generation Successful');
+          final successResponse = {
+            'status': 'success',
+            'message': 'OTP sent successfully',
+            'message_ar': 'تم إرسال رمز التحقق بنجاح',
+            'data': data['result']
           };
-          print('❌ Returning Error Response: $errorResponse');
-          return errorResponse;
+          print('✅ Returning Success Response: $successResponse');
+          return successResponse;
         }
-
-        print('❌ HTTP Request Failed with Status: ${response.statusCode}');
-        return {
+        
+        print('❌ OTP Generation Failed with Error: ${data['message']}');
+        final errorResponse = {
           'status': 'error',
-          'message': 'Failed to generate OTP',
+          'message': data['message'] ?? 'Failed to generate OTP',
           'message_ar': 'فشل في إرسال رمز التحقق'
         };
-      } finally {
-        client.close();
+        print('❌ Returning Error Response: $errorResponse');
+        return errorResponse;
       }
+
+      print('❌ HTTP Request Failed with Status: ${response.statusCode}');
+      return {
+        'status': 'error',
+        'message': 'Failed to generate OTP',
+        'message_ar': 'فشل في إرسال رمز التحقق'
+      };
     } catch (e, stackTrace) {
       print('\n=== GENERATE OTP ERROR ===');
       print('❌ Error: $e');
@@ -164,87 +158,78 @@ class RegistrationService {
         'message_ar': 'حدث خطأ أثناء إرسال رمز التحقق'
       };
     } finally {
-      print('=== END GENERATE OTP ===\n');
+      client?.close();
     }
   }
 
   // Verify OTP
-  Future<Map<String, dynamic>> verifyOTP(String nationalId, String otpCode) async {
+  Future<Map<String, dynamic>> verifyOTP(String nationalId, String otp) async {
+    HttpClient? client;
     try {
-      print('\n=== VERIFY OTP REQUEST ===');
-      final url = '${Constants.apiBaseUrl}/proxy/forward?url=${Constants.proxyOtpVerifyUrl}';
-      print('🌐 URL: $url');
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
       
-      final headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-API-Key': Constants.apiKey
-      };
-      print('📤 Headers: $headers');
+      final uri = Uri.parse(Constants.proxyOtpVerifyUrl);
+      final request = await client.postUrl(uri);
       
-      final requestBody = Constants.otpVerifyRequestBody(nationalId, otpCode);
-      print('📤 Request Body: ${json.encode(requestBody)}');
+      // Add headers
+      Constants.defaultHeaders.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+      
+      // Add body
+      final requestBody = Constants.otpVerifyRequestBody(nationalId, otp);
+      request.write(jsonEncode(requestBody));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
-      // Create a client that follows redirects
-      final client = http.Client();
-      try {
-        final response = await client.post(
-          Uri.parse(url),
-          headers: headers,
-          body: json.encode(requestBody),
-        );
+      print('\n=== VERIFY OTP RESPONSE ===');
+      print('📥 Status Code: ${response.statusCode}');
+      print('📥 Response Body: $responseBody');
 
-        print('\n=== VERIFY OTP RESPONSE ===');
-        print('📥 Status Code: ${response.statusCode}');
-        print('📥 Response Headers: ${response.headers}');
-        print('📥 Response Body: ${response.body}');
-
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          print('✅ Parsed Response Data: $data');
-          
-          if (data['success'] == true) {
-            print('✅ OTP Verification Successful');
-            final successResponse = {
-              'status': 'success',
-              'message': 'OTP verified successfully',
-              'message_ar': 'تم التحقق من رمز التحقق بنجاح',
-              'data': data['result']
-            };
-            print('✅ Returning Success Response: $successResponse');
-            return successResponse;
-          }
-          
-          print('❌ OTP Verification Failed with Error: ${data['message']}');
-          final errorResponse = {
-            'status': 'error',
-            'message': data['message'] ?? 'Failed to verify OTP',
-            'message_ar': 'فشل في التحقق من رمز التحقق'
+      if (response.statusCode == 200) {
+        final data = json.decode(responseBody);
+        print('✅ Parsed Response Data: $data');
+        
+        if (data['success'] == true) {
+          print('✅ OTP Verification Successful');
+          final successResponse = {
+            'status': 'success',
+            'message': 'OTP verified successfully',
+            'message_ar': 'تم التحقق من رمز التحقق بنجاح',
+            'data': data['result']
           };
-          print('❌ Returning Error Response: $errorResponse');
-          return errorResponse;
+          print('✅ Returning Success Response: $successResponse');
+          return successResponse;
         }
-
-        print('❌ HTTP Request Failed with Status: ${response.statusCode}');
-        return {
+        
+        print('❌ OTP Verification Failed with Error: ${data['message']}');
+        final errorResponse = {
           'status': 'error',
-          'message': 'Failed to verify OTP',
+          'message': data['message'] ?? 'Failed to verify OTP',
           'message_ar': 'فشل في التحقق من رمز التحقق'
         };
-      } finally {
-        client.close();
+        print('❌ Returning Error Response: $errorResponse');
+        return errorResponse;
       }
-    } catch (e, stackTrace) {
-      print('\n=== VERIFY OTP ERROR ===');
-      print('❌ Error: $e');
-      print('❌ Stack Trace: $stackTrace');
+
+      print('❌ HTTP Request Failed with Status: ${response.statusCode}');
+      return {
+        'status': 'error',
+        'message': 'Failed to verify OTP',
+        'message_ar': 'فشل في التحقق من رمز التحقق'
+      };
+    } catch (e) {
+      print('Error verifying OTP: $e');
       return {
         'status': 'error',
         'message': e.toString(),
         'message_ar': 'حدث خطأ أثناء التحقق من رمز التحقق'
       };
     } finally {
-      print('=== END VERIFY OTP ===\n');
+      client?.close();
     }
   }
 
@@ -257,7 +242,7 @@ class RegistrationService {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'X-API-Key': Constants.apiKey
+          'x-api-key': Constants.apiKey
         },
         body: json.encode({
           'national_id': id,
@@ -331,7 +316,7 @@ class RegistrationService {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'X-API-Key': Constants.apiKey
+          'x-api-key': Constants.apiKey
         },
         body: json.encode(requestBody),
       );
@@ -372,33 +357,48 @@ class RegistrationService {
     String? dateOfBirthHijri,
     String? idExpiryDate,
   }) async {
+    HttpClient? client;
     try {
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+      
       print('\n=== GETTING GOVERNMENT DATA ===');
       print('🔍 National ID: $nationalId');
-      print('🌐 URL: ${Constants.apiBaseUrl}${Constants.endpointGetGovernmentData}');
+      print('🔍 Date of Birth Hijri: ${dateOfBirthHijri ?? '1398-07-01'}');
+      print('🔍 ID Expiry Date: ${idExpiryDate ?? '1-1-1'}');
+      print('🌐 URL: ${Constants.endpointGetGovernmentData}');
 
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointGetGovernmentData}'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-API-Key': Constants.apiKey
-        },
-        body: json.encode({
-          'iqamaNumber': nationalId,
-          'dateOfBirthHijri': dateOfBirthHijri ?? '1398-07-01',
-          'idExpiryDate': idExpiryDate ?? '1-1-1'
-        }),
-      );
+      final requestBody = {
+        'iqamaNumber': nationalId,
+        'dateOfBirthHijri': dateOfBirthHijri?.replaceAll(' هـ', '').replaceAll('/', '-') ?? '1398-07-01',
+        'idExpiryDate': idExpiryDate?.replaceAll(' هـ', '').replaceAll('/', '-') ?? '1-1-1'
+      };
+      print('📤 Request Body: ${json.encode(requestBody)}');
+      print('📤 Request Headers: ${Constants.defaultHeaders}');
+
+      final uri = Uri.parse('${Constants.endpointGetGovernmentData}');
+      final request = await client.postUrl(uri);
+      
+      // Add headers
+      Constants.defaultHeaders.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+      
+      // Add body
+      request.write(jsonEncode(requestBody));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
       print('📥 Response Status: ${response.statusCode}');
-      print('📥 Response Body: ${response.body}');
+      print('📥 Response Body: $responseBody');
 
       if (response.statusCode == 200) {
         print('✅ Government data retrieved successfully');
         return {
           'status': 'success',
-          'data': json.decode(response.body)
+          'data': json.decode(responseBody)
         };
       }
 
@@ -413,6 +413,74 @@ class RegistrationService {
         'status': 'error',
         'message': e.toString()
       };
+    } finally {
+      client?.close();
+    }
+  }
+
+  // Get government address data
+  Future<Map<String, dynamic>> getGovernmentAddress(String nationalId, {
+    String? dateOfBirthHijri,
+    String addressLanguage = 'ar',
+  }) async {
+    HttpClient? client;
+    try {
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+      
+      print('\n=== GETTING GOVERNMENT ADDRESS DATA ===');
+      print('🔍 National ID: $nationalId');
+      print('🔍 Date of Birth Hijri: ${dateOfBirthHijri ?? '1398-07-01'}');
+      print('🔍 Address Language: $addressLanguage');
+      print('🌐 URL: ${Constants.endpointGetGovernmentAddress}');
+
+      final requestBody = {
+        'iqamaNumber': nationalId,
+        'dateOfBirthHijri': dateOfBirthHijri?.replaceAll(' هـ', '').replaceAll('/', '-') ?? '1398-07-01',
+        'addressLanguage': addressLanguage
+      };
+      print('📤 Request Body: ${json.encode(requestBody)}');
+      print('📤 Request Headers: ${Constants.defaultHeaders}');
+
+      final uri = Uri.parse('${Constants.endpointGetGovernmentAddress}');
+      final request = await client.postUrl(uri);
+      
+      // Add headers
+      Constants.defaultHeaders.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+      
+      // Add body
+      request.write(jsonEncode(requestBody));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      print('📥 Response Status: ${response.statusCode}');
+      print('📥 Response Body: $responseBody');
+
+      if (response.statusCode == 200) {
+        print('✅ Government address data retrieved successfully');
+        return {
+          'status': 'success',
+          'data': json.decode(responseBody)
+        };
+      }
+
+      print('❌ Failed to get government address data');
+      return {
+        'status': 'error',
+        'message': 'Failed to get government address data'
+      };
+    } catch (e) {
+      print('❌ Error getting government address data: $e');
+      return {
+        'status': 'error',
+        'message': e.toString()
+      };
+    } finally {
+      client?.close();
     }
   }
 
@@ -434,6 +502,7 @@ class RegistrationService {
     required String email,
     required String phone,
     required Map<String, dynamic> userData,
+    Map<String, dynamic>? addressData,
     String? password,
     Map<String, dynamic>? nafathData,
   }) async {
@@ -442,16 +511,16 @@ class RegistrationService {
     
     final secureData = {
       'national_id': nationalId,
-      'full_name': userData['full_name'],
-      'arabic_name': userData['arabic_name'],
+      'full_name': '${userData['englishFirstName']} ${userData['englishLastName']}',
+      'arabic_name': '${userData['firstName']} ${userData['familyName']}',
       'email': email,
-      'dob': userData['dob'],
+      'dob': userData['dateOfBirth'],
       'salary': userData['salary'],
-      'employment_status': userData['employment_status'],
-      'employer_name': userData['employer_name'],
-      'employment_date': userData['employment_date'],
-      'national_address': userData['national_address'],
-      'updated_at': userData['updated_at'],
+      'employment_status': userData['employmentStatus'],
+      'employer_name': userData['employerName'],
+      'employment_date': userData['employmentDate'],
+      'national_address': addressData?['citizenaddresslists']?[0] ?? userData['nationalAddress'],
+      'updated_at': DateTime.now().toIso8601String(),
       if (nafathData != null) 'nafath_data': nafathData,
     };
     
@@ -461,8 +530,9 @@ class RegistrationService {
     final registrationData = {
       'national_id': nationalId,
       'email': email,
-      'phone': phone,
+      'phone': '966' + phone,
       'userData': userData,
+      if (addressData != null) 'addressData': addressData,
       if (password != null) 'password': password,
       if (nafathData != null) 'nafath_data': nafathData,
       'registration_timestamp': DateTime.now().toIso8601String(),
@@ -506,68 +576,101 @@ class RegistrationService {
         return false;
       }
 
-      // Get government data for name and arabic_name
-      final govData = await getGovernmentData(nationalId);
-      if (govData['status'] != 'success' || govData['data'] == null) {
-        print('❌ Failed to get government data: ${govData['message']}');
-        return false;
-      }
-
-      final userData = govData['data'];
-      if (userData['englishFirstName'] == null || userData['englishLastName'] == null) {
-        print('❌ Missing required user data from government service');
+      // 💡 Use stored government data instead of making a new API call
+      final userData = storedData['userData'];
+      if (userData == null || 
+          userData['englishFirstName'] == null || 
+          userData['englishLastName'] == null) {
+        print('❌ Missing required user data from stored data');
         return false;
       }
 
       final deviceInfo = await _getDeviceInfo();
       print('📱 Device Info: $deviceInfo');
 
-      final requestBody = {
-        'NationalId': nationalId,
-        'DeviceInfo': deviceInfo,
-        // Required Name fields (English)
-        'FirstNameEn': userData['englishFirstName'],
-        'SecondNameEn': userData['englishSecondName'] ?? '',
-        'ThirdNameEn': userData['englishThirdName'] ?? '',
-        'FamilyNameEn': userData['englishLastName'],
-        // Required Name fields (Arabic)
-        'FirstNameAr': userData['firstName'],
-        'SecondNameAr': userData['fatherName'] ?? '',
-        'ThirdNameAr': userData['grandFatherName'] ?? '',
-        'FamilyNameAr': userData['familyName'],
-        // Required fields
-        'Email': storedData['email'],  // Required, no null fallback
-        'Phone': storedData['phone'],  // Required, no null fallback
-        'Password': password,
-        // Optional fields
-        'DateOfBirth': userData['dateOfBirth'],
-        'IdExpiryDate': userData['idExpiryDate'],
-        'Mpin': mpin,
-        'MpinEnabled': enableBiometric,
-        'RegistrationDate': DateTime.now().toIso8601String(),
-        'Consent': true,
-        'ConsentDate': DateTime.now().toIso8601String(),
+      // 💡 Format dates to match API requirements (yyyy-MM-dd)
+      String formatDate(String? hijriDate) {
+        if (hijriDate == null) return '';
+        // Convert from dd-MM-yyyy to yyyy-MM-dd
+        final parts = hijriDate.split('-');
+        if (parts.length != 3) return hijriDate;
+        return '${parts[2]}-${parts[1]}-${parts[0]}';
+      }
+
+      // 💡 Format phone number (ensure it starts with 966 and no +)
+      String formatPhone(String phone) {
+        phone = phone.replaceAll('+', '').replaceAll(' ', '');
+        if (!phone.startsWith('966')) {
+          phone = '966${phone.startsWith('0') ? phone.substring(1) : phone}';
+        }
+        return phone;
+      }
+
+      // 💡 Format the request according to API requirements
+      final registrationRequest = {
+        "nationalId": nationalId.trim(),
+        "firstNameEn": (userData['englishFirstName'] as String).trim().toUpperCase(),
+        "secondNameEn": (userData['englishSecondName'] as String? ?? '').trim().toUpperCase(),
+        "thirdNameEn": (userData['englishThirdName'] as String? ?? '').trim().toUpperCase(),
+        "familyNameEn": (userData['englishLastName'] as String).trim().toUpperCase(),
+        "firstNameAr": (userData['firstName'] as String).trim(),
+        "secondNameAr": (userData['fatherName'] as String? ?? '').trim(),
+        "thirdNameAr": (userData['grandFatherName'] as String? ?? '').trim(),
+        "familyNameAr": (userData['familyName'] as String).trim(),
+        "email": (storedData['email'] as String).trim().toLowerCase(),
+        "phone": formatPhone(storedData['phone'] as String),
+        "password": password,
+        "dateOfBirth": formatDate(userData['dateOfBirth']),
+        "idExpiryDate": formatDate(userData['idExpiryDate']),
+        "mpin": mpin,
+        "mpinEnabled": enableBiometric,
+        "registrationDate": DateTime.now().toIso8601String(),
+        "consent": true,
+        "consentDate": DateTime.now().toIso8601String(),
+        "deviceInfo": {
+          "deviceId": deviceInfo['deviceId'],
+          "platform": deviceInfo['platform'],
+          "model": deviceInfo['model'],
+          "manufacturer": deviceInfo['manufacturer']
+        }
       };
 
       print('📝 Preparing registration request...');
-      print('📤 Request Body: ${json.encode(requestBody)}');
+      print('📤 Request Body: ${json.encode(registrationRequest)}');
 
       // Validate required fields
-      final requiredFields = ['NationalId', 'FirstNameEn', 'FamilyNameEn', 'FirstNameAr', 'FamilyNameAr', 'Email', 'Phone', 'Password'];
+      final requiredFields = [
+        'nationalId', 'firstNameEn', 'familyNameEn', 'firstNameAr', 
+        'familyNameAr', 'email', 'phone', 'password'
+      ];
+      
       for (final field in requiredFields) {
-        if (requestBody[field] == null || requestBody[field].toString().isEmpty) {
+        if (registrationRequest[field] == null || registrationRequest[field].toString().trim().isEmpty) {
           final error = 'Required field $field is missing or empty';
           print('❌ Validation Error: $error');
           throw Exception(error);
         }
-        print('✅ Field $field is valid: ${requestBody[field]}');
+        print('✅ Field $field is valid: ${registrationRequest[field]}');
+      }
+
+      // 💡 Additional validations
+      final email = registrationRequest['email'] as String;
+      if (!email.contains('@') || !email.contains('.')) {
+        print('❌ Invalid email format: $email');
+        return false;
+      }
+
+      final phone = registrationRequest['phone'] as String;
+      if (!phone.startsWith('966') || phone.length != 12) {
+        print('❌ Invalid phone format: $phone');
+        return false;
       }
 
       print('🌐 Registration Endpoint: ${Constants.apiBaseUrl}${Constants.endpointRegistration}');
       print('📤 Request Headers: ${json.encode({
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'X-API-Key': Constants.apiKey
+        'x-api-key': Constants.apiKey
       })}');
 
       final client = http.Client();
@@ -580,9 +683,9 @@ class RegistrationService {
               headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-                'X-API-Key': Constants.apiKey
+                'x-api-key': Constants.apiKey
               },
-              body: json.encode(requestBody),
+              body: json.encode(registrationRequest),
             ).timeout(const Duration(seconds: 30)); // 30 second timeout
 
             print('📥 Response Status: ${response.statusCode}');
@@ -619,6 +722,124 @@ class RegistrationService {
     } catch (e) {
       print('❌ Error completing registration: $e');
       return false;
+    }
+  }
+
+  // 💡 Get expat info from Yakeen API
+  Future<Map<String, dynamic>> getExpatInfo(String iqamaNumber, String sponsorId) async {
+    HttpClient? client;
+    try {
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+      
+      print('\n=== GETTING EXPAT INFO ===');
+      print('🔍 IQAMA Number: $iqamaNumber');
+      print('🔍 Sponsor ID: $sponsorId');
+      print('🌐 URL: ${Constants.endpointGetAlienInfo}');
+
+      final requestBody = {
+        'iqamaNumber': iqamaNumber,
+        'sponsorID': sponsorId
+      };
+      print('📤 Request Body: ${json.encode(requestBody)}');
+
+      final uri = Uri.parse('${Constants.endpointGetAlienInfo}');
+      final request = await client.postUrl(uri);
+      
+      Constants.defaultHeaders.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+      
+      request.write(jsonEncode(requestBody));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      print('📥 Response Status: ${response.statusCode}');
+      print('📥 Response Body: $responseBody');
+
+      if (response.statusCode == 200) {
+        print('✅ Expat info retrieved successfully');
+        return {
+          'status': 'success',
+          'data': json.decode(responseBody)
+        };
+      }
+
+      print('❌ Failed to get expat info');
+      return {
+        'status': 'error',
+        'message': 'Failed to get expat info'
+      };
+
+    } catch (e) {
+      print('❌ Error getting expat info: $e');
+      return {
+        'status': 'error',
+        'message': e.toString()
+      };
+    } finally {
+      client?.close();
+    }
+  }
+
+  // 💡 Get expat address from Yakeen API
+  Future<Map<String, dynamic>> getExpatAddress(String iqamaNumber, String dateOfBirthHijri, {String addressLanguage = 'A'}) async {
+    HttpClient? client;
+    try {
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+      
+      print('\n=== GETTING EXPAT ADDRESS ===');
+      print('🔍 IQAMA Number: $iqamaNumber');
+      print('🔍 Date of Birth Hijri: $dateOfBirthHijri');
+      print('🔍 Address Language: $addressLanguage');
+      print('🌐 URL: ${Constants.endpointGetAlienAddress}');
+
+      final requestBody = {
+        'iqamaIDNumber': iqamaNumber,
+        'dateOfBirthHijri': dateOfBirthHijri,
+        'addressLanguage': addressLanguage
+      };
+      print('📤 Request Body: ${json.encode(requestBody)}');
+
+      final uri = Uri.parse('${Constants.endpointGetAlienAddress}');
+      final request = await client.postUrl(uri);
+      
+      Constants.defaultHeaders.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+      
+      request.write(jsonEncode(requestBody));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      print('📥 Response Status: ${response.statusCode}');
+      print('📥 Response Body: $responseBody');
+
+      if (response.statusCode == 200) {
+        print('✅ Expat address retrieved successfully');
+        return {
+          'status': 'success',
+          'data': json.decode(responseBody)
+        };
+      }
+
+      print('❌ Failed to get expat address');
+      return {
+        'status': 'error',
+        'message': 'Failed to get expat address'
+      };
+
+    } catch (e) {
+      print('❌ Error getting expat address: $e');
+      return {
+        'status': 'error',
+        'message': e.toString()
+      };
+    } finally {
+      client?.close();
     }
   }
 }

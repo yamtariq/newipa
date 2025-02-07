@@ -19,16 +19,19 @@ namespace NayifatAPI.Controllers
     {
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILogger<ProxyController> _logger;
+        private readonly HttpClient _httpClient;
 
         public ProxyController(
             ApplicationDbContext context,
             IHttpClientFactory httpClientFactory,
             IConfiguration configuration,
-            ILogger<ProxyController> logger
+            ILogger<ProxyController> logger,
+            HttpClient httpClient
         ) : base(context, configuration)
         {
             _httpClientFactory = httpClientFactory;
             _logger = logger;
+            _httpClient = httpClient;
         }
 
         [HttpPost("forward")]
@@ -128,6 +131,27 @@ namespace NayifatAPI.Controllers
             // Adjust to your real validation logic
             var apiKey = Request.Headers["x-api-key"].FirstOrDefault() ?? string.Empty;
             return !string.IsNullOrEmpty(apiKey) && apiKey == "7ca7427b418bdbd0b3b23d7debf69bf7";
+        }
+
+        // 💡 New endpoint for Dakhli salary
+        [HttpGet("dakhli/salary")]
+        public async Task<IActionResult> GetDakhliSalary(
+            [FromQuery] string customerId,
+            [FromQuery] string dob,
+            [FromQuery] string reason)
+        {
+            try 
+            {
+                var url = $"https://172.22.226.190:4043/api/Dakhli/GetDakhliPubPriv?customerId={customerId}&dob={dob}&reason={reason}";
+                var response = await _httpClient.GetAsync(url);
+                var result = await response.Content.ReadAsStringAsync();
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching Dakhli salary data");
+                return Error("Service temporarily unavailable", 503);
+            }
         }
     }
 }

@@ -113,23 +113,13 @@ class _ForgetMPINScreenState extends State<ForgetMPINScreen> {
     );
   }
 
-  void _onNextPressed() async {
-    if (_nationalIdController.text.isEmpty ||
-        _passwordController.text.isEmpty) {
-      _showErrorBanner(
-        widget.isArabic
-            ? 'يرجى إدخال رقم الهوية وكلمة المرور'
-            : 'Please enter both National ID and password'
-      );
-      return;
-    }
+  Future<void> _verifyNationalId() async {
+    if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
-      // First verify the password
+      // First verify credentials
       final loginResponse = await _authService.signIn(
         nationalId: _nationalIdController.text,
         password: _passwordController.text,
@@ -138,27 +128,16 @@ class _ForgetMPINScreenState extends State<ForgetMPINScreen> {
       if (loginResponse['status'] != 'success') {
         _showErrorBanner(
           widget.isArabic
-              ? 'كلمة المرور غير صحيحة'
-              : 'Invalid password'
+              ? (loginResponse['message_ar'] ?? 'بيانات الدخول غير صحيحة')
+              : (loginResponse['message'] ?? 'Invalid credentials')
         );
         return;
       }
 
-      // Generate OTP
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPGenerate}'),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'api-key': AuthService.apiKey,
-        },
-        body: {
-          'national_id': _nationalIdController.text,
-        },
-      );
-
-      final data = json.decode(response.body);
+      // Generate OTP using AuthService
+      final response = await _authService.generateOTP(_nationalIdController.text);
       
-      if (data['status'] == 'success') {
+      if (response['success'] == true) {
         if (mounted) {
           final otpVerified = await showDialog<bool>(
             context: context,
@@ -167,68 +146,44 @@ class _ForgetMPINScreenState extends State<ForgetMPINScreen> {
               nationalId: _nationalIdController.text,
               isArabic: widget.isArabic,
               onResendOTP: () async {
-                final response = await http.post(
-                  Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPGenerate}'),
-                  headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'api-key': AuthService.apiKey,
-                  },
-                  body: {
-                    'national_id': _nationalIdController.text,
-                  },
-                );
-                return json.decode(response.body);
+                return await _authService.generateOTP(_nationalIdController.text);
               },
               onVerifyOTP: (otp) async {
-                final response = await http.post(
-                  Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPVerification}'),
-                  headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'api-key': AuthService.apiKey,
-                  },
-                  body: {
-                    'national_id': _nationalIdController.text,
-                    'otp_code': otp,
-                  },
-                );
-                return json.decode(response.body);
+                return await _authService.verifyOTP(_nationalIdController.text, otp);
               },
             ),
           );
 
           if (otpVerified == true) {
-            // Navigate to MPIN setup screen
-            if (mounted) {
-              // Reset manual sign off flag in session provider
-              Provider.of<SessionProvider>(context, listen: false).resetManualSignOff();
-              
-              // Store user data in local storage
-              await _authService.storeUserData(loginResponse['user']);
+            // Reset manual sign off flag in session provider
+            Provider.of<SessionProvider>(context, listen: false).resetManualSignOff();
+            
+            // Store user data in local storage
+            await _authService.storeUserData(loginResponse['user']);
 
-              // Set session as active
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('isSessionActive', true);
+            // Set session as active
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setBool('isSessionActive', true);
 
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => MPINSetupScreen(
-                    nationalId: _nationalIdController.text,
-                    password: _passwordController.text,
-                    isArabic: widget.isArabic,
-                    showSteps: false,
-                    user: loginResponse['user'],
-                  ),
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MPINSetupScreen(
+                  nationalId: _nationalIdController.text,
+                  password: _passwordController.text,
+                  isArabic: widget.isArabic,
+                  showSteps: false,
+                  user: loginResponse['user'],
                 ),
-              );
-            }
+              ),
+            );
           }
         }
       } else {
         _showErrorBanner(
           widget.isArabic
-              ? (data['message_ar'] ?? 'فشل في إرسال رمز التحقق')
-              : (data['message'] ?? 'Failed to send OTP')
+              ? (response['message_ar'] ?? 'فشل في إرسال رمز التحقق')
+              : (response['message'] ?? 'Failed to send OTP')
         );
       }
     } catch (e) {
@@ -438,7 +393,7 @@ class _ForgetMPINScreenState extends State<ForgetMPINScreen> {
 
                       // Next Button
                       ElevatedButton(
-                        onPressed: _isLoading ? null : _onNextPressed,
+                        onPressed: _isLoading ? null : _verifyNationalId,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: themeColor,
                           foregroundColor: Colors.white,

@@ -349,7 +349,7 @@ class AuthService {
       final headers = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'X-API-Key': Constants.apiKey,
+        'x-api-key': Constants.apiKey,
       };
 
       print('API Call Details:');
@@ -508,7 +508,7 @@ class AuthService {
       final headers = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'X-API-Key': Constants.apiKey,
+        'x-api-key': Constants.apiKey,
       };
 
       print('API Call Details:');
@@ -1411,7 +1411,7 @@ class AuthService {
     return {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'api-key': apiKey,
+      'x-api-key': apiKey,
       if (token != null) 'Authorization': 'Bearer $token',
     };
   }
@@ -1605,24 +1605,29 @@ class AuthService {
       print('National ID: $nationalId');
       print('Mobile Number: $mobileNo');
 
-      final url = '${Constants.apiBaseUrl}/proxy/forward?url=${Constants.proxyOtpGenerateUrl}';
-      print('🌐 URL: $url');
-
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-API-Key': Constants.apiKey
-        },
-        body: json.encode(requestBody),
-      );
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      final client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+      
+      final uri = Uri.parse(Constants.proxyOtpGenerateUrl);
+      final request = await client.postUrl(uri);
+      
+      // Add headers
+      Constants.defaultHeaders.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+      
+      // Add body
+      request.write(jsonEncode(requestBody));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
       print('OTP Generation Response Status: ${response.statusCode}');
-      print('OTP Generation Response Body: ${response.body}');
+      print('OTP Generation Response Body: $responseBody');
 
       if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
+        final responseData = json.decode(responseBody);
         print('OTP Generation Response: $responseData');
         return responseData;
       } else {
@@ -1639,70 +1644,66 @@ class AuthService {
 
   // Verify OTP
   Future<Map<String, dynamic>> verifyOTP(String nationalId, String otp) async {
+    print('\n=== VERIFY OTP ===');
+    print('📤 National ID: $nationalId');
+    print('📤 OTP: $otp');
+
     try {
-      print('\n=== VERIFY OTP REQUEST ===');
-      final url = '${Constants.apiBaseUrl}/proxy/forward?url=${Constants.proxyOtpVerifyUrl}';
-      print('🌐 URL: $url');
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      final client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
       
-      final headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-API-Key': Constants.apiKey
-      };
-      print('📤 Headers: $headers');
+      final uri = Uri.parse(Constants.proxyOtpVerifyUrl);
+      final request = await client.postUrl(uri);
       
+      // Add headers
+      Constants.defaultHeaders.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+      
+      // Add body
       final requestBody = Constants.otpVerifyRequestBody(nationalId, otp);
-      print('📤 Request Body: ${json.encode(requestBody)}');
+      request.write(jsonEncode(requestBody));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
-      // Create a client that follows redirects
-      final client = http.Client();
-      try {
-        final response = await client.post(
-          Uri.parse(url),
-          headers: headers,
-          body: json.encode(requestBody),
-        );
+      print('\n=== VERIFY OTP RESPONSE ===');
+      print('📥 Status Code: ${response.statusCode}');
+      print('📥 Response Body: $responseBody');
 
-        print('\n=== VERIFY OTP RESPONSE ===');
-        print('📥 Status Code: ${response.statusCode}');
-        print('📥 Response Headers: ${response.headers}');
-        print('📥 Response Body: ${response.body}');
-
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          print('✅ Parsed Response Data: $data');
-          
-          if (data['success'] == true) {
-            print('✅ OTP Verification Successful');
-            final successResponse = {
-              'status': 'success',
-              'message': 'OTP verified successfully',
-              'message_ar': 'تم التحقق من رمز التحقق بنجاح',
-              'data': data['result']
-            };
-            print('✅ Returning Success Response: $successResponse');
-            return successResponse;
-          }
-          
-          print('❌ OTP Verification Failed with Error: ${data['message']}');
-          final errorResponse = {
-            'status': 'error',
-            'message': data['message'] ?? 'Failed to verify OTP',
-            'message_ar': 'فشل في التحقق من رمز التحقق'
+      if (response.statusCode == 200) {
+        final data = json.decode(responseBody);
+        print('✅ Parsed Response Data: $data');
+        
+        if (data['success'] == true) {
+          print('✅ OTP Verification Successful');
+          final successResponse = {
+            'status': 'success',
+            'message': 'OTP verified successfully',
+            'message_ar': 'تم التحقق من رمز التحقق بنجاح',
+            'data': data['result']
           };
-          print('❌ Returning Error Response: $errorResponse');
-          return errorResponse;
+          print('✅ Returning Success Response: $successResponse');
+          return successResponse;
         }
-
-        print('❌ HTTP Request Failed with Status: ${response.statusCode}');
-        return {
+        
+        print('❌ OTP Verification Failed with Error: ${data['message']}');
+        final errorResponse = {
           'status': 'error',
-          'message': 'Failed to verify OTP',
+          'message': data['message'] ?? 'Failed to verify OTP',
           'message_ar': 'فشل في التحقق من رمز التحقق'
         };
-      } finally {
-        client.close();
+        print('❌ Returning Error Response: $errorResponse');
+        return errorResponse;
       }
+
+      print('❌ HTTP Request Failed with Status: ${response.statusCode}');
+      return {
+        'status': 'error',
+        'message': 'Failed to verify OTP',
+        'message_ar': 'فشل في التحقق من رمز التحقق'
+      };
     } catch (e, stackTrace) {
       print('\n=== VERIFY OTP ERROR ===');
       print('❌ Error: $e');

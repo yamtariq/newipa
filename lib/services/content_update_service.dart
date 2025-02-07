@@ -211,6 +211,22 @@ class ContentUpdateService extends ChangeNotifier {
         force = true;
       }
 
+      // 💡 Check if minimum time interval has passed since last check
+      if (!force && !isInitialLoad) {
+        final prefs = await SharedPreferences.getInstance();
+        final lastCheckStr = prefs.getString(_lastCheckKey);
+        if (lastCheckStr != null) {
+          final lastCheck = DateTime.parse(lastCheckStr);
+          final now = DateTime.now();
+          if (now.difference(lastCheck) < _minimumCheckInterval) {
+            _log('TTT_Skipping update check - minimum interval not passed');
+            return;
+          }
+        }
+        // Update last check time
+        await prefs.setString(_lastCheckKey, DateTime.now().toIso8601String());
+      }
+
       // Show loading if needed
       if (force && !isInitialLoad) {
         _isUpdating = true;
@@ -287,6 +303,9 @@ class ContentUpdateService extends ChangeNotifier {
       }
 
       bool updateSuccess = true;
+      
+      // 💡 Copy existing content to tempCache first
+      tempCache.addAll(_memoryCache);
 
       // Fetch each content item that needs updating
       for (final update in pendingUpdates) {
@@ -317,6 +336,9 @@ class ContentUpdateService extends ChangeNotifier {
         final content = data['data'];
         final keyName = update['keyName']!;
           
+        // 💡 Remove old content and related files before updating
+        _removeOldContent(tempCache, keyName);
+          
         if (keyName.startsWith('slideshow_content')) {
           if (content['slides'] != null) {
             tempCache[keyName] = content['slides'];
@@ -333,6 +355,15 @@ class ContentUpdateService extends ChangeNotifier {
           if (content['ads'] != null) {
             tempCache[keyName] = content['ads'];
             if (!await _processAdImage(keyName, content['ads'], tempCache)) {
+              updateSuccess = false;
+            }
+          }
+        }
+        // 💡 Add PDF content handling
+        else if (keyName.contains('terms') || keyName.contains('privacy')) {
+          if (content['url'] != null) {
+            tempCache[keyName] = content['url'];
+            if (!await _downloadAndCacheImage(keyName, content['url'], tempCache)) {
               updateSuccess = false;
             }
           }
@@ -356,6 +387,26 @@ class ContentUpdateService extends ChangeNotifier {
     } catch (e) {
       _log('TTT_Error updating content: $e');
       return false;
+    }
+  }
+
+  // 💡 Helper method to remove old content and related files
+  void _removeOldContent(Map<String, dynamic> cache, String keyName) {
+    // Remove the main content
+    cache.remove(keyName);
+    
+    // Remove related image files
+    if (keyName.startsWith('slideshow_content')) {
+      // Remove all related slide images
+      cache.removeWhere((key, _) => 
+        key.startsWith('slide_') && 
+        (key.contains(keyName.contains('_ar') ? 'ar_' : 'en_')));
+    } else if (keyName.endsWith('_ad')) {
+      // Remove ad image
+      cache.remove('${keyName}_image_bytes');
+    } else if (keyName.contains('terms') || keyName.contains('privacy')) {
+      // Remove document file
+      cache.remove('${keyName}_bytes');
     }
   }
 

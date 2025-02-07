@@ -33,6 +33,7 @@ import '../utils/constants.dart';
 import 'package:flutter/foundation.dart';
 import '../services/theme_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
 // Arabic versions
 import 'registration_page_ar.dart';
 import 'auth/sign_in_page_ar.dart';
@@ -1059,15 +1060,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                                   onPressed: () async {
                                     final hasActiveSession = Provider.of<SessionProvider>(context, listen: false).hasActiveSession;
                                     if (hasActiveSession) {
-                                      // For users with active session
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => LoanApplicationStartScreen(
-                                            isArabic: widget.isArabic,
-                                          ),
-                                        ),
-                                      );
+                                      await _handleApplicationStart(isLoanApplication: true);
                                     } else {
                                       // For users without active session, shows dialog with options
                                       showDialog(
@@ -1294,15 +1287,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                                   onPressed: () async {
                                     final hasActiveSession = Provider.of<SessionProvider>(context, listen: false).hasActiveSession;
                                     if (hasActiveSession) {
-                                      // For users with active session
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => CardApplicationStartScreen(
-                                            isArabic: widget.isArabic,
-                                          ),
-                                        ),
-                                      );
+                                      await _handleApplicationStart(isLoanApplication: false);
                                     } else {
                                       // For users without active session, shows dialog with options
                                       showDialog(
@@ -1896,29 +1881,49 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
         ? Constants.darkLabelTextColor 
         : Constants.lightLabelTextColor);
 
+    // 💡 Determine if this is a phone or email item
+    bool isPhone = icon == Icons.phone;
+    bool isEmail = icon == Icons.email;
+
+    Widget content = Row(
+      children: [
+        Icon(
+          icon,
+          color: color ?? themeColor,
+          size: 20,
+        ),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: fontSize,
+              color: isLink ? (color ?? themeColor) : textColor,
+              decoration: isLink ? TextDecoration.underline : null,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+
+    // 💡 Wrap with GestureDetector for phone and email
+    if (isPhone || isEmail) {
+      return GestureDetector(
+        onTap: () {
+          if (isPhone) {
+            _launchUrl('tel:${text.replaceAll(' ', '')}');
+          } else if (isEmail) {
+            _launchUrl('mailto:$text');
+          }
+        },
+        child: content,
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2.0),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            color: color ?? themeColor,
-            size: 20,
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: fontSize,
-                color: isLink ? (color ?? themeColor) : textColor,
-                decoration: isLink ? TextDecoration.underline : null,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
+      child: content,
     );
   }
 
@@ -2084,5 +2089,175 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     } catch (e) {
       print('-----STORAGE DATA----- Error logging storage data: $e');
     }
+  }
+
+  // 💡 Add new function to get salary data
+  Future<Map<String, dynamic>?> _getSavedSalaryData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final salaryDataStr = prefs.getString('dakhli_salary_data');
+    if (salaryDataStr != null) {
+      return json.decode(salaryDataStr) as Map<String, dynamic>;
+    }
+    return null;
+  }
+
+  // 💡 Add new function to save salary data
+  Future<void> _saveSalaryData(Map<String, dynamic> data) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('dakhli_salary_data', json.encode({
+      'last_updated': DateTime.now().toIso8601String(),
+      'employments': data['result']['employmentStatusInfo'],
+    }));
+  }
+
+  // 💡 Add new function to get Dakhli salary
+  Future<Map<String, dynamic>> _getDakhliSalary({
+    required String? nationalId,
+    required String? dob,
+    required String reason,
+  }) async {
+    // Validate parameters
+    if (nationalId == null || dob == null) {
+      throw Exception('National ID and Date of Birth are required');
+    }
+
+    // 💡 Use test data if flag is true
+    if (Constants.useTestData) {
+      return Constants.testDakhliResponse;
+    }
+
+    final response = await http.get(
+      Uri.parse('${Constants.dakhliSalaryEndpoint}?customerId=$nationalId&dob=$dob&reason=$reason'),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to fetch salary data');
+  }
+
+  // 💡 Add new function to handle application start
+  Future<void> _handleApplicationStart({required bool isLoanApplication}) async {
+    try {
+      setState(() => _isLoading = true);
+      
+      // Check local storage first for existing salary data
+      final salaryData = await _getSavedSalaryData();
+      
+      if (salaryData == null) {
+        String? nationalId;
+        String? dob;
+        
+        // 💡 Use test data if flag is true
+        if (Constants.useTestData) {
+          nationalId = Constants.testUserData['nationalId'];
+          dob = Constants.testUserData['dateOfBirth'];
+        } else {
+          // First try to get data from widget.userData
+          if (widget.userData.isNotEmpty) {
+            print('DEBUG: Checking widget.userData: ${widget.userData}');
+            nationalId = widget.userData['national_id']?.toString();
+            dob = widget.userData['date_of_birth']?.toString();
+            
+            // If there's a nested user object
+            if (widget.userData['user'] != null) {
+              nationalId ??= widget.userData['user']['national_id']?.toString();
+              dob ??= widget.userData['user']['date_of_birth']?.toString();
+            }
+          }
+          
+          // If not found in widget.userData, try secure storage
+          if (nationalId == null || dob == null) {
+            print('DEBUG: Checking secure storage');
+            final storage = const FlutterSecureStorage();
+            final userDataStr = await storage.read(key: 'user_data');
+            nationalId ??= await storage.read(key: 'national_id');
+            
+            if (userDataStr != null) {
+              final userData = json.decode(userDataStr) as Map<String, dynamic>;
+              print('DEBUG: Secure storage data: $userData');
+              
+              // Try to get DOB from user object if it exists
+              if (userData['user'] != null) {
+                dob ??= userData['user']['date_of_birth']?.toString();
+              }
+              
+              // If not found in user object, try the root level
+              dob ??= userData['date_of_birth']?.toString() ?? 
+                     userData['dateOfBirth']?.toString() ?? 
+                     userData['dob']?.toString();
+            }
+          }
+          
+          print('DEBUG: Final values - NationalID: $nationalId, DOB: $dob');
+          
+          if (nationalId == null) {
+            throw Exception('User data not found');
+          }
+          
+          if (dob == null) {
+            throw Exception('Date of birth not found');
+          }
+        }
+        
+        // Call proxy endpoint
+        final response = await _getDakhliSalary(
+          nationalId: nationalId,
+          dob: dob,
+          reason: isLoanApplication ? 'LOAN' : 'CARD'
+        );
+        
+        // Save to local storage
+        await _saveSalaryData(response);
+      }
+      
+      // Navigate to appropriate screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => isLoanApplication 
+            ? LoanApplicationStartScreen(isArabic: widget.isArabic)
+            : CardApplicationStartScreen(isArabic: widget.isArabic),
+        ),
+      );
+    } catch (e) {
+      print('DEBUG: Application Start Error: $e'); // Debug print
+      _showErrorDialog(e);
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  // 💡 Add new function to show error dialog
+  void _showErrorDialog(dynamic error) {
+    String message;
+    
+    if (error.toString().contains('User data not found')) {
+      message = widget.isArabic 
+        ? 'يرجى تسجيل الدخول أولاً'
+        : 'Please sign in first';
+    } else if (error.toString().contains('Date of birth not found')) {
+      message = widget.isArabic
+        ? 'معلومات تاريخ الميلاد غير متوفرة'
+        : 'Date of birth information not available';
+    } else {
+      message = widget.isArabic
+        ? 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى'
+        : 'An unexpected error occurred. Please try again';
+    }
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(widget.isArabic ? 'تنبيه' : 'Alert'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(widget.isArabic ? 'حسناً' : 'OK'),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -29,6 +29,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
   final TextEditingController _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
   bool _otpVerified = false;
+  final AuthService _authService = AuthService();
 
   void _showErrorBanner(String message) {
     if (!mounted) return;
@@ -137,22 +138,10 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Generate OTP
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPGenerate}'),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'api-key': AuthService.apiKey,
-        },
-        body: {
-          'national_id': _nationalIdController.text,
-          'type': 'reset_password',
-        },
-      );
-
-      final data = json.decode(response.body);
+      // Generate OTP using AuthService
+      final response = await _authService.generateOTP(_nationalIdController.text);
       
-      if (data['status'] == 'success') {
+      if (response['success'] == true) {
         if (mounted) {
           final otpVerified = await showDialog<bool>(
             context: context,
@@ -161,33 +150,10 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
               nationalId: _nationalIdController.text,
               isArabic: widget.isArabic,
               onResendOTP: () async {
-                final response = await http.post(
-                  Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPGenerate}'),
-                  headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'api-key': AuthService.apiKey,
-                  },
-                  body: {
-                    'national_id': _nationalIdController.text,
-                    'type': 'reset_password',
-                  },
-                );
-                return json.decode(response.body);
+                return await _authService.generateOTP(_nationalIdController.text);
               },
               onVerifyOTP: (otp) async {
-                final response = await http.post(
-                  Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPVerification}'),
-                  headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'api-key': AuthService.apiKey,
-                  },
-                  body: {
-                    'national_id': _nationalIdController.text,
-                    'otp_code': otp,
-                    'type': 'reset_password',
-                  },
-                );
-                return json.decode(response.body);
+                return await _authService.verifyOTP(_nationalIdController.text, otp);
               },
             ),
           );
@@ -199,7 +165,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
       } else {
         String errorMessage;
         
-        switch (data['code']) {
+        switch (response['code']) {
           case 'USER_NOT_FOUND':
             errorMessage = widget.isArabic
                 ? 'رقم الهوية غير مسجل في النظام'
@@ -222,8 +188,8 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
             break;
           default:
             errorMessage = widget.isArabic
-                ? (data['message_ar'] ?? 'حدث خطأ غير متوقع')
-                : (data['message'] ?? 'An unexpected error occurred');
+                ? (response['message_ar'] ?? 'حدث خطأ غير متوقع')
+                : (response['message'] ?? 'An unexpected error occurred');
         }
         
         _showErrorBanner(errorMessage);

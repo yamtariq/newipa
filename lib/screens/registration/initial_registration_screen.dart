@@ -21,6 +21,13 @@ import '../../widgets/nafath_verification_dialog.dart';
 import 'package:flutter_holo_date_picker/flutter_holo_date_picker.dart';
 import 'package:flutter_holo_date_picker/widget/date_picker_widget.dart';
 import '../../widgets/custom_hijri_picker.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:dio/dio.dart';
+import 'dart:io';
+import 'package:url_launcher/url_launcher.dart';
 
 class InitialRegistrationScreen extends StatefulWidget {
   final bool isArabic;
@@ -42,8 +49,10 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> w
   final TextEditingController _dobController = TextEditingController();
   final TextEditingController _idExpiryController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _sponsorIdController = TextEditingController();
   final AuthService _authService = AuthService();
   final RegistrationService _registrationService = RegistrationService();
+  final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
   PhoneNumber _phoneNumber = PhoneNumber(isoCode: 'SA');
   DateTime? _selectedDate;
   DateTime? _selectedExpiryDate;
@@ -53,6 +62,10 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> w
   bool _isHijri = true; // Default to Hijri as per Saudi standards
   String? _errorMessage;
   late final AnimationController _animationController;
+  bool _termsAccepted = false;
+  bool _isDownloading = false;
+  double _downloadProgress = 0;
+  bool _isExpat = false;
 
   final List<String> _stepsEn = ['Basic', 'Password', 'MPIN'];
 
@@ -69,15 +82,240 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> w
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
+
+    // 💡 Add listener to national ID field
+    _nationalIdController.addListener(_checkIfExpat);
+  }
+
+  // 💡 Check if the user is an expat based on national ID
+  void _checkIfExpat() {
+    if (_nationalIdController.text.isNotEmpty) {
+      setState(() {
+        _isExpat = _nationalIdController.text.startsWith('2');
+      });
+    }
+  }
+
+  Future<bool> _requestStoragePermission() async {
+    if (Platform.isAndroid) {
+      final androidInfo = await _deviceInfo.androidInfo;
+      final sdkInt = androidInfo.version.sdkInt;
+      
+      if (sdkInt >= 33) {
+        // Android 13 and above
+        final photos = await Permission.photos.request();
+        return photos.isGranted;
+      } else {
+        // Android 12 and below
+        final storage = await Permission.storage.request();
+        return storage.isGranted;
+      }
+    } else if (Platform.isIOS) {
+      return true; // iOS doesn't require explicit permission for downloads
+    }
+    return false;
+  }
+
+  Future<void> _downloadPdf(String type, String url) async {
+    if (_isDownloading) return;
+
+    try {
+      final hasPermission = await _requestStoragePermission();
+      if (!hasPermission) {
+        Navigator.of(context).pop(); // Close popup first
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                widget.isArabic 
+                  ? 'يرجى منح الإذن للتطبيق للوصول إلى وحدة التخزين لتنزيل الملف'
+                  : 'Please grant storage permission to download the file'
+              ),
+              action: SnackBarAction(
+                label: widget.isArabic ? 'الإعدادات' : 'Settings',
+                onPressed: () => openAppSettings(),
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      setState(() {
+        _isDownloading = true;
+        _downloadProgress = 0;
+      });
+
+      final fileName = type == 'terms' 
+          ? (widget.isArabic ? 'الشروط-والأحكام.pdf' : 'terms-and-conditions.pdf')
+          : (widget.isArabic ? 'سياسة-الخصوصية.pdf' : 'privacy-policy.pdf');
+
+      final directory = Platform.isAndroid
+          ? Directory('/storage/emulated/0/Download')
+          : await getApplicationDocumentsDirectory();
+
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
+      }
+
+      final savePath = '${directory.path}/$fileName';
+      final dio = Dio();
+
+      await dio.download(
+        url,
+        savePath,
+        onReceiveProgress: (received, total) {
+          if (total != -1) {
+            setState(() {
+              _downloadProgress = received / total;
+            });
+          }
+        },
+      );
+
+      setState(() {
+        _isDownloading = false;
+        _downloadProgress = 0;
+      });
+
+      Navigator.of(context).pop(); // Close popup first
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              widget.isArabic 
+                ? 'تم تحميل الملف بنجاح إلى ${directory.path}'
+                : 'File downloaded successfully to ${directory.path}'
+            ),
+            duration: Duration(seconds: 5),
+            action: Platform.isAndroid ? SnackBarAction(
+              label: widget.isArabic ? 'فتح المجلد' : 'Open Folder',
+              onPressed: () async {
+                final uri = Uri.parse('content://com.android.externalstorage.documents/document/primary%3ADownload');
+                await launchUrl(uri);
+              },
+            ) : SnackBarAction(
+              label: widget.isArabic ? 'عرض' : 'View',
+              onPressed: () async {
+                final uri = Uri.file(savePath);
+                await launchUrl(uri);
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isDownloading = false;
+        _downloadProgress = 0;
+      });
+      
+      Navigator.of(context).pop(); // Close popup first
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(
+            widget.isArabic 
+              ? 'فشل تحميل الملف: $e'
+              : 'Failed to download file: $e'
+          )),
+        );
+      }
+    }
+  }
+
+  Future<void> _openPdf(String type) async {
+    String url = type == 'terms' 
+      ? 'https://icreditdept.com/api/terms.pdf'
+      : 'https://icreditdept.com/api/privacy.pdf';
+    
+    try {
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return Dialog(
+              insetPadding: EdgeInsets.all(16),
+              child: Container(
+                width: double.infinity,
+                height: MediaQuery.of(context).size.height * 0.8,
+                child: Column(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              type == 'terms' 
+                                ? (widget.isArabic ? 'الشروط والأحكام' : 'Terms & Conditions')
+                                : (widget.isArabic ? 'سياسة الخصوصية' : 'Privacy Policy'),
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          if (_isDownloading)
+                            SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                value: _downloadProgress,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          else
+                            IconButton(
+                              icon: Icon(Icons.download),
+                              onPressed: () => _downloadPdf(type, url),
+                              tooltip: widget.isArabic ? 'تحميل' : 'Download',
+                            ),
+                          IconButton(
+                            icon: Icon(Icons.close),
+                            onPressed: () => Navigator.of(context).pop(),
+                            tooltip: widget.isArabic ? 'إغلاق' : 'Close',
+                          ),
+                        ],
+                      ),
+                    ),
+                    Divider(height: 1),
+                    Expanded(
+                      child: SfPdfViewer.network(
+                        url,
+                        onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
+                          Navigator.of(context).pop();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Could not load $type document: ${details.error}')),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error opening $type document: $e')),
+        );
+      }
+    }
   }
 
   @override
   void dispose() {
+    _nationalIdController.removeListener(_checkIfExpat);
     _nationalIdController.dispose();
     _phoneController.dispose();
     _dobController.dispose();
     _idExpiryController.dispose();
     _emailController.dispose();
+    _sponsorIdController.dispose();
     _animationController.dispose();
     super.dispose();
   }
@@ -418,6 +656,78 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> w
       return;
     }
 
+    // 💡 Validate sponsor ID for expats
+    if (_isExpat && _sponsorIdController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.isArabic 
+              ? 'رقم الكفيل مطلوب للمقيمين'
+              : 'Sponsor ID is required for expats'
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // 💡 Convert dates to Hijri format for API (using hyphens instead of slashes)
+    String dobHijri = '';
+    String expiryHijri = '';
+    
+    if (_selectedDate != null) {
+      if (!_isHijri) {
+        // Convert Gregorian to Hijri
+        final hijri = HijriCalendar.fromDate(_selectedDate!);
+        dobHijri = '${hijri.hYear}-${hijri.hMonth.toString().padLeft(2, '0')}-${hijri.hDay.toString().padLeft(2, '0')}';
+        print('💡 Converted DOB from Gregorian to Hijri: $dobHijri');
+      } else {
+        // Already in Hijri format, just parse from the text
+        final parts = _dobController.text.split('/');
+        if (parts.length >= 3) {
+          final day = parts[0];
+          final month = parts[1];
+          final year = parts[2].split(' ')[0]; // Remove the 'H' or 'هـ' suffix
+          dobHijri = '$year-${month.padLeft(2, '0')}-${day.padLeft(2, '0')}';
+          print('💡 Parsed DOB from Hijri text: $dobHijri');
+        }
+      }
+    }
+    
+    if (_selectedExpiryDate != null) {
+      if (!_isHijri) {
+        // Convert Gregorian to Hijri
+        final hijri = HijriCalendar.fromDate(_selectedExpiryDate!);
+        expiryHijri = '${hijri.hYear}-${hijri.hMonth.toString().padLeft(2, '0')}-${hijri.hDay.toString().padLeft(2, '0')}';
+        print('💡 Converted Expiry from Gregorian to Hijri: $expiryHijri');
+      } else {
+        // Already in Hijri format, just parse from the text
+        final parts = _idExpiryController.text.split('/');
+        if (parts.length >= 3) {
+          final day = parts[0];
+          final month = parts[1];
+          final year = parts[2].split(' ')[0]; // Remove the 'H' or 'هـ' suffix
+          expiryHijri = '$year-${month.padLeft(2, '0')}-${day.padLeft(2, '0')}';
+          print('💡 Parsed Expiry from Hijri text: $expiryHijri');
+        }
+      }
+    }
+
+    // 💡 Check terms acceptance
+    if (!_termsAccepted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.isArabic 
+              ? 'يجب الموافقة على الشروط والأحكام وسياسة الخصوصية للمتابعة'
+              : 'You must agree to the Terms & Conditions and Privacy Policy to continue'
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -523,41 +833,79 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> w
         return;
       }
 
-      // Show loading for government data fetch
-      setState(() => _isLoading = true);
-      _animationController.repeat();
+      // 💡 3. Get expat info and address if applicable
+      Map<String, dynamic>? expatInfo;
+      Map<String, dynamic>? expatAddress;
+      
+      if (_isExpat) {
+        setState(() => _isLoading = true);
+        _animationController.repeat();
 
-      // 3. Get Yakeen data
-      final governmentData = await _registrationService.getGovernmentData(
-        _nationalIdController.text,
-        dateOfBirthHijri: _dobController.text,
-        idExpiryDate: _idExpiryController.text,
-      );
+        // Get expat info
+        expatInfo = await _registrationService.getExpatInfo(
+          _nationalIdController.text,
+          _sponsorIdController.text,
+        );
 
-      if (governmentData['status'] != 'success') {
-        throw Exception(governmentData['message']);
+        if (expatInfo['status'] != 'success') {
+          _animationController.stop();
+          setState(() => _isLoading = false);
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                expatInfo['message'] ?? 'Failed to get expat information',
+                style: const TextStyle(color: Colors.white),
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+
+        // Get expat address
+        expatAddress = await _registrationService.getExpatAddress(
+          _nationalIdController.text,
+          dobHijri,
+          addressLanguage: widget.isArabic ? 'A' : 'E',
+        );
+
+        if (expatAddress['status'] != 'success') {
+          _animationController.stop();
+          setState(() => _isLoading = false);
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                expatAddress['message'] ?? 'Failed to get expat address',
+                style: const TextStyle(color: Colors.white),
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
       }
-
-      // 4. Store registration data locally
-      await _registrationService.storeRegistrationData(
-        nationalId: _nationalIdController.text,
-        email: _emailController.text,
-        phone: _phoneController.text,
-        userData: governmentData['data'],
-      );
 
       // Stop loading before navigation
       _animationController.stop();
       setState(() => _isLoading = false);
 
-      // 5. Navigate to password setup
+      // 💡 Navigate to password setup with essential data only
       if (mounted) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => PasswordSetupScreen(
               nationalId: _nationalIdController.text,
+              email: _emailController.text,
+              phone: _phoneController.text,
+              dateOfBirthHijri: dobHijri,
+              idExpiryDateHijri: expiryHijri,
               isArabic: widget.isArabic,
+              sponsorId: _isExpat ? _sponsorIdController.text : null,
+              expatInfo: _isExpat && expatInfo != null ? expatInfo['data'] as Map<String, dynamic> : null,
+              expatAddress: _isExpat && expatAddress != null ? expatAddress['data'] as Map<String, dynamic> : null,
             ),
           ),
         );
@@ -771,6 +1119,49 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> w
                           ),
                           const SizedBox(height: 20),
 
+                          // 💡 Sponsor ID Field (only visible for expats)
+                          if (_isExpat)
+                            Theme(
+                              data: Theme.of(context).copyWith(
+                                inputDecorationTheme: inputDecorationTheme,
+                              ),
+                              child: Column(
+                                children: [
+                                  TextFormField(
+                                    controller: _sponsorIdController,
+                                    decoration: InputDecoration(
+                                      labelText: widget.isArabic
+                                          ? 'رقم الكفيل'
+                                          : 'Sponsor ID',
+                                      hintText: widget.isArabic
+                                          ? 'أدخل رقم الكفيل'
+                                          : 'Enter Sponsor ID',
+                                      prefixIcon: Icon(Icons.business,
+                                          color: primaryColor),
+                                    ),
+                                    validator: (value) {
+                                      if (_isExpat && (value == null || value.isEmpty)) {
+                                        return widget.isArabic
+                                            ? 'رقم الكفيل مطلوب للمقيمين'
+                                            : 'Sponsor ID is required for expats';
+                                      }
+                                      if (value != null && value.isNotEmpty && !RegExp(r'^\d{10}$').hasMatch(value)) {
+                                        return widget.isArabic
+                                            ? 'يجب أن يكون رقم الكفيل 10 أرقام'
+                                            : 'Sponsor ID must be 10 digits';
+                                      }
+                                      return null;
+                                    },
+                                    keyboardType: TextInputType.number,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly
+                                    ],
+                                  ),
+                                  const SizedBox(height: 20),
+                                ],
+                              ),
+                            ),
+
                           // Phone Number Field
                           Theme(
                             data: Theme.of(context).copyWith(
@@ -840,6 +1231,43 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> w
                               ],
                               textAlign: TextAlign.left,
                               textDirection: ui.TextDirection.ltr,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // 💡 Email Field moved here, after phone
+                          Theme(
+                            data: Theme.of(context).copyWith(
+                              inputDecorationTheme: inputDecorationTheme,
+                            ),
+                            child: TextFormField(
+                              controller: _emailController,
+                              decoration: InputDecoration(
+                                labelText: widget.isArabic
+                                    ? 'البريد الإلكتروني'
+                                    : 'Email',
+                                hintText: widget.isArabic
+                                    ? 'أدخل البريد الإلكتروني'
+                                    : 'Enter email',
+                                prefixIcon: Icon(Icons.email_outlined,
+                                    color: primaryColor),
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return widget.isArabic
+                                      ? 'البريد الإلكتروني مطلوب'
+                                      : 'Email is required';
+                                }
+                                if (!RegExp(
+                                        r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                    .hasMatch(value)) {
+                                  return widget.isArabic
+                                      ? 'البريد الإلكتروني غير صحيح'
+                                      : 'Invalid email format';
+                                }
+                                return null;
+                              },
+                              keyboardType: TextInputType.emailAddress,
                             ),
                           ),
                           const SizedBox(height: 20),
@@ -1216,39 +1644,103 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> w
                           ),
                           const SizedBox(height: 20),
 
-                          // Email Field
-                          Theme(
-                            data: Theme.of(context).copyWith(
-                              inputDecorationTheme: inputDecorationTheme,
+                          // 💡 Terms and Conditions with modern styling
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Color(themeProvider.isDarkMode 
+                                  ? Constants.darkSurfaceColor 
+                                  : Constants.lightSurfaceColor),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Color(themeProvider.isDarkMode 
+                                      ? Constants.darkPrimaryColor 
+                                      : Constants.lightPrimaryColor).withOpacity(0.05),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 5),
+                                ),
+                              ],
                             ),
-                            child: TextFormField(
-                              controller: _emailController,
-                              decoration: InputDecoration(
-                                labelText: widget.isArabic
-                                    ? 'البريد الإلكتروني'
-                                    : 'Email',
-                                hintText: widget.isArabic
-                                    ? 'أدخل البريد الإلكتروني'
-                                    : 'Enter email',
-                                prefixIcon: Icon(Icons.email_outlined,
-                                    color: primaryColor),
+                            child: Directionality(
+                              textDirection: widget.isArabic ? ui.TextDirection.rtl : ui.TextDirection.ltr,
+                              child: Row(
+                                mainAxisAlignment: widget.isArabic ? MainAxisAlignment.end : MainAxisAlignment.start,
+                                children: [
+                                  Transform.scale(
+                                    scale: 1.2,
+                                    child: Checkbox(
+                                      value: _termsAccepted,
+                                      onChanged: (value) {
+                                        setState(() => _termsAccepted = value ?? false);
+                                      },
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      activeColor: Color(themeProvider.isDarkMode 
+                                          ? Constants.darkPrimaryColor 
+                                          : Constants.lightPrimaryColor),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Container(
+                                      alignment: widget.isArabic ? Alignment.centerRight : Alignment.centerLeft,
+                                      child: Wrap(
+                                        alignment: widget.isArabic ? WrapAlignment.end : WrapAlignment.start,
+                                        crossAxisAlignment: WrapCrossAlignment.center,
+                                        children: [
+                                          Text(
+                                            widget.isArabic ? 'أوافق على ' : 'I agree to the ',
+                                            textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
+                                            style: TextStyle(
+                                              color: Color(themeProvider.isDarkMode 
+                                                  ? Constants.darkLabelTextColor 
+                                                  : Constants.lightLabelTextColor),
+                                            ),
+                                          ),
+                                          GestureDetector(
+                                            onTap: () => _openPdf('terms'),
+                                            child: Text(
+                                              widget.isArabic ? 'الشروط والأحكام' : 'Terms & Conditions',
+                                              textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
+                                              style: TextStyle(
+                                                color: Color(themeProvider.isDarkMode 
+                                                    ? Constants.darkPrimaryColor 
+                                                    : Constants.lightPrimaryColor),
+                                                decoration: TextDecoration.underline,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                          Text(
+                                            widget.isArabic ? ' و ' : ' and ',
+                                            textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
+                                            style: TextStyle(
+                                              color: Color(themeProvider.isDarkMode 
+                                                  ? Constants.darkLabelTextColor 
+                                                  : Constants.lightLabelTextColor),
+                                            ),
+                                          ),
+                                          GestureDetector(
+                                            onTap: () => _openPdf('privacy'),
+                                            child: Text(
+                                              widget.isArabic ? 'سياسة الخصوصية' : 'Privacy Policy',
+                                              textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
+                                              style: TextStyle(
+                                                color: Color(themeProvider.isDarkMode 
+                                                    ? Constants.darkPrimaryColor 
+                                                    : Constants.lightPrimaryColor),
+                                                decoration: TextDecoration.underline,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return widget.isArabic
-                                      ? 'البريد الإلكتروني مطلوب'
-                                      : 'Email is required';
-                                }
-                                if (!RegExp(
-                                        r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                                    .hasMatch(value)) {
-                                  return widget.isArabic
-                                      ? 'البريد الإلكتروني غير صحيح'
-                                      : 'Invalid email format';
-                                }
-                                return null;
-                              },
-                              keyboardType: TextInputType.emailAddress,
                             ),
                           ),
                         ],

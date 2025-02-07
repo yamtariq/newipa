@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
 import 'dart:async';  // Add this import for TimeoutException
+import 'dart:io';  // 💡 Add this import for HttpClient
 import '../utils/constants.dart';
 import '../services/api_service.dart';
 import '../services/theme_service.dart';
@@ -51,23 +52,31 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
 
   Future<bool> _verifyOTP(String otp) async {
     try {
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}/proxy/forward?url=${Constants.proxyOtpVerifyUrl}'),
-        headers: Constants.defaultHeaders,
-        body: jsonEncode({
-          'nationalId': _idNumberController.text,
-          'otp_code': otp,
-          'type': 'application',
-          'request': {
-            'nationalId': _idNumberController.text,
-            'otp_code': otp,
-            'type': 'application'
-          }
-        }),
-      );
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      final client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+      
+      final uri = Uri.parse('${Constants.proxyOtpVerifyUrl}');
+      final request = await client.postUrl(uri);
+      
+      // Add headers
+      Constants.defaultHeaders.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+      
+      // Add body
+      final body = {
+        'nationalId': _idNumberController.text,
+        'otp': otp,
+        'userId': '1'
+      };
+      request.write(jsonEncode(body));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = jsonDecode(responseBody);
         return data['success'] == true;
       }
       return false;
@@ -79,24 +88,33 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
 
   Future<bool> _sendOTP() async {
     try {
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}/proxy/forward?url=${Constants.proxyOtpGenerateUrl}'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-API-Key': Constants.apiKey
-        },
-        body: jsonEncode(Constants.otpGenerateRequestBody(
-          _idNumberController.text,
-          '966${_phoneController.text}',  // Add country code prefix
-          purpose: 'application'
-        )),
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      final client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+      
+      final uri = Uri.parse(Constants.proxyOtpGenerateUrl);
+      final request = await client.postUrl(uri);
+      
+      // Add headers
+      Constants.defaultHeaders.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+      
+      // Add body
+      final body = Constants.otpGenerateRequestBody(
+        _idNumberController.text,
+        '966${_phoneController.text}',
+        purpose: 'application'
       );
-
-      print('OTP Generation Response: ${response.body}'); // Debug log
+      request.write(jsonEncode(body));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+      
+      print('OTP Generation Response: $responseBody'); // Debug log
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = jsonDecode(responseBody);
         return data['success'] == true;
       }
       return false;
@@ -116,26 +134,35 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
         print('National ID: ${_idNumberController.text}');
         print('OTP: $otp');
         
-        final response = await http.post(
-          Uri.parse('${Constants.apiBaseUrl}/proxy/forward?url=${Constants.proxyOtpVerifyUrl}'),
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'X-API-Key': Constants.apiKey
-          },
-          body: jsonEncode(Constants.otpVerifyRequestBody(
-            _idNumberController.text,
-            otp
-          )),
-        ).timeout(
+        // 💡 Create a custom HttpClient that accepts self-signed certificates
+        final client = HttpClient()
+          ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+        
+        final uri = Uri.parse('${Constants.proxyOtpVerifyUrl}');
+        final request = await client.postUrl(uri);
+        
+        // Add headers
+        Constants.defaultHeaders.forEach((key, value) {
+          request.headers.set(key, value);
+        });
+        
+        // Add body
+        final body = Constants.otpVerifyRequestBody(
+          _idNumberController.text,
+          otp
+        );
+        request.write(jsonEncode(body));
+        
+        final response = await request.close().timeout(
           const Duration(seconds: 30),
           onTimeout: () {
             throw TimeoutException('Request timed out. Please try again.');
           },
         );
+        final responseBody = await response.transform(utf8.decoder).join();
         
-        print('OTP Verification Response: ${json.encode(response.body)}');
-        final data = jsonDecode(response.body);
+        print('OTP Verification Response: $responseBody');
+        final data = jsonDecode(responseBody);
         
         if (data['success'] == true) {
           print('✅ OTP verified successfully');
@@ -234,12 +261,8 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
                   isArabic: widget.isArabic,
                   onResendOTP: () async {
                     final response = await http.post(
-                      Uri.parse('${Constants.apiBaseUrl}/proxy/forward?url=${Constants.proxyOtpGenerateUrl}'),
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-API-Key': Constants.apiKey
-                      },
+                      Uri.parse('${Constants.proxyOtpGenerateUrl}'),
+                      headers: Constants.defaultHeaders,
                       body: jsonEncode(Constants.otpGenerateRequestBody(
                         _idNumberController.text,
                         '966${_phoneController.text}',  // Add country code prefix
@@ -600,12 +623,8 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
         isArabic: widget.isArabic,
         onResendOTP: () async {
           final response = await http.post(
-            Uri.parse('${Constants.apiBaseUrl}/proxy/forward?url=${Constants.proxyOtpGenerateUrl}'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'X-API-Key': Constants.apiKey
-            },
+            Uri.parse('${Constants.proxyOtpGenerateUrl}'),
+            headers: Constants.defaultHeaders,
             body: jsonEncode(Constants.otpGenerateRequestBody(
               _idNumberController.text,
               '966${_phoneController.text}',  // Add country code prefix
