@@ -628,8 +628,8 @@ class NotificationService {
           category: NotificationCategory.Message,
           autoDismissible: false,
           // 💡 Platform-specific icon handling
-          icon: Platform.isAndroid ? 'resource://mipmap/ic_launcher' : null,
-          largeIcon: validatedLargeIconUrl,
+          icon: Platform.isAndroid ? 'resource://drawable/notification_icon' : null, // Monochrome icon for status bar
+          largeIcon: validatedLargeIconUrl ?? (Platform.isAndroid ? 'resource://mipmap/launcher_icon' : null), // Company logo as default
           bigPicture: validatedBigPictureUrl,
           // 💡 iOS-specific settings
           groupKey: Platform.isIOS ? 'basic_channel' : null,

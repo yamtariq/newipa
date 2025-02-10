@@ -63,9 +63,106 @@ class ContentUpdateService extends ChangeNotifier {
   static const String _firstRunFlagFile = 'first_run_flag';
   bool _isFirstRun = true;
 
+  // 💡 Add missing properties
+  bool _hasDefaultContent = false;
+  bool _hasCachedContent = false;
+  bool get hasAnyContent => _hasDefaultContent || _hasCachedContent;
+
+  // 💡 Add logging method
   void _log(String message) {
     if (foundation.kDebugMode) {
       foundation.debugPrint('TTT_$message');
+    }
+  }
+
+  // 💡 Modified to use existing static content
+  Future<void> _loadDefaultAssets() async {
+    try {
+      // Load default slides from Constants
+      _memoryCache['default_slideshow_content'] = Constants.staticSlides.map((slide) => {
+        'slide_id': int.parse(slide['id'] ?? '0'),
+        'image_url': slide['imageUrl'],
+        'link': slide['link'],
+        'leftTitle': slide['leftTitleEn'],
+        'rightTitle': slide['rightTitleAr'],
+      }).toList();
+
+      _memoryCache['default_slideshow_content_ar'] = Constants.staticSlides.map((slide) => {
+        'slide_id': int.parse(slide['id'] ?? '0'),
+        'image_url': slide['imageUrl'],
+        'link': slide['link'],
+        'leftTitle': slide['leftTitleAr'],
+        'rightTitle': slide['rightTitleEn'],
+      }).toList();
+      
+      // Load default ads from Constants
+      _memoryCache['default_loan_ad'] = Constants.loanAd;
+      _memoryCache['default_card_ad'] = Constants.cardAd;
+      
+      _hasDefaultContent = true;
+      notifyListeners();
+    } catch (e) {
+      _log('TTT_Error loading default assets: $e');
+    }
+  }
+
+  // 💡 Modified to prioritize cached content
+  Future<void> checkAndUpdateContent({bool force = false, bool isInitialLoad = false, bool isResumed = false}) async {
+    try {
+      _log('\nTTT_=== Content Update Check ===');
+
+      // Load default content first if not loaded
+      if (!_hasDefaultContent) {
+        await _loadDefaultAssets();
+      }
+
+      // Quick load of cached content if not done yet
+      if (!_hasCachedContent) {
+        final hasCached = await _loadCachedContent();
+        if (hasCached) {
+          _hasCachedContent = true;
+          notifyListeners();
+        }
+      }
+
+      // Check update interval
+      if (!force && !isInitialLoad) {
+        final prefs = await SharedPreferences.getInstance();
+        final lastCheckStr = prefs.getString(_lastCheckKey);
+        if (lastCheckStr != null) {
+          final lastCheck = DateTime.parse(lastCheckStr);
+          final now = DateTime.now();
+          if (now.difference(lastCheck) < _minimumCheckInterval) {
+            _log('TTT_Skipping update check - minimum interval not passed');
+            return;
+          }
+        }
+      }
+
+      // Check for updates in background without blocking UI
+      bool hasUpdates = await _hasContentUpdates();
+      if (hasUpdates) {
+        _isUpdating = true;
+        
+        final tempCache = Map<String, dynamic>.from(_memoryCache);
+        final success = await _updateAllContent(tempCache);
+
+        if (success) {
+          _memoryCache.addAll(tempCache);
+          await _saveContentToCache();
+          
+          if (await _verifySavedContent()) {
+            _hasCachedContent = true;
+            _isUpdating = false;
+            notifyListeners();
+          }
+        } else {
+          _isUpdating = false;
+        }
+      }
+    } catch (e) {
+      _log('TTT_Error in content update: $e');
+      _isUpdating = false;
     }
   }
 
@@ -206,103 +303,6 @@ class ContentUpdateService extends ChangeNotifier {
       return false;
     } finally {
       client?.close();
-    }
-  }
-
-  Future<void> checkAndUpdateContent({bool force = false, bool isInitialLoad = false, bool isResumed = false}) async {
-    try {
-      _log('\nTTT_=== Content Update Check ===');
-      _log('TTT_Force update: $force, Initial load: $isInitialLoad, Resumed: $isResumed');
-      
-      // Always try to load cached content first if not done yet
-      if (!_initialLoadDone) {
-        await _loadCachedContent();
-        _initialLoadDone = true;
-      }
-
-      // Check if this is first run
-      if (await _isAppFirstRun()) {
-        _log('TTT_First run detected - forcing content update');
-        force = true;
-      }
-
-      // 💡 Check if minimum time interval has passed since last check
-      if (!force && !isInitialLoad) {
-        final prefs = await SharedPreferences.getInstance();
-        final lastCheckStr = prefs.getString(_lastCheckKey);
-        if (lastCheckStr != null) {
-          final lastCheck = DateTime.parse(lastCheckStr);
-          final now = DateTime.now();
-          if (now.difference(lastCheck) < _minimumCheckInterval) {
-            _log('TTT_Skipping update check - minimum interval not passed');
-            return;
-          }
-        }
-        // Update last check time
-        await prefs.setString(_lastCheckKey, DateTime.now().toIso8601String());
-      }
-
-      // Show loading if needed
-      if (force && !isInitialLoad) {
-        _isUpdating = true;
-        notifyListeners();
-      }
-
-      try {
-        // Create temporary storage for new content
-        final tempCache = Map<String, dynamic>.from(_memoryCache);
-        
-        // Check if update is needed
-        bool shouldUpdate = force;
-        if (!shouldUpdate && !isInitialLoad) {
-          shouldUpdate = await _hasContentUpdates();
-        }
-
-        if (shouldUpdate) {
-          _log('TTT_Starting content update');
-          final success = await _updateAllContent(tempCache);
-
-          if (success) {
-            _log('TTT_Update successful, saving new content');
-            // Backup current cache in case save fails
-            final backupCache = Map<String, dynamic>.from(_memoryCache);
-            
-            try {
-              // Update memory cache while preserving existing content
-              _memoryCache.addAll(tempCache);
-              
-              // Try to save to persistent storage
-              await _saveContentToCache();
-              
-              // Verify the save was successful
-              final savedContent = await _verifySavedContent();
-              if (!savedContent) {
-                _log('TTT_Save verification failed, rolling back to backup');
-                _memoryCache.clear();
-                _memoryCache.addAll(backupCache);
-                throw Exception('Failed to verify saved content');
-              }
-              
-              _log('TTT_Content updated and saved successfully');
-            } catch (e) {
-              _log('TTT_Error saving content: $e');
-              // Restore backup if save failed
-              _memoryCache.clear();
-              _memoryCache.addAll(backupCache);
-              throw e;
-            }
-          } else {
-            _log('TTT_Update failed or no content to update');
-          }
-        } else {
-          _log('TTT_No updates needed');
-        }
-      } finally {
-        _isUpdating = false;
-        notifyListeners();
-      }
-    } catch (e) {
-      _log('TTT_Error in content update: $e');
     }
   }
 

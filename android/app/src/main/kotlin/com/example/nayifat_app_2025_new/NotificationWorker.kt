@@ -282,7 +282,7 @@ class NotificationWorker(
     }
 
     private fun showNotification(notification: Map<String, String>) {
-        Log.d(TAG, "Step 8.1: Starting notification display process")
+        Log.d(TAG, "Step 8: Starting notification display process")
         val channelId = "nayifat_channel"
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -344,10 +344,11 @@ class NotificationWorker(
             null
         }
 
-        // 💡 Create notification builder with default icon
+        // 💡 Create notification builder with company branding
         Log.d(TAG, "Step 8.5: Building notification with title: ${notification["title"]}")
         val builder = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(R.mipmap.ic_launcher) // Use app icon as default small icon
+            .setSmallIcon(R.drawable.notification_icon) // Monochrome icon for status bar
+            .setLargeIcon(android.graphics.BitmapFactory.decodeResource(context.resources, R.mipmap.launcher_icon)) // Company logo
             .setContentTitle(notification["title"])
             .setContentText(notification["body"])
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -356,35 +357,24 @@ class NotificationWorker(
             .setOnlyAlertOnce(false)
 
         // 💡 Handle images with proper error handling and fallbacks
-        var hasLargeIcon = false
+        var hasLargeIcon = true // Already set with company logo
         var hasBigPicture = false
 
-        // First try to set large icon
+        // Try to set custom large icon if provided
         val largeIconUrl = notification["largeIconUrl"]?.takeIf { it.isNotBlank() }
         if (!largeIconUrl.isNullOrBlank()) {
             try {
-                Log.d(TAG, "Step 8.5.1: Setting large icon from URL: $largeIconUrl")
+                Log.d(TAG, "Step 8.5.1: Setting custom large icon from URL: $largeIconUrl")
                 val iconBitmap = getBitmapFromUrl(largeIconUrl)
                 if (iconBitmap != null) {
                     builder.setLargeIcon(iconBitmap)
-                    hasLargeIcon = true
-                    Log.d(TAG, "Step 8.5.2: Large icon set successfully")
+                    Log.d(TAG, "Step 8.5.2: Custom large icon set successfully")
                 } else {
-                    Log.e(TAG, "Step 8.5.3: Failed to load large icon")
-                    // Set default icon from resources
-                    builder.setLargeIcon(android.graphics.BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher))
-                    hasLargeIcon = true
+                    Log.e(TAG, "Step 8.5.3: Failed to load custom large icon, using company logo")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Step 8.5.4: Error setting large icon: ${e.message}")
-                // Set default icon from resources
-                builder.setLargeIcon(android.graphics.BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher))
-                hasLargeIcon = true
+                Log.e(TAG, "Step 8.5.4: Error setting custom large icon: ${e.message}")
             }
-        } else {
-            Log.d(TAG, "Step 8.5.1.1: Using default large icon")
-            builder.setLargeIcon(android.graphics.BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher))
-            hasLargeIcon = true
         }
 
         // Then try to set big picture
