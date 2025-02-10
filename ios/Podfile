@@ -12,7 +12,6 @@ def flutter_root
   unless File.exist?(generated_xcode_build_settings_path)
     raise "#{generated_xcode_build_settings_path} must exist. Run flutter pub get first"
   end
-
   File.foreach(generated_xcode_build_settings_path) do |line|
     matches = line.match(/FLUTTER_ROOT\=(.*)/)
     return matches[1].strip if matches
@@ -39,8 +38,7 @@ post_install do |installer|
       config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
       config.build_settings['OTHER_SWIFT_FLAGS'] = '-DCOCOAPODS'
       
-      # For targets that include a bridging header (like Runner or syncfusion_flutter_pdfviewer),
-      # disable module interface generation.
+      # For targets with bridging headers, disable module interface generation.
       if target.name == 'Runner' || target.name == 'syncfusion_flutter_pdfviewer'
         config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'NO'
       else
@@ -48,7 +46,6 @@ post_install do |installer|
       end
     end
 
-    # Override header search paths for the syncfusion plugin.
     if target.name == 'syncfusion_flutter_pdfviewer'
       target.build_configurations.each do |config|
         config.build_settings['HEADER_SEARCH_PATHS'] = '$(inherited) $(PODS_ROOT)/Headers/Private/Flutter'
