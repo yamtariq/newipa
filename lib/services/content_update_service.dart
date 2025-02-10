@@ -112,6 +112,7 @@ class ContentUpdateService extends ChangeNotifier {
   }
 
   Future<bool> _hasContentUpdates() async {
+    HttpClient? client;
     try {
       _log('\nTTT_=== Checking for Content Updates ===');
       
@@ -136,19 +137,31 @@ class ContentUpdateService extends ChangeNotifier {
       
       _log('TTT_Stored timestamps: $storedTimestamps');
       
-      // Get all timestamps from server in one call
-      final response = await http.post(
-        Uri.parse(Constants.contentTimestampsUrl),
-        headers: Constants.defaultHeaders,
-        body: json.encode({})
-      );
+      // 💡 Create HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+
+      final uri = Uri.parse(Constants.contentTimestampsUrl);
+      final request = await client.postUrl(uri);
+      
+      // Add headers
+      Constants.defaultHeaders.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+      request.headers.contentType = ContentType.json;
+
+      // Add body
+      request.write('{}');
+
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
       
       if (response.statusCode != 200) {
         _log('TTT_API request failed: ${response.statusCode}');
         return false;
       }
 
-      final data = json.decode(response.body);
+      final data = json.decode(responseBody);
       if (!data['success'] || data['data'] == null) {
         _log('TTT_Invalid response format');
         return false;
@@ -191,6 +204,8 @@ class ContentUpdateService extends ChangeNotifier {
     } catch (e) {
       _log('TTT_Error checking for updates: $e');
       return false;
+    } finally {
+      client?.close();
     }
   }
 
@@ -292,13 +307,27 @@ class ContentUpdateService extends ChangeNotifier {
   }
 
   Future<bool> _updateAllContent(Map<String, dynamic> tempCache) async {
+    HttpClient? client;
     try {
       _log('\nTTT_=== Updating All Content ===');
       
-      // Get the pending updates list
-      final pendingUpdates = _memoryCache['_pending_updates'] as List<Map<String, String>>?;
-      if (pendingUpdates == null || pendingUpdates.isEmpty) {
+      // 💡 Get and properly cast the pending updates list
+      final dynamic pendingUpdatesRaw = _memoryCache['_pending_updates'];
+      if (pendingUpdatesRaw == null) {
         _log('TTT_No pending updates found');
+        return false;
+      }
+
+      final List<Map<String, String>> pendingUpdates = (pendingUpdatesRaw as List<dynamic>)
+          .map((update) => {
+                'page': update['page']?.toString() ?? '',
+                'keyName': update['keyName']?.toString() ?? '',
+              })
+          .where((update) => update['page']!.isNotEmpty && update['keyName']!.isNotEmpty)
+          .toList();
+
+      if (pendingUpdates.isEmpty) {
+        _log('TTT_No valid pending updates found after casting');
         return false;
       }
 
@@ -311,14 +340,27 @@ class ContentUpdateService extends ChangeNotifier {
       for (final update in pendingUpdates) {
         _log('TTT_Fetching content for page: ${update['page']}, key: ${update['keyName']}');
         
-        final response = await http.post(
-          Uri.parse(Constants.masterFetchUrl),
-          headers: Constants.defaultHeaders,
-          body: json.encode({
-            'Page': update['page'],
-            'KeyName': update['keyName'],
-          }),
-        );
+        // 💡 Create HttpClient that accepts self-signed certificates
+        client = HttpClient()
+          ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+
+        final uri = Uri.parse(Constants.masterFetchUrl);
+        final request = await client.postUrl(uri);
+        
+        // Add headers
+        Constants.defaultHeaders.forEach((key, value) {
+          request.headers.set(key, value);
+        });
+        request.headers.contentType = ContentType.json;
+
+        // Add body
+        request.write(json.encode({
+          'Page': update['page'],
+          'KeyName': update['keyName'],
+        }));
+
+        final response = await request.close();
+        final responseBody = await response.transform(utf8.decoder).join();
 
         if (response.statusCode != 200) {
           _log('TTT_API request failed: ${response.statusCode}');
@@ -326,7 +368,7 @@ class ContentUpdateService extends ChangeNotifier {
           continue;
         }
 
-        final data = json.decode(response.body);
+        final data = json.decode(responseBody);
         if (!data['success'] || data['data'] == null) {
           _log('TTT_Invalid response format');
           updateSuccess = false;
@@ -375,6 +417,8 @@ class ContentUpdateService extends ChangeNotifier {
           await prefs.setString('${_lastUpdateKey}_${update['page']}_${keyName}', content['last_updated']);
           _log('TTT_Saved timestamp for ${update['page']}_${keyName}: ${content['last_updated']}');
         }
+
+        client?.close();
       }
 
       // Clear pending updates
@@ -387,6 +431,8 @@ class ContentUpdateService extends ChangeNotifier {
     } catch (e) {
       _log('TTT_Error updating content: $e');
       return false;
+    } finally {
+      client?.close();
     }
   }
 
@@ -442,10 +488,21 @@ class ContentUpdateService extends ChangeNotifier {
   }
 
   Future<bool> _downloadAndCacheImage(String key, String url, [Map<String, dynamic>? targetCache]) async {
+    HttpClient? client;
     try {
-      final response = await http.get(Uri.parse(url));
+      // 💡 Create HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+
+      final uri = Uri.parse(url);
+      final request = await client.getUrl(uri);
+      final response = await request.close();
+
       if (response.statusCode == 200) {
-        final bytes = response.bodyBytes;
+        final bytes = await response.fold<List<int>>(
+          [],
+          (previous, element) => previous..addAll(element),
+        );
         final cacheKey = '${key}_bytes';
         
         final cache = targetCache ?? _memoryCache;
@@ -459,6 +516,8 @@ class ContentUpdateService extends ChangeNotifier {
     } catch (e) {
       _log('TTT_Error downloading image: $e');
       return false;
+    } finally {
+      client?.close();
     }
   }
 

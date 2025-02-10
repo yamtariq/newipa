@@ -51,152 +51,58 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchLoanDecision();
-  }
+    print('\n=== LOAN OFFER SCREEN - INITIALIZATION ===');
+    print('Timestamp: ${DateTime.now()}');
+    print('Response Data:');
+    widget.userData.forEach((key, value) {
+      print('$key: $value');
+    });
 
-  Future<void> _fetchLoanDecision() async {
-    try {
+    // Extract values from response
+    if (widget.userData['result'] != null) {
+      final result = widget.userData['result'];
       setState(() {
-        _isLoading = true;
-        _error = null;
-      });
-
-      final loanService = LoanService();
-      final userData = widget.userData;
-
-      print('DEBUG - User Data received: $userData');
-
-      // Add null checks and default values
-      final salary = double.tryParse(userData['salary']?.toString() ?? '0') ?? 0;
-      final foodExpense = double.tryParse(userData['food_expense']?.toString() ?? '0') ?? 0;
-      final transportExpense = double.tryParse(userData['transportation_expense']?.toString() ?? '0') ?? 0;
-      
-      // Calculate total liabilities (existing EMIs + other liabilities)
-      final existingEMIs = double.tryParse(userData['existing_emis']?.toString() ?? '0') ?? 0;
-      final otherLiabilities = double.tryParse(userData['other_liabilities']?.toString() ?? '0') ?? 0;
-      final totalLiabilities = existingEMIs + otherLiabilities;
-
-      print('DEBUG - Values being sent to API:');
-      print('Salary: $salary');
-      print('Total Liabilities: $totalLiabilities');
-      print('Food Expense: $foodExpense');
-      print('Transport Expense: $transportExpense');
-      print('Total Expenses: ${foodExpense + transportExpense}');
-      print('Requested Tenure: 60');
-
-      // Only proceed if salary is greater than 0
-      if (salary <= 0) {
-        throw Exception('Invalid salary amount');
-      }
-
-      final response = await loanService.getLoanDecision(
-        salary: salary,
-        liabilities: totalLiabilities,
-        expenses: foodExpense + transportExpense,
-        requestedTenure: 60, // Start with maximum tenure
-      );
-
-      print('DEBUG - Loan Decision Response:');
-      print('Status: ${response['status']}');
-      print('Decision: ${response['decision']}');
-      print('Finance Amount: ${response['finance_amount']}');
-      print('EMI: ${response['emi']}');
-      print('Total Repayment: ${response['total_repayment']}');
-      print('Interest: ${response['interest']}');
-
-      if (response['status'] == 'success' && response['decision'] == 'approved') {
-        // Validate finance amount and EMI
-        final financeAmount = double.tryParse(response['finance_amount']?.toString() ?? '0') ?? 0;
-        final monthlyEMI = double.tryParse(response['emi']?.toString() ?? '0') ?? 0;
-        final totalRepayment = double.tryParse(response['total_repayment']?.toString() ?? '0') ?? 0;
-        final interest = double.tryParse(response['interest']?.toString() ?? '0') ?? 0;
-        
-        // Get flat rate from API response or use default
-        _flatRate = double.tryParse(response['flat_rate']?.toString() ?? '0.05') ?? 0.05;
-        print('DEBUG - Flat Rate from API: $_flatRate');
-
-        // Store application number from API response
-        widget.userData['application_number'] = response['application_number'];
-        print('DEBUG - Application Number from API: ${widget.userData['application_number']}');
-
-        print('DEBUG - Validating response values:');
-        print('Finance Amount: $financeAmount (Min required: 10000)');
-        print('Monthly EMI: $monthlyEMI');
-        print('Total Repayment: $totalRepayment');
-        print('Interest: $interest');
-
-        // Check if finance amount meets minimum requirement
-        if (financeAmount < 10000) {
-          print('DEBUG - Finance amount too low: $financeAmount');
-          setState(() {
-            _error = isArabic 
-              ? 'عذراً، المبلغ المتاح للتمويل أقل من الحد الأدنى المطلوب (10,000 ريال)'
-              : 'Sorry, the available finance amount is below the minimum requirement (10,000 SAR)';
-            _isLoading = false;
-          });
-          return;
-        }
-
-        // Check if EMI is reasonable (not zero or negative)
-        if (monthlyEMI <= 0) {
-          print('DEBUG - Invalid EMI amount: $monthlyEMI');
-          setState(() {
-            _error = isArabic 
-              ? 'عذراً، حدث خطأ في حساب القسط الشهري'
-              : 'Sorry, there was an error calculating the monthly installment';
-            _isLoading = false;
-          });
-          return;
-        }
-
-        setState(() {
-          // Store original values from API
-          _originalFinanceAmount = financeAmount;
-          _originalEMI = monthlyEMI;
-          _originalTotalRepayment = totalRepayment;
-          _originalInterest = interest;
-          _originalTenure = int.tryParse(response['tenure_months']?.toString() ?? '60') ?? 60;
-
-          // Set current values
-          _maxFinanceAmount = financeAmount;
-          print('DEBUG - Setting max finance amount: $_maxFinanceAmount');
-          this.financeAmount = _maxFinanceAmount;
-          _maxEMI = monthlyEMI;
-          emi = _maxEMI;
-          tenure = _originalTenure;
-          _totalRepayment = totalRepayment;
-          _interest = interest;
-          _isLoading = false;
-        });
-      } else {
-        print('DEBUG - Loan not approved:');
-        print('Status: ${response['status']}');
-        print('Code: ${response['code']}');
-        print('Message: ${response['message']}');
-        
-        if (response['code'] == 'ACTIVE_APPLICATION_EXISTS') {
-          _showActiveLoanDialog(
-            response['application_no'], 
-            response['current_status'],
-            response['message'],
-            response['message_ar']
-          );
-          return;
-        }
-        setState(() {
-          _error = isArabic 
-            ? 'عذراً، لم نتمكن من الموافقة على طلب التمويل الخاص بك في هذا الوقت'
-            : 'Sorry, we could not approve your finance application at this time';
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      print('Error fetching loan decision: $e');
-      setState(() {
-        _error = isArabic 
-          ? 'حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى'
-          : 'An error occurred while processing your request. Please try again';
         _isLoading = false;
+        _error = null;
+        
+        // Set finance amount
+        _maxFinanceAmount = double.tryParse(result['eligibleAmount']?.toString() ?? '0') ?? 0;
+        financeAmount = _maxFinanceAmount;
+        _originalFinanceAmount = _maxFinanceAmount;
+        
+        // Set EMI
+        _maxEMI = double.tryParse(result['eligibleEmi']?.toString() ?? '0') ?? 0;
+        emi = _maxEMI;
+        _originalEMI = _maxEMI;
+        
+        // Set tenure
+        tenure = 60; // Default tenure
+        _originalTenure = tenure;
+        
+        // Set flat rate
+        _flatRate = 0.05; // 5% flat rate
+        
+        // Calculate total repayment and interest
+        _totalRepayment = financeAmount * (1 + (_flatRate * tenure / 12));
+        _interest = _totalRepayment - financeAmount;
+        
+        _originalTotalRepayment = _totalRepayment;
+        _originalInterest = _interest;
+        
+        print('\nInitialized values:');
+        print('Finance Amount: $financeAmount');
+        print('EMI: $emi');
+        print('Tenure: $tenure');
+        print('Total Repayment: $_totalRepayment');
+        print('Interest: $_interest');
+        print('Flat Rate: $_flatRate');
+      });
+    } else {
+      setState(() {
+        _isLoading = false;
+        _error = widget.isArabic 
+          ? 'عذراً، لم نتمكن من معالجة طلبك في هذا الوقت'
+          : 'Sorry, we could not process your request at this time';
       });
     }
   }

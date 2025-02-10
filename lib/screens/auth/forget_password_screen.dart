@@ -135,14 +135,31 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
   Future<void> _verifyNationalId() async {
     if (!_formKey.currentState!.validate()) return;
 
+    print('T_ResetPass_1: Starting national ID verification process');
+    print('T_ResetPass_2: National ID: ${_nationalIdController.text}');
+
     setState(() => _isLoading = true);
 
     try {
+      print('T_ResetPass_3: Attempting to generate OTP');
       // Generate OTP using AuthService
       final response = await _authService.generateOTP(_nationalIdController.text);
+      print('T_ResetPass_4: OTP generation response: $response');
       
       if (response['success'] == true) {
+        print('T_ResetPass_5: OTP generation successful');
+        // 💡 Store phone number if available in response
+        if (response['phone'] != null) {
+          print('T_ResetPass_6: Phone number found in response: ${response['phone']}');
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('user_phone', response['phone']);
+          print('T_ResetPass_7: Stored phone number in SharedPreferences');
+        } else {
+          print('T_ResetPass_8: No phone number in response');
+        }
+
         if (mounted) {
+          print('T_ResetPass_9: Showing OTP dialog');
           final otpVerified = await showDialog<bool>(
             context: context,
             barrierDismissible: false,
@@ -150,19 +167,26 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
               nationalId: _nationalIdController.text,
               isArabic: widget.isArabic,
               onResendOTP: () async {
+                print('T_ResetPass_10: Resending OTP');
                 return await _authService.generateOTP(_nationalIdController.text);
               },
               onVerifyOTP: (otp) async {
+                print('T_ResetPass_11: Verifying OTP: $otp');
                 return await _authService.verifyOTP(_nationalIdController.text, otp);
               },
             ),
           );
 
+          print('T_ResetPass_12: OTP dialog result: $otpVerified');
           if (otpVerified == true) {
+            print('T_ResetPass_13: OTP verified successfully');
             setState(() => _otpVerified = true);
+          } else {
+            print('T_ResetPass_14: OTP verification failed or cancelled');
           }
         }
       } else {
+        print('T_ResetPass_15: OTP generation failed with code: ${response['code']}');
         String errorMessage;
         
         switch (response['code']) {
@@ -170,32 +194,37 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
             errorMessage = widget.isArabic
                 ? 'رقم الهوية غير مسجل في النظام'
                 : 'National ID is not registered in the system';
+            print('T_ResetPass_16: User not found error');
             break;
           case 'RATE_LIMIT_EXCEEDED':
             errorMessage = widget.isArabic
                 ? 'يرجى الانتظار قبل طلب رمز تحقق جديد'
                 : 'Please wait before requesting a new OTP';
+            print('T_ResetPass_17: Rate limit exceeded error');
             break;
           case 'INVALID_PHONE':
             errorMessage = widget.isArabic
                 ? 'رقم الهاتف المسجل غير صالح'
                 : 'Registered phone number is invalid';
+            print('T_ResetPass_18: Invalid phone error');
             break;
           case 'INVALID_ID_FORMAT':
             errorMessage = widget.isArabic
                 ? 'صيغة رقم الهوية غير صحيحة'
                 : 'Invalid National ID format';
+            print('T_ResetPass_19: Invalid ID format error');
             break;
           default:
             errorMessage = widget.isArabic
                 ? (response['message_ar'] ?? 'حدث خطأ غير متوقع')
                 : (response['message'] ?? 'An unexpected error occurred');
+            print('T_ResetPass_20: Unexpected error: ${response['message']}');
         }
         
         _showErrorBanner(errorMessage);
       }
     } catch (e) {
-      print('Error during verification: $e');
+      print('T_ResetPass_21: Error during verification: $e');
       _showErrorBanner(
         widget.isArabic
             ? 'حدث خطأ أثناء التحقق. يرجى المحاولة مرة أخرى'
@@ -203,6 +232,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
       );
     } finally {
       if (mounted) {
+        print('T_ResetPass_22: Resetting loading state');
         setState(() => _isLoading = false);
       }
     }
@@ -211,45 +241,45 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
   Future<void> _resetPassword() async {
     if (!_formKey.currentState!.validate()) return;
 
+    print('T_ResetPass_23: Starting password reset process');
     setState(() => _isLoading = true);
 
     try {
+      print('T_ResetPass_24: Sending password reset request');
+      print('T_ResetPass_25: National ID: ${_nationalIdController.text}');
       // Send request
       final response = await http.post(
         Uri.parse('${Constants.apiBaseUrl}${Constants.endpointPasswordChange}'),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'api-key': AuthService.apiKey,
-        },
-        body: {
-          'national_id': _nationalIdController.text,
-          'new_password': _newPasswordController.text,
-          'type': 'reset_password',
-        },
+        headers: Constants.authHeaders,
+        body: json.encode({
+          'nationalId': _nationalIdController.text,
+          'newPassword': _newPasswordController.text,
+        }),
       );
 
-      print('Response Status Code: ${response.statusCode}');
-      print('Response Body: ${response.body}');
+      print('T_ResetPass_26: Response Status Code: ${response.statusCode}');
+      print('T_ResetPass_27: Response Body: ${response.body}');
 
       final data = json.decode(response.body);
       
-      if (data['status'] == 'success') {
+      if (data['success'] == true) {
+        print('T_ResetPass_28: Password reset successful');
         _showSuccessBanner(
           widget.isArabic
-              ? data['message_ar']
-              : data['message']
+              ? data['data']['message']
+              : data['data']['message']
         );
         
         // Sign in with the new password to get user data
-        print('Attempting sign in with new password...');
+        print('T_ResetPass_29: Attempting sign in with new password');
         final signInResponse = await AuthService().signIn(
           nationalId: _nationalIdController.text,
           password: _newPasswordController.text,
         );
 
-        print('Sign in response: ${json.encode(signInResponse)}');
+        print('T_ResetPass_30: Sign in response: ${json.encode(signInResponse)}');
 
-        if (signInResponse['status'] == 'success') {
+        if (signInResponse['success'] == true && signInResponse['data'] != null) {
           // Register device
           final deviceInfo = await AuthService().getDeviceInfo();
           final registerResponse = await AuthService().registerDevice(
@@ -257,16 +287,16 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
             deviceInfo: deviceInfo,
           );
 
-          print('Device registration response: ${json.encode(registerResponse)}');
+          print('T_ResetPass_31: Device registration response: ${json.encode(registerResponse)}');
 
-          if (registerResponse['status'] == 'success') {
+          if (registerResponse['success'] == true) {
             // Reset manual sign off flag in session provider
             if (mounted) {
               Provider.of<SessionProvider>(context, listen: false).resetManualSignOff();
             }
 
             // Store user data in local storage
-            await AuthService().storeUserData(signInResponse['user']);
+            await AuthService().storeUserData(signInResponse['data']['user']);
 
             // Set session as active
             final prefs = await SharedPreferences.getInstance();
@@ -281,7 +311,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
                     builder: (context) => MPINSetupScreen(
                       nationalId: _nationalIdController.text,
                       password: _newPasswordController.text,
-                      user: signInResponse['user'],
+                      user: signInResponse['data']['user'],
                       isArabic: widget.isArabic,
                       showSteps: false,
                     ),
@@ -290,7 +320,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
               }
             });
           } else {
-            print('Device registration failed with code: ${registerResponse['code']}');
+            print('T_ResetPass_32: Device registration failed with code: ${registerResponse['code']}');
             String errorMessage;
             
             switch (registerResponse['code']) {
@@ -313,7 +343,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
             _showErrorBanner(errorMessage);
           }
         } else {
-          print('Sign in failed with code: ${signInResponse['code']}');
+          print('T_ResetPass_33: Sign in failed with code: ${signInResponse['code']}');
           String errorMessage;
           
           switch (signInResponse['code']) {
@@ -353,7 +383,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
         );
       }
     } catch (e) {
-      print('Error during password reset: $e');
+      print('T_ResetPass_34: Error during password reset: $e');
       _showErrorBanner(
         widget.isArabic
             ? 'حدث خطأ أثناء تغيير كلمة المرور. يرجى المحاولة مرة أخرى'
@@ -361,6 +391,7 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
       );
     } finally {
       if (mounted) {
+        print('T_ResetPass_35: Resetting loading state');
         setState(() => _isLoading = false);
       }
     }

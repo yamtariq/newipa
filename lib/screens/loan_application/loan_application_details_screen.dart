@@ -7,6 +7,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../utils/constants.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../services/document_upload_service.dart';
+import '../../services/loan_service.dart';
 
 class LoanApplicationDetailsScreen extends StatefulWidget {
   final bool isArabic;
@@ -22,6 +25,7 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
   Map<String, dynamic> _userData = {};
   Map<String, String> _uploadedFiles = {};
   bool _salaryChanged = false;
+  bool _consentAccepted = false;
   bool get isArabic => widget.isArabic;
 
   @override
@@ -32,21 +36,145 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
 
   Future<void> _fetchUserData() async {
     try {
+      print('\n=== LOAN APPLICATION DETAILS - DATA FETCH START ===');
+      
+      // 💡 First try secure storage for user data
       final userDataStr = await _secureStorage.read(key: 'user_data');
+      print('1. Secure Storage - user_data: $userDataStr');
+      
+      String? selectedSalaryStr = await _secureStorage.read(key: 'selected_salary_data');
+      print('2. Secure Storage - selected_salary_data: $selectedSalaryStr');
+      
+      String? dakhliSalaryStr = await _secureStorage.read(key: 'dakhli_salary_data');
+      print('3. Secure Storage - dakhli_salary_data: $dakhliSalaryStr');
+
+      // 💡 Get registration data from SharedPreferences with correct key
+      final prefs = await SharedPreferences.getInstance();
+      final registrationDataStr = prefs.getString('registration_data');
+      int? dependentsCount;
+      
+      if (registrationDataStr != null) {
+        try {
+          final registrationData = json.decode(registrationDataStr);
+          print('3.1. Registration data found: ${registrationData['userData']}');
+          if (registrationData['userData'] != null) {
+            // Access the correct field from userData
+            dependentsCount = registrationData['userData']['totalNumberOfCurrentDependents'] as int?;
+            print('3.2. Found dependents count: $dependentsCount');
+          }
+        } catch (e) {
+          print('Error parsing registration data: $e');
+        }
+      }
+      
+      Map<String, dynamic>? userData;
+      
+      // Try to get user data from secure storage first
       if (userDataStr != null) {
-        final userData = json.decode(userDataStr);
+        final parsedData = json.decode(userDataStr);
+        print('4. Parsed Secure Storage user data: $parsedData');
+        
+        // 💡 Map the fields correctly and include dependents with priority to registration data
+        userData = {
+          'name': parsedData['fullName'] ?? parsedData['full_name'] ?? '${parsedData['firstName'] ?? ''} ${parsedData['lastName'] ?? ''}'.trim(),
+          'arabic_name': parsedData['arabicName'] ?? parsedData['arabic_name'] ?? parsedData['fullName'] ?? '',
+          'national_id': parsedData['nationalId'] ?? parsedData['national_id'],
+          'email': parsedData['email'],
+          'dependents': dependentsCount?.toString() ?? '0', // Always use the registration data value
+        };
+      }
+      
+      // If not found in secure storage, try SharedPreferences
+      if (userData == null || userData['name']?.toString().trim().isEmpty == true) {
+        print('\n5. No valid data in secure storage, checking SharedPreferences...');
+        final prefsUserDataStr = prefs.getString('user_data');
+        print('10. SharedPreferences - user_data: $prefsUserDataStr');
+        
+        if (prefsUserDataStr != null) {
+          final prefsData = json.decode(prefsUserDataStr);
+          print('11. Parsed SharedPreferences user data: $prefsData');
+          
+          // 💡 Map the fields correctly from SharedPreferences
+          userData = {
+            'name': '${prefsData['first_name_en'] ?? ''} ${prefsData['family_name_en'] ?? ''}'.trim(),
+            'arabic_name': '${prefsData['first_name_ar'] ?? ''} ${prefsData['family_name_ar'] ?? ''}'.trim(),
+            'national_id': prefsData['national_id'],
+            'email': prefsData['email'],
+            'phone': prefsData['phone'],
+            'date_of_birth': prefsData['date_of_birth'],
+            'iban': prefsData['iban'],
+            'dependents': prefsData['dependents'] ?? '0',
+          };
+          print('11a. Mapped SharedPreferences user data: $userData');
+        }
+      }
+
+      // 💡 Handle salary data (preserving existing salary logic)
+      print('\n12. Processing salary data...');
+      if (selectedSalaryStr != null) {
+        final selectedSalary = json.decode(selectedSalaryStr);
+        print('13. Selected salary data: $selectedSalary');
+        userData = userData ?? {};
+        userData['salary'] = selectedSalary['amount']?.toString() ?? userData['salary'];
+        userData['employer'] = selectedSalary['employer'];
+        // Only update name if it's empty
+        if (userData['name']?.toString().trim().isEmpty == true) {
+          userData['name'] = selectedSalary['fullName'];
+          // Try to set Arabic name if it's empty
+          if (userData['arabic_name']?.toString().trim().isEmpty == true) {
+            userData['arabic_name'] = selectedSalary['fullName'];
+          }
+        }
+        _uploadedFiles['salary'] = 'Verified through Dakhli';
+        print('14. Updated user data with selected salary: $userData');
+      } else if (dakhliSalaryStr != null) {
+        final dakhliData = json.decode(dakhliSalaryStr);
+        print('15. Dakhli salary data: $dakhliData');
+        final salaries = List<Map<String, dynamic>>.from(dakhliData['salaries'] ?? []);
+        if (salaries.isNotEmpty) {
+          userData = userData ?? {};
+          // Get the highest salary
+          final highestSalary = salaries.reduce((a, b) => 
+            double.parse(a['amount'].toString()) > double.parse(b['amount'].toString()) ? a : b);
+          userData['salary'] = highestSalary['amount']?.toString() ?? userData['salary'];
+          userData['employer'] = highestSalary['employer'];
+          // Only update name if it's empty
+          if (userData['name']?.toString().trim().isEmpty == true) {
+            userData['name'] = highestSalary['fullName'];
+            // Try to set Arabic name if it's empty
+            if (userData['arabic_name']?.toString().trim().isEmpty == true) {
+              userData['arabic_name'] = highestSalary['fullName'];
+            }
+          }
+          _uploadedFiles['salary'] = 'Verified through Dakhli';
+          print('16. Updated user data with Dakhli salary: $userData');
+        }
+      }
+
+      print('\n17. Final user data before setState: $userData');
+      if (userData != null) {
         setState(() {
-          _userData = userData;
+          _userData = userData!;
           // Set default values for required fields if they're null
           _userData['salary'] ??= '0';
-          _userData['loan_purpose'] ??= isArabic ? 'أسهم' : 'Stocks';  // Add Arabic translation for Stocks
+          _userData['loan_purpose'] ??= isArabic ? 'أسهم' : 'Stocks';
           double salary = double.parse(_userData['salary'].toString());
           _userData['food_expense'] = (salary * 0.08).round().toString();
           _userData['transportation_expense'] = (salary * 0.05).round().toString();
           _userData['other_liabilities'] ??= '';
           _isLoading = false;
+          print('\n18. Final _userData after setState:');
+          print('- Name: ${_userData['name']}');
+          print('- Arabic Name: ${_userData['arabic_name']}');
+          print('- National ID: ${_userData['national_id']}');
+          print('- Email: ${_userData['email']}');
+          print('- Salary: ${_userData['salary']}');
+          print('- Loan Purpose: ${_userData['loan_purpose']}');
+          print('- Food Expense: ${_userData['food_expense']}');
+          print('- Transportation: ${_userData['transportation_expense']}');
         });
       } else {
+        print('\nERROR: No user data found in any storage location');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -59,7 +187,7 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
         }
       }
     } catch (e) {
-      print('Error loading user data: $e');
+      print('\nERROR loading user data: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -72,6 +200,7 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
       }
     } finally {
       setState(() => _isLoading = false);
+      print('\n=== LOAN APPLICATION DETAILS - DATA FETCH END ===\n');
     }
   }
 
@@ -180,6 +309,71 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
     }
   }
 
+  Widget _buildUploadOverlay(BuildContext context, {required bool isArabic}) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final surfaceColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
+    final textColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
+
+    return Container(
+      color: Colors.black54,
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+          decoration: BoxDecoration(
+            color: surfaceColor,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: primaryColor.withOpacity(0.2),
+                blurRadius: 20,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                  strokeWidth: 3,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                isArabic ? 'جاري تحميل المستند' : 'Uploading document',
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isArabic ? 'يرجى الانتظار' : 'Please wait',
+                style: TextStyle(
+                  color: textColor.withOpacity(0.7),
+                  fontSize: 14,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _pickFile(String field) async {
     print('Picking file for field: $field');
     print('Current uploaded files before picking: $_uploadedFiles');
@@ -194,9 +388,7 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
             showDialog(
               context: context,
               barrierDismissible: false,
-              builder: (BuildContext context) {
-                return const Center(child: CircularProgressIndicator());
-              },
+              builder: (BuildContext context) => _buildUploadOverlay(context, isArabic: isArabic),
             );
           } else {
             Navigator.of(context).pop();
@@ -212,14 +404,48 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
           return;
         }
 
-        setState(() {
-          _uploadedFiles[field] = file.name;
-          print('File picked successfully. Updated uploaded files: $_uploadedFiles');
-          // Only reset salary changed flag for salary document
-          if (field == 'salary') {
-            _salaryChanged = false;
-          }
-        });
+        // 💡 Upload document to server
+        final documentUploadService = DocumentUploadService();
+        final nationalId = _userData['national_id']?.toString() ?? '';
+        
+        if (nationalId.isEmpty) {
+          _showError('National ID not found');
+          return;
+        }
+
+        // Show loading dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) => _buildUploadOverlay(context, isArabic: isArabic),
+        );
+
+        // Upload document
+        final success = await documentUploadService.uploadDocument(
+          nationalId: nationalId,
+          documentType: field,
+          filePath: file.path!,
+          fileName: file.name,
+          productType: 'loan',
+        );
+
+        // Hide loading dialog
+        Navigator.of(context).pop();
+
+        if (success) {
+          setState(() {
+            _uploadedFiles[field] = file.name;
+            print('File picked and uploaded successfully. Updated uploaded files: $_uploadedFiles');
+            // Only reset salary changed flag for salary document
+            if (field == 'salary') {
+              _salaryChanged = false;
+            }
+          });
+        } else {
+          _showError(isArabic 
+            ? 'فشل تحميل المستند. الرجاء المحاولة مرة أخرى'
+            : 'Failed to upload document. Please try again');
+        }
       } else {
         print('User canceled file picking');
       }
@@ -456,18 +682,78 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () async {
-                      FilePickerResult? result = await FilePicker.platform.pickFiles(
-                        type: FileType.custom,
-                        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
-                      );
-                      if (result != null) {
-                        setDialogState(() {
-                          fileName = result.files.single.name;
-                          if (field == 'salary') {
-                            validationError = null;
+                      try {
+                        FilePickerResult? result = await FilePicker.platform.pickFiles(
+                          type: FileType.custom,
+                          allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+                        );
+                        
+                        if (result != null) {
+                          final file = result.files.single;
+                          
+                          // Check file size (max 10MB)
+                          if (file.size > 10 * 1024 * 1024) {
+                            setDialogState(() {
+                              validationError = isArabic 
+                                ? 'يجب أن يكون حجم الملف أقل من 10 ميجابايت'
+                                : 'File size must be less than 10MB';
+                            });
+                            return;
                           }
+
+                          // 💡 Upload document
+                          final documentUploadService = DocumentUploadService();
+                          final nationalId = _userData['national_id']?.toString() ?? '';
+                          
+                          if (nationalId.isEmpty) {
+                            setDialogState(() {
+                              validationError = isArabic 
+                                ? 'لم يتم العثور على رقم الهوية'
+                                : 'National ID not found';
+                            });
+                            return;
+                          }
+
+                          // Show loading indicator
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (BuildContext context) => _buildUploadOverlay(context, isArabic: isArabic),
+                          );
+
+                          // Upload document
+                          final success = await documentUploadService.uploadDocument(
+                            nationalId: nationalId,
+                            documentType: field,
+                            filePath: file.path!,
+                            fileName: file.name,
+                            productType: 'loan',
+                          );
+
+                          // Hide loading dialog
+                          Navigator.of(context).pop();
+
+                          if (success) {
+                            setDialogState(() {
+                              fileName = file.name;
+                              validationError = null;
+                            });
+                            _uploadedFiles[field] = file.name;
+                          } else {
+                            setDialogState(() {
+                              validationError = isArabic 
+                                ? 'فشل تحميل المستند. الرجاء المحاولة مرة أخرى'
+                                : 'Failed to upload document. Please try again';
+                            });
+                          }
+                        }
+                      } catch (e) {
+                        print('Error picking/uploading file: $e');
+                        setDialogState(() {
+                          validationError = isArabic 
+                            ? 'خطأ في تحميل الملف: ${e.toString()}'
+                            : 'Error uploading file: ${e.toString()}';
                         });
-                        _uploadedFiles[field] = result.files.single.name;
                       }
                     },
                     style: ElevatedButton.styleFrom(
@@ -578,7 +864,7 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
       case 'salary':
         return 'تحديث الراتب';
       case 'loan_purpose':
-        return 'تحديث الغرض من القرض';
+        return 'تحديث الغرض من التمويل';
       case 'ibanNo':
         return 'تحديث رقم الآيبان';
       case 'food_expense':
@@ -676,7 +962,7 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
       case 'National ID':
         return 'رقم الهوية';
       case 'Loan Purpose':
-        return 'الغرض من القرض';
+        return 'الغرض من التمويل';
       case 'Email':
         return 'البريد الإلكتروني';
       case 'Salary':
@@ -689,6 +975,8 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
         return 'مصاريف المواصلات';
       case 'Other Liabilities':
         return 'إلتزامات أخرى';
+      case 'Number of Dependents':
+        return 'عدد المعالين';
       default:
         return englishLabel;
     }
@@ -709,7 +997,9 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
       case 'email':
         return 'البريد الإلكتروني';
       case 'loan_purpose':
-        return 'الغرض من القرض';
+        return 'الغرض من التمويل';
+      case 'dependents':
+        return 'عدد المعالين';
       default:
         return field;
     }
@@ -880,7 +1170,8 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                       _userData['salary'] != null &&
                       _userData['ibanNo'] != null &&
                       _uploadedFiles['national_id'] != null &&
-                      _uploadedFiles['ibanNo'] != null;
+                      _uploadedFiles['ibanNo'] != null &&
+                      _consentAccepted;
 
     return Directionality(
       textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
@@ -967,6 +1258,7 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                                   _buildInfoField('National ID', _userData['national_id']?.toString() ?? ''),
                                   _buildInfoField('Loan Purpose', _userData['loan_purpose']?.toString() ?? (isArabic ? 'أسهم' : 'Stocks'), editable: true, fieldName: 'loan_purpose'),
                                   _buildInfoField('Email', _userData['email']?.toString() ?? '', editable: true),
+                                  _buildInfoField('Number of Dependents', _userData['dependents']?.toString() ?? '0', editable: false, fieldName: 'dependents'),
                                   _buildInfoField(
                                     'Salary', 
                                     double.parse(_userData['salary']?.toString() ?? '0').round().toString(), 
@@ -1049,21 +1341,111 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                             ),
                             const SizedBox(height: 32),
 
+                            // Consent Section
+                            Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                color: surfaceColor,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: primaryColor.withOpacity(0.05),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 5),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: Checkbox(
+                                          value: _consentAccepted,
+                                          onChanged: (value) {
+                                            setState(() {
+                                              _consentAccepted = value ?? false;
+                                            });
+                                          },
+                                          activeColor: primaryColor,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          isArabic
+                                              ? 'أقر بأن جميع المعلومات المقدمة صحيحة وكاملة'
+                                              : 'I declare that all provided information is true and complete',
+                                          style: TextStyle(
+                                            color: textColor,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+
                             // Next Button
                             SizedBox(
                               width: double.infinity,
                               height: 56,
                               child: ElevatedButton(
-                                onPressed: canProceed ? () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => LoanOfferScreen(
-                                        userData: _userData,
-                                        isArabic: isArabic,
+                                onPressed: canProceed ? () async {
+                                  try {
+                                    setState(() => _isLoading = true);
+                                    
+                                    print('\n=== LOAN APPLICATION NEXT BUTTON CLICKED ===');
+                                    print('Timestamp: ${DateTime.now()}');
+                                    
+                                    // Call the loan service to create offer
+                                    final loanService = LoanService();
+                                    final response = await loanService.createLoanApplicationOffer(
+                                      isArabic: isArabic
+                                    );
+                                    
+                                    if (!mounted) return;
+                                    
+                                    if (response['status'] == 'error') {
+                                      throw Exception(response['message']);
+                                    }
+                                    
+                                    // Navigate to offer screen with response data
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => LoanOfferScreen(
+                                          userData: response,
+                                          isArabic: isArabic,
+                                        ),
                                       ),
-                                    ),
-                                  );
+                                    );
+                                  } catch (e) {
+                                    print('Error creating loan offer: $e');
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            isArabic 
+                                              ? 'حدث خطأ أثناء إنشاء عرض التمويل'
+                                              : 'Error creating loan offer',
+                                            textAlign: isArabic ? TextAlign.right : TextAlign.left,
+                                          ),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
+                                  } finally {
+                                    if (mounted) {
+                                      setState(() => _isLoading = false);
+                                    }
+                                  }
                                 } : null,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: primaryColor,

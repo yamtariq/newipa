@@ -122,5 +122,15 @@
 				</dict>
 			</dict>
 		</dict>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>We need access to photo library to upload required documents</string>
+		<key>NSCameraUsageDescription</key>
+		<string>We need access to camera to capture required documents</string>
+		<key>NSMicrophoneUsageDescription</key>
+		<string>We do not need microphone access</string>
+		<key>LSSupportsOpeningDocumentsInPlace</key>
+		<true/>
+		<key>UIFileSharingEnabled</key>
+		<true/>
 	</dict>
 </plist>

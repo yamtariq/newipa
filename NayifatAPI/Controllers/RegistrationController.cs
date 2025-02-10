@@ -92,9 +92,24 @@ namespace NayifatAPI.Controllers
                     Password = hashedPassword,
                     DateOfBirth = registrationRequest.DateOfBirth,
                     IdExpiryDate = registrationRequest.IdExpiryDate,
+                    BuildingNo = registrationRequest.BuildingNo,
+                    Street = registrationRequest.Street,
+                    District = registrationRequest.District,
+                    City = registrationRequest.City,
+                    Zipcode = registrationRequest.Zipcode,
+                    AddNo = registrationRequest.AddNo,
+                    Iban = registrationRequest.Iban,
+                    Dependents = registrationRequest.Dependents,
+                    SalaryDakhli = registrationRequest.SalaryDakhli,
+                    SalaryCustomer = registrationRequest.SalaryCustomer,
+                    Los = registrationRequest.Los,
+                    Sector = registrationRequest.Sector,
+                    Employer = registrationRequest.Employer,
                     RegistrationDate = DateTime.UtcNow,
-                    Consent = true,
-                    ConsentDate = DateTime.UtcNow
+                    Consent = registrationRequest.Consent,
+                    ConsentDate = DateTime.UtcNow,
+                    NafathStatus = registrationRequest.NafathStatus ?? "pending",
+                    NafathTimestamp = DateTime.UtcNow
                 };
 
                 _logger.LogDebug("📝 New Customer Data: {@Customer}", new 
@@ -106,6 +121,7 @@ namespace NayifatAPI.Controllers
                     customer.Phone,
                     customer.DateOfBirth,
                     customer.IdExpiryDate,
+                    customer.Dependents,
                     customer.RegistrationDate
                 });
 
@@ -152,7 +168,8 @@ namespace NayifatAPI.Controllers
                         email = customer.Email,
                         phone = customer.Phone,
                         date_of_birth = customer.DateOfBirth?.ToString("yyyy-MM-dd"),
-                        id_expiry_date = customer.IdExpiryDate?.ToString("yyyy-MM-dd")
+                        id_expiry_date = customer.IdExpiryDate?.ToString("yyyy-MM-dd"),
+                        dependents = customer.Dependents
                     }
                 };
 
@@ -196,7 +213,6 @@ namespace NayifatAPI.Controllers
         public string? Zipcode { get; set; }
         public string? AddNo { get; set; }
         public string? Iban { get; set; }
-        public int? Dependents { get; set; }
         public decimal? SalaryDakhli { get; set; }
         public decimal? SalaryCustomer { get; set; }
         public int? Los { get; set; }
@@ -204,6 +220,7 @@ namespace NayifatAPI.Controllers
         public string? Employer { get; set; }
         public bool Consent { get; set; }
         public string? NafathStatus { get; set; }
+        public int? Dependents { get; set; }
         public required DeviceInfo DeviceInfo { get; set; }
     }
 

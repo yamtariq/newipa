@@ -8,6 +8,8 @@ import '../../utils/constants.dart';
 import 'dart:math' as math;
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../services/document_upload_service.dart';
 
 class CardApplicationDetailsScreen extends StatefulWidget {
   final bool isArabic;
@@ -23,6 +25,7 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
   Map<String, dynamic> _userData = {};
   Map<String, String> _uploadedFiles = {};
   bool _salaryChanged = false;
+  bool _consentAccepted = false;
   bool get isArabic => widget.isArabic;
 
   @override
@@ -33,56 +36,166 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
 
   Future<void> _fetchUserData() async {
     try {
+      print('\n=== CARD APPLICATION DETAILS - DATA FETCH START ===');
+      
+      // 💡 First try secure storage for user data
       final userDataStr = await _secureStorage.read(key: 'user_data');
+      print('1. Secure Storage - user_data: $userDataStr');
+      
+      // 💡 Get salary data from secure storage
+      String? selectedSalaryStr = await _secureStorage.read(key: 'selected_salary_data');
+      print('2. Secure Storage - selected_salary_data: $selectedSalaryStr');
+      
+      String? dakhliSalaryStr = await _secureStorage.read(key: 'dakhli_salary_data');
+      print('3. Secure Storage - dakhli_salary_data: $dakhliSalaryStr');
+      
+      // 💡 Get registration data from SharedPreferences with correct key
+      final prefs = await SharedPreferences.getInstance();
+      final registrationDataStr = prefs.getString('registration_data');
+      int? dependentsCount;
+      
+      if (registrationDataStr != null) {
+        try {
+          final registrationData = json.decode(registrationDataStr);
+          print('4. Registration data found: ${registrationData['userData']}');
+          if (registrationData['userData'] != null) {
+            dependentsCount = registrationData['userData']['totalNumberOfCurrentDependents'] as int?;
+            print('5. Found dependents count: $dependentsCount');
+          }
+        } catch (e) {
+          print('Error parsing registration data: $e');
+        }
+      }
+      
+      Map<String, dynamic>? userData;
+      
+      // Try to get user data from secure storage first
       if (userDataStr != null) {
-        final userData = json.decode(userDataStr);
+        final parsedData = json.decode(userDataStr);
+        print('6. Parsed Secure Storage user data: $parsedData');
+        
+        // 💡 Map the fields correctly and include dependents
+        userData = {
+          'name': parsedData['fullName'] ?? parsedData['full_name'] ?? '${parsedData['firstName'] ?? ''} ${parsedData['lastName'] ?? ''}'.trim(),
+          'arabic_name': parsedData['arabicName'] ?? parsedData['arabic_name'] ?? parsedData['fullName'] ?? '',
+          'national_id': parsedData['nationalId'] ?? parsedData['national_id'],
+          'email': parsedData['email'],
+          'dependents': dependentsCount?.toString() ?? '0',
+        };
+      }
+      
+      // If not found in secure storage, try SharedPreferences
+      if (userData == null || userData['name']?.toString().trim().isEmpty == true) {
+        print('\n7. No valid data in secure storage, checking SharedPreferences...');
+        final prefsUserDataStr = prefs.getString('user_data');
+        print('8. SharedPreferences - user_data: $prefsUserDataStr');
+        
+        if (prefsUserDataStr != null) {
+          final prefsData = json.decode(prefsUserDataStr);
+          print('9. Parsed SharedPreferences user data: $prefsData');
+          
+          // 💡 Map the fields correctly from SharedPreferences
+          userData = {
+            'name': '${prefsData['first_name_en'] ?? ''} ${prefsData['family_name_en'] ?? ''}'.trim(),
+            'arabic_name': '${prefsData['first_name_ar'] ?? ''} ${prefsData['family_name_ar'] ?? ''}'.trim(),
+            'national_id': prefsData['national_id'],
+            'email': prefsData['email'],
+            'phone': prefsData['phone'],
+            'date_of_birth': prefsData['date_of_birth'],
+            'dependents': prefsData['dependents'] ?? dependentsCount?.toString() ?? '0',
+          };
+          print('10. Mapped SharedPreferences user data: $userData');
+        }
+      }
+
+      // 💡 Handle salary data (preserving existing salary logic)
+      print('\n11. Processing salary data...');
+      if (selectedSalaryStr != null) {
+        final selectedSalary = json.decode(selectedSalaryStr);
+        print('12. Selected salary data: $selectedSalary');
+        userData = userData ?? {};
+        userData['salary'] = selectedSalary['amount']?.toString() ?? userData['salary'];
+        userData['employer'] = selectedSalary['employer'];
+        // Only update name if it's empty
+        if (userData['name']?.toString().trim().isEmpty == true) {
+          userData['name'] = selectedSalary['fullName'];
+          // Try to set Arabic name if it's empty
+          if (userData['arabic_name']?.toString().trim().isEmpty == true) {
+            userData['arabic_name'] = selectedSalary['fullName'];
+          }
+        }
+        _uploadedFiles['salary'] = 'Verified through Dakhli';
+        print('13. Updated user data with selected salary: $userData');
+      } else if (dakhliSalaryStr != null) {
+        final dakhliData = json.decode(dakhliSalaryStr);
+        print('14. Dakhli salary data: $dakhliData');
+        final salaries = List<Map<String, dynamic>>.from(dakhliData['salaries'] ?? []);
+        if (salaries.isNotEmpty) {
+          userData = userData ?? {};
+          // Get the highest salary
+          final highestSalary = salaries.reduce((a, b) => 
+            double.parse(a['amount'].toString()) > double.parse(b['amount'].toString()) ? a : b);
+          userData['salary'] = highestSalary['amount']?.toString() ?? userData['salary'];
+          userData['employer'] = highestSalary['employer'];
+          // Only update name if it's empty
+          if (userData['name']?.toString().trim().isEmpty == true) {
+            userData['name'] = highestSalary['fullName'];
+            // Try to set Arabic name if it's empty
+            if (userData['arabic_name']?.toString().trim().isEmpty == true) {
+              userData['arabic_name'] = highestSalary['fullName'];
+            }
+          }
+          _uploadedFiles['salary'] = 'Verified through Dakhli';
+          print('15. Updated user data with Dakhli salary: $userData');
+        }
+      }
+
+      print('\n16. Final user data before setState: $userData');
+      if (userData != null) {
         setState(() {
-          _userData = userData;
+          _userData = userData!;
           _userData['salary'] ??= '0';
           double salary = double.parse(_userData['salary'].toString());
           _userData['food_expense'] = (salary * 0.08).round().toString();
           _userData['transportation_expense'] = (salary * 0.05).round().toString();
           _userData['other_liabilities'] ??= '';
           _isLoading = false;
+          print('\n17. Final _userData after setState:');
+          print('- Name: ${_userData['name']}');
+          print('- Arabic Name: ${_userData['arabic_name']}');
+          print('- National ID: ${_userData['national_id']}');
+          print('- Email: ${_userData['email']}');
+          print('- Salary: ${_userData['salary']}');
+          print('- Dependents: ${_userData['dependents']}');
         });
       } else {
+        print('\nERROR: No user data found in any storage location');
         if (mounted) {
-          final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                isArabic ? 'لم يتم العثور على بيانات المستخدم' : 'User data not found',
-                style: TextStyle(
-                  color: themeProvider.isDarkMode ? Colors.black : Colors.white,
-                ),
-              ),
-              backgroundColor: Color(themeProvider.isDarkMode 
-                  ? Constants.darkPrimaryColor 
-                  : Constants.lightPrimaryColor),
+              content: Text(isArabic 
+                ? 'لم يتم العثور على بيانات المستخدم' 
+                : 'User data not found'),
+              backgroundColor: Colors.red,
             ),
           );
         }
       }
     } catch (e) {
-      print('Error loading user data: $e');
+      print('\nERROR loading user data: $e');
       if (mounted) {
-        final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              isArabic ? 'خطأ في تحميل بيانات المستخدم' : 'Error loading user data',
-              style: TextStyle(
-                color: themeProvider.isDarkMode ? Colors.black : Colors.white,
-              ),
-            ),
-            backgroundColor: Color(themeProvider.isDarkMode 
-                ? Constants.darkPrimaryColor 
-                : Constants.lightPrimaryColor),
+            content: Text(isArabic 
+              ? 'خطأ في تحميل بيانات المستخدم' 
+              : 'Error loading user data'),
+            backgroundColor: Colors.red,
           ),
         );
       }
     } finally {
       setState(() => _isLoading = false);
+      print('\n=== CARD APPLICATION DETAILS - DATA FETCH END ===\n');
     }
   }
 
@@ -188,6 +301,71 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
     }
   }
 
+  Widget _buildUploadOverlay(BuildContext context, {required bool isArabic}) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final surfaceColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
+    final textColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
+
+    return Container(
+      color: Colors.black54,
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+          decoration: BoxDecoration(
+            color: surfaceColor,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: primaryColor.withOpacity(0.2),
+                blurRadius: 20,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                  strokeWidth: 3,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                isArabic ? 'جاري تحميل المستند' : 'Uploading document',
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isArabic ? 'يرجى الانتظار' : 'Please wait',
+                style: TextStyle(
+                  color: textColor.withOpacity(0.7),
+                  fontSize: 14,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _pickFile(String field) async {
     print('Picking file for field: $field');
     print('Current uploaded files before picking: $_uploadedFiles');
@@ -202,9 +380,7 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
             showDialog(
               context: context,
               barrierDismissible: false,
-              builder: (BuildContext context) {
-                return const Center(child: CircularProgressIndicator());
-              },
+              builder: (BuildContext context) => _buildUploadOverlay(context, isArabic: isArabic),
             );
           } else {
             Navigator.of(context).pop();
@@ -216,20 +392,60 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
         final file = result.files.single;
         // Check file size (max 10MB)
         if (file.size > 10 * 1024 * 1024) {
-          _showError('File size must be less than 10MB');
+          _showError(isArabic ? 'يجب أن يكون حجم الملف أقل من 10 ميجابايت' : 'File size must be less than 10MB');
           return;
         }
 
-        setState(() {
-          _uploadedFiles[field] = file.name;
-          print('File picked successfully. Updated uploaded files: $_uploadedFiles');
-        });
+        // 💡 Upload document to server
+        final documentUploadService = DocumentUploadService();
+        final nationalId = _userData['national_id']?.toString() ?? '';
+        
+        if (nationalId.isEmpty) {
+          _showError(isArabic ? 'لم يتم العثور على رقم الهوية' : 'National ID not found');
+          return;
+        }
+
+        // Show loading dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) => _buildUploadOverlay(context, isArabic: isArabic),
+        );
+
+        // Upload document
+        final success = await documentUploadService.uploadDocument(
+          nationalId: nationalId,
+          documentType: field,
+          filePath: file.path!,
+          fileName: file.name,
+          productType: 'card',
+        );
+
+        // Hide loading dialog
+        Navigator.of(context).pop();
+
+        if (success) {
+          setState(() {
+            _uploadedFiles[field] = file.name;
+            print('File picked and uploaded successfully. Updated uploaded files: $_uploadedFiles');
+            // Only reset salary changed flag for salary document
+            if (field == 'salary') {
+              _salaryChanged = false;
+            }
+          });
+        } else {
+          _showError(isArabic 
+            ? 'فشل تحميل المستند. الرجاء المحاولة مرة أخرى'
+            : 'Failed to upload document. Please try again');
+        }
       } else {
         print('User canceled file picking');
       }
     } catch (e) {
       print('Error picking file: $e');
-      _showError('Error picking file: ${e.toString()}');
+      _showError(isArabic 
+        ? 'خطأ في اختيار الملف: ${e.toString()}'
+        : 'Error picking file: ${e.toString()}');
     }
   }
 
@@ -308,10 +524,16 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                       borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide(color: primaryColor),
                     ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.red),
+                    ),
+                    focusedErrorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.red),
+                    ),
                     filled: true,
-                    fillColor: themeProvider.isDarkMode 
-                        ? surfaceColor.withOpacity(0.1)
-                        : surfaceColor.withOpacity(0.5),
+                    fillColor: surfaceColor,
                     alignLabelWithHint: true,
                   ),
                   keyboardType: _getKeyboardType(field),
@@ -330,6 +552,12 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                             validationError = isArabic ? 'الحد الأدنى 2000' : 'Minimum 2000';
                           } else {
                             validationError = null;
+                            // 💡 Show document upload UI when salary is changed
+                            if (showDocumentUpload && fileName == null) {
+                              validationError = isArabic 
+                                ? 'يجب تحميل خطاب الراتب'
+                                : 'Salary letter is required';
+                            }
                           }
                         }
                       } else if (field == 'email') {
@@ -341,15 +569,17 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                           validationError = null;
                         }
                       } else if (field == 'food_expense' || field == 'transportation_expense') {
+                        // Get the minimum allowed value (current calculated value)
                         double salary = double.parse(_userData['salary']?.toString() ?? '0');
                         double minValue = field == 'food_expense' 
                           ? salary * 0.08 
                           : salary * 0.05;
-                          
+                        
+                        // Get the other expense value
                         double otherExpense = field == 'food_expense'
                           ? double.parse(_userData['transportation_expense']?.toString() ?? '0')
                           : double.parse(_userData['food_expense']?.toString() ?? '0');
-                          
+                        
                         if (value.isEmpty) {
                           validationError = isArabic ? 'القيمة مطلوبة' : 'Value is required';
                         } else if (!RegExp(r'^\d+$').hasMatch(value)) {
@@ -376,18 +606,78 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () async {
-                      FilePickerResult? result = await FilePicker.platform.pickFiles(
-                        type: FileType.custom,
-                        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
-                      );
-                      if (result != null) {
-                        setDialogState(() {
-                          fileName = result.files.single.name;
-                          if (field == 'salary') {
-                            validationError = null;
+                      try {
+                        FilePickerResult? result = await FilePicker.platform.pickFiles(
+                          type: FileType.custom,
+                          allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+                        );
+                        
+                        if (result != null) {
+                          final file = result.files.single;
+                          
+                          // Check file size (max 10MB)
+                          if (file.size > 10 * 1024 * 1024) {
+                            setDialogState(() {
+                              validationError = isArabic 
+                                ? 'يجب أن يكون حجم الملف أقل من 10 ميجابايت'
+                                : 'File size must be less than 10MB';
+                            });
+                            return;
                           }
+
+                          // 💡 Upload document
+                          final documentUploadService = DocumentUploadService();
+                          final nationalId = _userData['national_id']?.toString() ?? '';
+                          
+                          if (nationalId.isEmpty) {
+                            setDialogState(() {
+                              validationError = isArabic 
+                                ? 'لم يتم العثور على رقم الهوية'
+                                : 'National ID not found';
+                            });
+                            return;
+                          }
+
+                          // Show loading indicator
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (BuildContext context) => _buildUploadOverlay(context, isArabic: isArabic),
+                          );
+
+                          // Upload document
+                          final success = await documentUploadService.uploadDocument(
+                            nationalId: nationalId,
+                            documentType: field,
+                            filePath: file.path!,
+                            fileName: file.name,
+                            productType: 'card',
+                          );
+
+                          // Hide loading dialog
+                          Navigator.of(context).pop();
+
+                          if (success) {
+                            setDialogState(() {
+                              fileName = file.name;
+                              validationError = null;
+                            });
+                            _uploadedFiles[field] = file.name;
+                          } else {
+                            setDialogState(() {
+                              validationError = isArabic 
+                                ? 'فشل تحميل المستند. الرجاء المحاولة مرة أخرى'
+                                : 'Failed to upload document. Please try again';
+                            });
+                          }
+                        }
+                      } catch (e) {
+                        print('Error picking/uploading file: $e');
+                        setDialogState(() {
+                          validationError = isArabic 
+                            ? 'خطأ في تحميل الملف: ${e.toString()}'
+                            : 'Error uploading file: ${e.toString()}';
                         });
-                        _uploadedFiles[field] = result.files.single.name;
                       }
                     },
                     style: ElevatedButton.styleFrom(
@@ -579,6 +869,8 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
         return 'مصاريف المواصلات';
       case 'Other Liabilities':
         return 'إلتزامات أخرى';
+      case 'Number of Dependents':
+        return 'عدد المعالين';
       default:
         return englishLabel;
     }
@@ -745,7 +1037,8 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
     bool canProceed = _userData['national_id'] != null &&
                       _userData['email'] != null &&
                       _userData['salary'] != null &&
-                      _uploadedFiles['national_id'] != null;
+                      _uploadedFiles['national_id'] != null &&
+                      _consentAccepted;
 
     return Directionality(
       textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
@@ -833,6 +1126,7 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                                   _buildInfoField('Name', isArabic ? _userData['arabic_name']?.toString() ?? '' : _userData['name']?.toString() ?? ''),
                                   _buildInfoField('National ID', _userData['national_id']?.toString() ?? ''),
                                   _buildInfoField('Email', _userData['email']?.toString() ?? '', editable: true),
+                                  _buildInfoField('Number of Dependents', _userData['dependents']?.toString() ?? '0', editable: false, fieldName: 'dependents'),
                                   _buildInfoField(
                                     'Salary', 
                                     double.parse(_userData['salary']?.toString() ?? '0').round().toString(), 
@@ -910,6 +1204,59 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                                 ],
                               ),
                               child: _buildDocumentsSection(),
+                            ),
+                            const SizedBox(height: 32),
+
+                            // Consent Section
+                            Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                color: surfaceColor,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Color(themeProvider.isDarkMode 
+                                        ? Constants.darkPrimaryShadowColor 
+                                        : Constants.lightPrimaryShadowColor),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 5),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: Checkbox(
+                                          value: _consentAccepted,
+                                          onChanged: (value) {
+                                            setState(() {
+                                              _consentAccepted = value ?? false;
+                                            });
+                                          },
+                                          activeColor: primaryColor,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          isArabic
+                                              ? 'أقر بأن جميع المعلومات المقدمة صحيحة وكاملة'
+                                              : 'I declare that all provided information is true and complete',
+                                          style: TextStyle(
+                                            color: textColor,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
                             const SizedBox(height: 32),
 

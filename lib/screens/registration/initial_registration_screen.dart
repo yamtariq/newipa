@@ -31,10 +31,12 @@ import 'package:url_launcher/url_launcher.dart';
 
 class InitialRegistrationScreen extends StatefulWidget {
   final bool isArabic;
+  final String? nationalId;
 
   const InitialRegistrationScreen({
     Key? key,
     this.isArabic = false,
+    this.nationalId,
   }) : super(key: key);
 
   @override
@@ -74,6 +76,10 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> w
   @override
   void initState() {
     super.initState();
+    // Pre-fill national ID if provided
+    if (widget.nationalId != null && widget.nationalId!.isNotEmpty) {
+      _nationalIdController.text = widget.nationalId!;
+    }
     // Set locale for Hijri calendar
     HijriCalendar.setLocal(widget.isArabic ? 'ar' : 'en');
     

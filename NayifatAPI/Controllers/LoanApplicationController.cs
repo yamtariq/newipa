@@ -253,8 +253,8 @@ namespace NayifatAPI.Controllers
                 }
                 else if (latestLeadApp == null)
                 {
-                    status = latestLoanApp.Status;
-                    statusTimestamp = latestLoanApp.StatusDate;
+                    status = latestLoanApp?.Status ?? "UNKNOWN";
+                    statusTimestamp = latestLoanApp?.StatusDate;
                     _logger.LogInformation("LOANS_CHECK_DECISION: Using Loan App (Lead App not found). Status={Status}, Date={Date}", status, statusTimestamp);
                 }
                 else if (latestLoanApp == null)

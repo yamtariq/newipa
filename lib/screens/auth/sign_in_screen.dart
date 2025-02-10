@@ -1051,12 +1051,13 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   void _initiateUserRegistration() async {
-    // Navigate to registration screen
+    // Navigate to registration screen with the entered national ID
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
         builder: (context) => InitialRegistrationScreen(
           isArabic: widget.isArabic,
+          nationalId: _nationalIdController.text,
         ),
       ),
     );

@@ -27,6 +27,7 @@ namespace NayifatAPI.Data
         public DbSet<LeadAppCard> LeadAppCards { get; set; }
         public DbSet<LeadAppLoan> LeadAppLoans { get; set; }
         public DbSet<BankCustomer> BankCustomers { get; set; }
+        public DbSet<CustomerDocument> CustomerDocuments { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

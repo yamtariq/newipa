@@ -109,10 +109,13 @@ namespace NayifatAPI.Controllers
                 }
 
                 // Check for expired notifications
-                var expiredNotifications = notifications.Where(n => 
-                    n["expires_at"] != null && 
-                    DateTime.Parse(n["expires_at"].ToString()!) < currentTime &&
-                    n["template_id"] != null).ToList();
+                var expiredNotifications = notifications?.Where(n => 
+                    n != null &&
+                    n.ContainsKey("expires_at") && n["expires_at"] != null && 
+                    n.ContainsKey("template_id") && n["template_id"] != null &&
+                    DateTime.TryParse(n["expires_at"].ToString(), out var expiryDate) && 
+                    expiryDate < currentTime
+                ).ToList() ?? new List<Dictionary<string, object>>();
 
                 if (expiredNotifications.Any())
                 {

@@ -6,11 +6,34 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../utils/constants.dart';
 import '../services/content_update_service.dart';
 import 'package:dio/dio.dart';
+import 'dart:io';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoanService {
   final _secureStorage = const FlutterSecureStorage();
   final _authService = AuthService();
   final _dio = Dio();
+  
+  // 💡 Helper function to log storage contents
+  Future<void> _logStorageContents() async {
+    try {
+      print('\n--Secure Storage Contents--');
+      final allSecureItems = await _secureStorage.readAll();
+      allSecureItems.forEach((key, value) {
+        print('$key: $value');
+      });
+
+      print('\n--Shared Preferences Contents--');
+      final prefs = await SharedPreferences.getInstance();
+      final allKeys = prefs.getKeys();
+      for (String key in allKeys) {
+        print('$key: ${prefs.get(key)}');
+      }
+      print('\n');
+    } catch (e) {
+      print('Error logging storage contents: $e');
+    }
+  }
   
   Future<Map<String, dynamic>> getLoanDecision({
     required double salary,
@@ -19,6 +42,8 @@ class LoanService {
     required int requestedTenure,
   }) async {
     try {
+      await _logStorageContents();  // 💡 Log storage contents before getting loan decision
+
       // Get user data from secure storage
       final userDataStr = await _secureStorage.read(key: 'user_data');
       if (userDataStr == null) {
@@ -104,7 +129,280 @@ class LoanService {
     }
   }
 
+  Future<Map<String, dynamic>> createCustomerLoanRequest(Map<String, dynamic> userData, bool isArabic) async {
+    try {
+      print('\n\n');
+      print('========================================================');
+      print('FUNCTION TRIGGERED: createCustomerLoanRequest');
+      print('TIMESTAMP: ${DateTime.now()}');
+      
+      // Get stack trace properly
+      try {
+        throw Exception();
+      } catch (e, stackTrace) {
+        print('\nCALL STACK:');
+        print(stackTrace.toString().split('\n').take(3).join('\n'));
+      }
+      print('========================================================');
+
+      // First log ALL storage contents
+      print('\nCOMPLETE STORAGE DUMP:');
+      await _logStorageContents();
+
+      print('\n********************************************************');
+      print('*            STARTING LOAN REQUEST CREATION              *');
+      print('********************************************************');
+      
+      print('\n1. INPUT DATA CHECK:');
+      print('   User Data Received:');
+      userData.forEach((key, value) {
+        print('   • $key: $value');
+      });
+      print('   Is Arabic: $isArabic');
+
+      print('\n2. CHECKING STORAGE:');
+      final storedUserDataStr = await _secureStorage.read(key: 'user_data');
+      print('   • user_data exists: ${storedUserDataStr != null}');
+      
+      final selectedSalaryDataStr = await _secureStorage.read(key: 'selected_salary_data');
+      print('   • selected_salary_data exists: ${selectedSalaryDataStr != null}');
+      
+      // 💡 Get registration data from SharedPreferences instead of secure storage
+      final prefs = await SharedPreferences.getInstance();
+      final registrationDataStr = prefs.getString('registration_data');
+      print('   • registration_data exists: ${registrationDataStr != null}');
+      print('   • Attempted to read registration_data from SharedPreferences');
+
+      if (storedUserDataStr == null || selectedSalaryDataStr == null || registrationDataStr == null) {
+        print('\nERROR: Missing required storage data:');
+        print('   • user_data: ${storedUserDataStr == null ? "MISSING" : "PRESENT"}');
+        print('   • selected_salary_data: ${selectedSalaryDataStr == null ? "MISSING" : "PRESENT"}');
+        print('   • registration_data: ${registrationDataStr == null ? "MISSING" : "PRESENT"}');
+        throw Exception('Required user data not found in storage');
+      }
+
+      print('\n3. PARSING STORED DATA:');
+      // 💡 Parse stored data
+      final storedUserData = jsonDecode(storedUserDataStr);
+      final selectedSalaryData = jsonDecode(selectedSalaryDataStr);
+      final registrationData = jsonDecode(registrationDataStr);
+      final userRegistrationData = registrationData['userData'];
+
+      // 💡 Combine data from storage with input userData
+      final enrichedUserData = {
+        'national_id': storedUserData['national_id'] ?? userData['national_id'],
+        'phone': storedUserData['phone'],
+        'email': storedUserData['email'] ?? userData['email'],
+        'ibanNo': userData['ibanNo'],
+        'employer': selectedSalaryData['employer'],
+        'salary': selectedSalaryData['amount'],
+        'loan_purpose': userData['loan_purpose'],
+        'name': storedUserData['name'] ?? userData['name'],
+        'name_ar': storedUserData['name_ar'] ?? userData['arabic_name'],
+        'date_of_birth': userRegistrationData['dateOfBirth'],
+        'id_expiry_date': userRegistrationData['idExpiryDate']
+      };
+
+      print('Enriched User Data:');
+      print('National ID: ${enrichedUserData['national_id']}');
+      print('Name: ${enrichedUserData['name']}');
+      print('Arabic Name: ${enrichedUserData['name_ar']}');
+      print('Original Phone: ${enrichedUserData['phone']}');
+      print('Email: ${enrichedUserData['email']}');
+      print('IBAN: ${enrichedUserData['ibanNo']}');
+      print('Employer: ${enrichedUserData['employer']}');
+      print('Salary: ${enrichedUserData['salary']}');
+      print('Loan Purpose: ${enrichedUserData['loan_purpose']}');
+      print('Date of Birth: ${enrichedUserData['date_of_birth']}');
+      print('ID Expiry Date: ${enrichedUserData['id_expiry_date']}');
+      print('Language: ${isArabic ? 'Arabic' : 'English'}');
+
+      // 💡 Get auth token
+      final token = await _authService.getToken();
+      if (token == null) {
+        throw Exception('Authentication token not found');
+      }
+
+      // 💡 Format phone number
+      String formattedPhone = enrichedUserData['phone']?.toString() ?? '';
+      if (formattedPhone.startsWith('966')) {
+        formattedPhone = '0${formattedPhone.substring(3)}';
+        print('Phone number transformed:');
+        print('Original: ${enrichedUserData['phone']}');
+        print('Formatted: $formattedPhone');
+      } else {
+        print('Phone number unchanged: $formattedPhone');
+      }
+
+      // 💡 Format dates to match API requirements (yyyy/mm/dd)
+      String formatHijriDate(String inputDate) {
+        // Input format: dd-mm-yyyy
+        final parts = inputDate.split('-');
+        if (parts.length == 3) {
+          return '${parts[2]}/${parts[1]}/${parts[0]}';  // Convert to yyyy/mm/dd
+        }
+        return inputDate;
+      }
+
+      // 💡 Prepare request data with mandatory fields only
+      final requestData = {
+        "nationalID": enrichedUserData['national_id'],
+        "dob": formatHijriDate(enrichedUserData['date_of_birth']),  // Convert date format
+        "doe": formatHijriDate(enrichedUserData['id_expiry_date']), // Convert date format
+        "finPurpose": enrichedUserData['loan_purpose'],
+        "language": isArabic ? 1 : 0,
+        "productType": 0,
+        "mobileNo": formattedPhone,
+        "emailId": enrichedUserData['email'],
+        "finAmount": double.tryParse(enrichedUserData['salary'].toString()) ?? 10000,
+        "tenure": 60,
+        "propertyStatus": 1,
+        "effRate": 1,
+        "ibanNo": enrichedUserData['ibanNo']
+      };
+
+      print('\n');
+      print('********************************************************');
+      print('*                   API REQUEST DETAILS                  *');
+      print('********************************************************');
+      print('\n1. ENDPOINT:');
+      print('   ${Constants.endpointCreateCustomer}');
+      
+      print('\n2. HEADERS:');
+      final headers = Constants.bankApiHeaders;
+      headers.forEach((key, value) {
+        if (key.toLowerCase() == 'authorization') {
+          print('   $key: [REDACTED FOR SECURITY]');
+        } else {
+          print('   $key: $value');
+        }
+      });
+
+      print('\n3. REQUEST BODY DETAILS:');
+      print('   National ID: ${requestData['nationalID']}');
+      print('   Date of Birth (formatted): ${requestData['dob']} (Original: ${enrichedUserData['date_of_birth']})');
+      print('   ID Expiry Date (formatted): ${requestData['doe']} (Original: ${enrichedUserData['id_expiry_date']})');
+      print('   Loan Purpose: ${requestData['finPurpose']}');
+      print('   Language: ${requestData['language']} (${isArabic ? 'Arabic' : 'English'})');
+      print('   Product Type: ${requestData['productType']}');
+      print('   Mobile Number: ${requestData['mobileNo']}');
+      print('   Email: ${requestData['emailId']}');
+      print('   Finance Amount: ${requestData['finAmount']} SAR');
+      print('   Tenure: ${requestData['tenure']} months');
+      print('   Property Status: ${requestData['propertyStatus']} (1 = Owned)');
+      print('   Effective Rate: ${requestData['effRate']}');
+      print('   IBAN: ${requestData['ibanNo']}');
+
+      print('\n4. COMPLETE REQUEST JSON:');
+      print(const JsonEncoder.withIndent('   ').convert(requestData));
+      print('\n********************************************************\n');
+
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      final client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+
+      final request = await client.postUrl(Uri.parse(Constants.endpointCreateCustomer));
+      
+      // Add headers
+      headers.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+
+      // Add body
+      request.write(jsonEncode(requestData));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      print('\nAPI Response:');
+      print('Status Code: ${response.statusCode}');
+      print('Response Body: $responseBody');
+
+      // 💡 Enhanced error logging
+      if (response.statusCode != 200) {
+        print('\nDetailed Error Analysis:');
+        try {
+          final errorData = jsonDecode(responseBody);
+          print('Error Type: ${errorData['type'] ?? 'Not specified'}');
+          print('Error Title: ${errorData['title'] ?? 'Not specified'}');
+          print('Error Status: ${errorData['status'] ?? 'Not specified'}');
+          print('Trace ID: ${errorData['traceId'] ?? 'Not specified'}');
+          
+          if (errorData['errors'] != null) {
+            print('\nValidation Errors:');
+            (errorData['errors'] as Map<String, dynamic>).forEach((key, value) {
+              print('$key: ${value is List ? value.join(', ') : value}');
+            });
+          }
+        } catch (e) {
+          print('Could not parse error response: $e');
+          print('Raw error response: $responseBody');
+        }
+        print('\nError: Non-200 status code received');
+        throw Exception('Failed to create customer: ${response.statusCode}');
+      }
+
+      final responseData = jsonDecode(responseBody);
+      print('\nParsed Response Data:');
+      print('Success: ${responseData['success']}');
+      if (responseData['errors'] != null) {
+        print('Errors: ${responseData['errors']}');
+      }
+      if (responseData['result'] != null) {
+        print('Result:');
+        responseData['result'].forEach((key, value) {
+          print('$key: $value');
+        });
+      }
+
+      // Save response for later use
+      await _secureStorage.write(
+        key: 'loan_offer_data',
+        value: jsonEncode(responseData),
+      );
+      print('\nResponse saved to secure storage with key: loan_offer_data');
+
+      if (!responseData['success']) {
+        print('\nRequest unsuccessful');
+        return {
+          'status': 'error',
+          'message': responseData['errors']?.join(', ') ?? 'Unknown error occurred',
+        };
+      }
+
+      final result = responseData['result'];
+      final mappedResponse = {
+        'status': 'success',
+        'decision': result['applicationStatus'] == 'APPROVED' ? 'approved' : 'rejected',
+        'finance_amount': double.tryParse(result['eligibleAmount'] ?? '0') ?? 0,
+        'emi': double.tryParse(result['eligibleEmi'] ?? '0') ?? 0,
+        'application_number': result['applicationId'],
+        'request_id': result['requestId'],
+        'customer_id': result['customerId'],
+      };
+
+      print('\nFinal Mapped Response:');
+      mappedResponse.forEach((key, value) {
+        print('$key: $value');
+      });
+
+      print('\n=== CREATE CUSTOMER LOAN REQUEST - END ===\n');
+      return mappedResponse;
+
+    } catch (e) {
+      print('\nERROR in createCustomerLoanRequest:');
+      print('Error Type: ${e.runtimeType}');
+      print('Error Message: $e');
+      print('\n=== CREATE CUSTOMER LOAN REQUEST - END WITH ERROR ===\n');
+      return {
+        'status': 'error',
+        'message': e.toString(),
+      };
+    }
+  }
+
   Future<List<Loan>> getUserLoans() async {
+    await _logStorageContents();  // 💡 Log storage contents before getting user loans
     // Dummy data for loans
     return [
       Loan(
@@ -124,6 +422,8 @@ class LoanService {
 
   Future<String> getCurrentApplicationStatus({bool isArabic = false}) async {
     try {
+      await _logStorageContents();  // 💡 Log storage contents before getting application status
+      
       final userDataStr = await _secureStorage.read(key: 'user_data');
       print('DEBUG - User Data String: $userDataStr'); // Debug log
 
@@ -196,6 +496,8 @@ class LoanService {
   Future<Map<String, dynamic>> updateLoanApplication(
       Map<String, dynamic> loanData) async {
     try {
+      await _logStorageContents();  // 💡 Log storage contents before updating loan application
+      
       print('DEBUG - Updating loan application:');
       print(
           'URL: ${Constants.apiBaseUrl}${Constants.endpointUpdateLoanApplication}');
@@ -226,6 +528,156 @@ class LoanService {
       }
     } catch (e) {
       print('Error updating loan application: $e');
+      return {
+        'status': 'error',
+        'message': e.toString(),
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> createLoanApplicationOffer({required bool isArabic}) async {
+    try {
+      print('\n=== LOAN APPLICATION OFFER REQUEST - START ===');
+      print('Timestamp: ${DateTime.now()}');
+
+      // Step 1: Get data from SharedPreferences
+      print('\n1. FETCHING DATA FROM STORAGE');
+      final prefs = await SharedPreferences.getInstance();
+      final registrationDataStr = prefs.getString('registration_data');
+      
+      if (registrationDataStr == null) {
+        throw Exception('Registration data not found');
+      }
+
+      // Parse registration data
+      final registrationData = jsonDecode(registrationDataStr);
+      final userData = registrationData['userData'];
+
+      print('\n2. PREPARING REQUEST DATA');
+      print('Registration data found:');
+      print(const JsonEncoder.withIndent('  ').convert(userData));
+
+      // Format dates to match API requirements (yyyy/mm/dd)
+      String formatHijriDate(String inputDate) {
+        final parts = inputDate.split('-');
+        if (parts.length == 3) {
+          return '${parts[2]}/${parts[1]}/${parts[0]}';
+        }
+        return inputDate;
+      }
+
+      // Format phone number if needed
+      String formatPhone(String phone) {
+        if (phone.startsWith('966')) {
+          return '0${phone.substring(3)}';
+        }
+        return phone;
+      }
+
+      // Log all available data before preparing request
+      print('\n3. AVAILABLE DATA FOR REQUEST:');
+      print('National ID: ${userData['nationalId']}');
+      print('Date of Birth: ${userData['dateOfBirth']}');
+      print('ID Expiry Date: ${userData['idExpiryDate']}');
+      print('Phone: ${userData['phone']}');
+      print('Email: ${userData['email']}');
+
+      // Step 2: Prepare request data with default values
+      final requestData = {
+        "nationalID": userData['nationalId'],
+        "dob": formatHijriDate(userData['dateOfBirth']),
+        "doe": formatHijriDate(userData['idExpiryDate']),
+        "finPurpose": "BUF",
+        "language": isArabic ? 1 : 0,
+        "productType": 0,
+        "mobileNo": formatPhone(userData['phone'] ?? ''),
+        "emailId": userData['email']?.toString().toLowerCase() ?? '',
+        "finAmount": 10000,
+        "tenure": 60,
+        "propertyStatus": 1,
+        "effRate": 1
+      };
+
+      print('\n4. PREPARED REQUEST DATA:');
+      print('National ID: ${requestData['nationalID']}');
+      print('Date of Birth (formatted): ${requestData['dob']} (Original: ${userData['dateOfBirth']})');
+      print('ID Expiry Date (formatted): ${requestData['doe']} (Original: ${userData['idExpiryDate']})');
+      print('Finance Purpose: ${requestData['finPurpose']}');
+      print('Language: ${requestData['language']} (${isArabic ? 'Arabic' : 'English'})');
+      print('Product Type: ${requestData['productType']}');
+      print('Mobile Number: ${requestData['mobileNo']}');
+      print('Email: ${requestData['emailId']}');
+      print('Finance Amount: ${requestData['finAmount']} SAR');
+      print('Tenure: ${requestData['tenure']} months');
+      print('Property Status: ${requestData['propertyStatus']}');
+      print('Effective Rate: ${requestData['effRate']}');
+
+      print('\n5. REQUEST DETAILS:');
+      print('Endpoint: ${Constants.endpointCreateCustomer}');
+      print('Headers: ${Constants.bankApiHeaders.map((key, value) => MapEntry(key, key.toLowerCase() == 'authorization' ? '[REDACTED]' : value))}');
+      print('Request Body (JSON):');
+      print(const JsonEncoder.withIndent('  ').convert(requestData));
+
+      // Step 3: Make API call
+      print('\n6. MAKING API CALL');
+      final client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+
+      final request = await client.postUrl(Uri.parse(Constants.endpointCreateCustomer));
+      
+      // Add headers
+      Constants.bankApiHeaders.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+
+      // Add body
+      request.write(jsonEncode(requestData));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      print('\n7. API RESPONSE:');
+      print('Status Code: ${response.statusCode}');
+      print('Response Headers:');
+      response.headers.forEach((name, values) {
+        print('  $name: ${values.join(', ')}');
+      });
+      print('Response Body:');
+      try {
+        print(const JsonEncoder.withIndent('  ').convert(jsonDecode(responseBody)));
+      } catch (e) {
+        print('Raw response: $responseBody');
+      }
+
+      if (response.statusCode != 200) {
+        print('\nERROR: Non-200 status code received');
+        throw Exception('Failed to create loan offer: ${response.statusCode}');
+      }
+
+      // Step 4: Parse and return response
+      final responseData = jsonDecode(responseBody);
+      
+      // Save response for later use
+      await _secureStorage.write(
+        key: 'loan_offer_data',
+        value: jsonEncode(responseData),
+      );
+      print('\n8. Response saved to secure storage with key: loan_offer_data');
+
+      print('\n=== LOAN APPLICATION OFFER REQUEST - END ===\n');
+      return responseData;
+
+    } catch (e) {
+      print('\nERROR in createLoanApplicationOffer:');
+      print('Error Type: ${e.runtimeType}');
+      print('Error Message: $e');
+      print('Stack Trace:');
+      try {
+        throw Exception();
+      } catch (_, stackTrace) {
+        print(stackTrace.toString().split('\n').take(5).join('\n'));
+      }
+      print('\n=== LOAN APPLICATION OFFER REQUEST - END WITH ERROR ===\n');
       return {
         'status': 'error',
         'message': e.toString(),

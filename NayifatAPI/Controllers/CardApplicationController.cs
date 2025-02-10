@@ -237,8 +237,8 @@ namespace NayifatAPI.Controllers
                 }
                 else if (latestLeadApp == null)
                 {
-                    status = latestCardApp.Status;
-                    statusTimestamp = latestCardApp.StatusDate;
+                    status = latestCardApp?.Status ?? "UNKNOWN";
+                    statusTimestamp = latestCardApp?.StatusDate;
                     _logger.LogInformation("CARDS_CHECK_DECISION: Using Card App (Lead App not found). Status={Status}, Date={Date}", status, statusTimestamp);
                 }
                 else if (latestCardApp == null)

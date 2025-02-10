@@ -11,11 +11,13 @@ import androidx.core.app.NotificationCompat
 import android.os.Build
 import org.json.JSONObject
 import java.net.URL
-import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.*
 import android.app.Notification
 import android.app.PendingIntent
 import org.json.JSONArray
 import android.content.SharedPreferences
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 
 class NotificationWorker(
     private val context: Context,
@@ -25,8 +27,9 @@ class NotificationWorker(
     companion object {
         private fun getApiBaseUrl(prefs: SharedPreferences): String {
             val useNewApi = prefs.getBoolean("flutter.useNewApi", true)
+            // 💡 Read development URL from SharedPreferences, with fallback
             return if (useNewApi) {
-                "https://eb3c-46-152-255-232.ngrok-free.app/api"
+                prefs.getString("flutter.apiBaseUrl", "https://172.22.160.20:5264/api") ?: "https://172.22.160.20:5264/api"
             } else {
                 "https://icreditdept.com/api"
             }
@@ -36,9 +39,30 @@ class NotificationWorker(
         private const val TAG = "Tariq_NotificationWorker"
     }
 
+    // 💡 Create a trust manager that trusts all certificates
+    private fun createTrustAllCerts(): Array<TrustManager> {
+        return arrayOf(object : X509TrustManager {
+            override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
+            override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
+            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+        })
+    }
+
+    // 💡 Configure SSL context to accept all certificates
+    private fun configureSSL(): SSLContext {
+        val sslContext = SSLContext.getInstance("TLS")
+        sslContext.init(null, createTrustAllCerts(), SecureRandom())
+        HttpsURLConnection.setDefaultSSLSocketFactory(sslContext.socketFactory)
+        HttpsURLConnection.setDefaultHostnameVerifier { _, _ -> true }
+        return sslContext
+    }
+
     override fun doWork(): Result {
         Log.d(TAG, "Step 1: Worker Started - Time: ${System.currentTimeMillis()}")
         try {
+            // Configure SSL to trust all certificates
+            configureSSL()
+
             // Get national ID from SharedPreferences
             val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
             val baseUrl = getApiBaseUrl(prefs)
@@ -106,6 +130,12 @@ class NotificationWorker(
                 }
             }
 
+            // 💡 Limit to 100 notifications for "all" target
+            if (allNotifications.size > 100) {
+                allNotifications.subList(0, 100)
+                Log.d(TAG, "Step 8.4.3: Trimmed notifications to 100 for all users")
+            }
+
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching notifications: ${e.message}")
         }
@@ -125,12 +155,17 @@ class NotificationWorker(
             val isArabic = prefs.getBoolean("flutter.isArabic", false)
             Log.d(TAG, "Step 4.2.1: App language setting - isArabic: $isArabic")
 
-            connection.requestMethod = "POST"
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.setRequestProperty("x-api-key", API_KEY)
-            connection.doOutput = true
-            connection.connectTimeout = 30000
-            connection.readTimeout = 30000
+            connection.apply {
+                requestMethod = "POST"
+                setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("x-api-key", API_KEY)
+                doOutput = true
+                connectTimeout = 30000
+                readTimeout = 30000
+                // 💡 Trust all certificates for this connection
+                sslSocketFactory = configureSSL().socketFactory
+                hostnameVerifier = HostnameVerifier { _, _ -> true }
+            }
 
             val requestBody = JSONObject().apply {
                 put("nationalId", nationalId)
@@ -309,10 +344,10 @@ class NotificationWorker(
             null
         }
 
-        // Create notification builder
+        // 💡 Create notification builder with default icon
         Log.d(TAG, "Step 8.5: Building notification with title: ${notification["title"]}")
         val builder = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.mipmap.ic_launcher) // Use app icon as default small icon
             .setContentTitle(notification["title"])
             .setContentText(notification["body"])
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -326,7 +361,7 @@ class NotificationWorker(
 
         // First try to set large icon
         val largeIconUrl = notification["largeIconUrl"]?.takeIf { it.isNotBlank() }
-        if (!largeIconUrl.isNullOrBlank() && (largeIconUrl.startsWith("http://") || largeIconUrl.startsWith("https://"))) {
+        if (!largeIconUrl.isNullOrBlank()) {
             try {
                 Log.d(TAG, "Step 8.5.1: Setting large icon from URL: $largeIconUrl")
                 val iconBitmap = getBitmapFromUrl(largeIconUrl)
@@ -337,31 +372,33 @@ class NotificationWorker(
                 } else {
                     Log.e(TAG, "Step 8.5.3: Failed to load large icon")
                     // Set default icon from resources
-                    builder.setLargeIcon(android.graphics.BitmapFactory.decodeResource(context.resources, R.mipmap.launcher_icon))
+                    builder.setLargeIcon(android.graphics.BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher))
                     hasLargeIcon = true
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Step 8.5.4: Error setting large icon: ${e.message}")
                 // Set default icon from resources
-                builder.setLargeIcon(android.graphics.BitmapFactory.decodeResource(context.resources, R.mipmap.launcher_icon))
+                builder.setLargeIcon(android.graphics.BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher))
                 hasLargeIcon = true
             }
         } else {
             Log.d(TAG, "Step 8.5.1.1: Using default large icon")
-            builder.setLargeIcon(android.graphics.BitmapFactory.decodeResource(context.resources, R.mipmap.launcher_icon))
+            builder.setLargeIcon(android.graphics.BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher))
             hasLargeIcon = true
         }
 
         // Then try to set big picture
         val bigPictureUrl = notification["bigPictureUrl"]?.takeIf { it.isNotBlank() }
-        if (!bigPictureUrl.isNullOrBlank() && (bigPictureUrl.startsWith("http://") || bigPictureUrl.startsWith("https://"))) {
+        if (!bigPictureUrl.isNullOrBlank()) {
             try {
                 Log.d(TAG, "Step 8.5.5: Setting big picture from URL: $bigPictureUrl")
                 val imageBitmap = getBitmapFromUrl(bigPictureUrl)
                 if (imageBitmap != null) {
                     val bigPictureStyle = NotificationCompat.BigPictureStyle()
                         .bigPicture(imageBitmap)
-                        
+                        .setBigContentTitle(notification["title"])
+                        .setSummaryText(notification["body"])
+                    
                     // If we have a large icon, hide it when expanded
                     if (hasLargeIcon) {
                         bigPictureStyle.bigLargeIcon(null as android.graphics.Bitmap?)
@@ -401,16 +438,19 @@ class NotificationWorker(
 
     // 💡 Helper function to load images from URLs with improved error handling and caching
     private fun getBitmapFromUrl(imageUrl: String): android.graphics.Bitmap? {
-        return try {
+        var connection: HttpsURLConnection? = null
+        try {
             Log.d(TAG, "Step Image 1: Starting image download from: $imageUrl")
             val url = URL(imageUrl)
-            val connection = url.openConnection() as HttpsURLConnection
+            connection = url.openConnection() as HttpsURLConnection
             connection.apply {
                 connectTimeout = 15000 // 15 seconds
                 readTimeout = 15000
                 doInput = true
                 requestMethod = "GET"
                 setRequestProperty("User-Agent", "Nayifat-Android-App")
+                // 💡 Accept image content types
+                setRequestProperty("Accept", "image/*")
             }
 
             Log.d(TAG, "Step Image 2: Connection configured, starting download")
@@ -427,34 +467,91 @@ class NotificationWorker(
                 android.graphics.BitmapFactory.decodeStream(input, null, options)
                 input.close()
 
-                // Calculate sample size
+                // Calculate sample size based on notification size requirements
                 options.apply {
                     inJustDecodeBounds = false
-                    inSampleSize = calculateInSampleSize(options, 512, 512) // Target size for notification
+                    // 💡 Use different target sizes for large icon and big picture
+                    val maxSize = if (imageUrl.contains("largeIcon")) {
+                        128 // Large icon size
+                    } else {
+                        512 // Big picture size
+                    }
+                    inSampleSize = calculateInSampleSize(options, maxSize, maxSize)
                 }
 
                 // Reopen connection for actual download
                 connection.disconnect()
-                val newConnection = url.openConnection() as HttpsURLConnection
-                newConnection.apply {
+                connection = url.openConnection() as HttpsURLConnection
+                connection.apply {
                     connectTimeout = 15000
                     readTimeout = 15000
                     doInput = true
+                    // 💡 Accept image content types
+                    setRequestProperty("Accept", "image/*")
                 }
 
                 Log.d(TAG, "Step Image 3: Downloading and decoding image")
-                val bitmap = android.graphics.BitmapFactory.decodeStream(newConnection.inputStream, null, options)
-                Log.d(TAG, "Step Image 4: Image downloaded successfully: ${bitmap != null}")
-                bitmap
+                val bitmap = android.graphics.BitmapFactory.decodeStream(connection.inputStream, null, options)
+                
+                if (bitmap != null) {
+                    // 💡 Process bitmap based on usage
+                    return if (imageUrl.contains("largeIcon")) {
+                        // Round the large icon
+                        getRoundedBitmap(bitmap)
+                    } else {
+                        // Scale and process big picture
+                        getProcessedBigPicture(bitmap)
+                    }
+                }
+                Log.d(TAG, "Step Image 4: Image downloaded and processed successfully")
+                return bitmap
             } else {
                 Log.e(TAG, "Step Image Error: Server returned code: ${connection.responseCode}")
-                null
+                return null
             }
         } catch (e: Exception) {
             Log.e(TAG, "Step Image Error: Failed to load image: ${e.message}")
             e.printStackTrace()
-            null
+            return null
+        } finally {
+            connection?.disconnect()
         }
+    }
+
+    // 💡 Helper function to create rounded bitmap for large icons
+    private fun getRoundedBitmap(bitmap: android.graphics.Bitmap): android.graphics.Bitmap {
+        val output = android.graphics.Bitmap.createBitmap(
+            bitmap.width,
+            bitmap.height,
+            android.graphics.Bitmap.Config.ARGB_8888
+        )
+        val canvas = android.graphics.Canvas(output)
+        val paint = android.graphics.Paint().apply {
+            isAntiAlias = true
+            shader = android.graphics.BitmapShader(
+                bitmap,
+                android.graphics.Shader.TileMode.CLAMP,
+                android.graphics.Shader.TileMode.CLAMP
+            )
+        }
+        val rect = android.graphics.RectF(0f, 0f, bitmap.width.toFloat(), bitmap.height.toFloat())
+        canvas.drawRoundRect(rect, bitmap.width / 2f, bitmap.height / 2f, paint)
+        return output
+    }
+
+    // 💡 Helper function to process big picture
+    private fun getProcessedBigPicture(bitmap: android.graphics.Bitmap): android.graphics.Bitmap {
+        // Scale bitmap if needed
+        val maxSize = 1024
+        if (bitmap.width > maxSize || bitmap.height > maxSize) {
+            val scale = maxSize.toFloat() / Math.max(bitmap.width, bitmap.height)
+            val matrix = android.graphics.Matrix()
+            matrix.postScale(scale, scale)
+            return android.graphics.Bitmap.createBitmap(
+                bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true
+            )
+        }
+        return bitmap
     }
 
     // 💡 Helper function to calculate optimal sample size for image loading

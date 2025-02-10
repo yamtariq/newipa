@@ -23,6 +23,15 @@ builder.Host.UseSerilog();
 builder.Services.AddHttpClient();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", 
+        builder => builder
+            .AllowAnyOrigin()
+            .AllowAnyMethod()
+            .AllowAnyHeader());
+});
+
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
@@ -67,13 +76,26 @@ builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+if (app.Environment.IsDevelopment() || app.Environment.IsProduction()) 
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Nayifat API V1");
-    c.RoutePrefix = string.Empty; // Serve Swagger UI at the root
-});
+    app.UseSwagger(c =>
+    {
+        c.SerializeAsV2 = false;
+        c.PreSerializeFilters.Add((swaggerDoc, httpReq) => 
+            swaggerDoc.Servers = new List<OpenApiServer> { 
+                new() { Url = $"{httpReq.Scheme}://{httpReq.Host.Value}" }
+            });
+    });
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Nayifat API V1");
+        c.RoutePrefix = string.Empty;
+        c.EnableDeepLinking();
+        c.DisplayRequestDuration();
+    });
+}
 
+app.UseCors("AllowAll");
 
 // Add exception handling middleware
 app.Use(async (context, next) =>

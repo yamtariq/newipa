@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import '../utils/constants.dart';
 import '../services/content_update_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io';
 
 class CardService {
   Future<Map<String, dynamic>> getCardDecision({
@@ -10,37 +11,59 @@ class CardService {
     required double liabilities,
     required double expenses,
     required String nationalId,
+    required String phone,
   }) async {
     try {
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointCardDecision}'),
-        headers: Constants.defaultHeaders,
-        body: json.encode({
-          'salary': salary,
-          'liabilities': liabilities,
-          'expenses': expenses,
-          'national_id': nationalId,
-        }),
-      );
+      // 💡 Format phone number if needed
+      String formattedPhone = phone;
+      if (formattedPhone.startsWith('966')) {
+        formattedPhone = '0${formattedPhone.substring(3)}';
+      }
+      if (!RegExp(r'^0\d{9}$').hasMatch(formattedPhone)) {
+        throw Exception('Invalid mobile number format');
+      }
+
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      final client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+
+      final request = await client.postUrl(Uri.parse(Constants.endpointCardDecision));
+      
+      // 💡 Add Bank API headers
+      Constants.bankApiHeaders.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+
+      // Add body
+      request.write(jsonEncode({
+        'salary': salary,
+        'liabilities': liabilities,
+        'expenses': expenses,
+        'national_id': nationalId,
+        'phone': formattedPhone,
+      }));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
       print('DEBUG - API Response:');
       print('Status Code: ${response.statusCode}');
-      print('Response Body: ${response.body}');
+      print('Response Body: $responseBody');
 
       if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
+        final responseData = json.decode(responseBody);
             
         // If decision is approved, determine card type based on credit limit
         if (responseData['status'] == 'success' && responseData['decision'] == 'approved') {
           final creditLimit = double.tryParse(responseData['credit_limit']?.toString() ?? '0') ?? 0;
           final cardType = creditLimit >= 17500 ? 'GOLD' : 'REWARD';
           responseData['card_type'] = cardType;
-  }
+        }
         
         return responseData;
       } else {
         throw Exception('Failed to get card decision');
-        }
+      }
     } catch (e) {
       print('Error getting card decision: $e');
       return {

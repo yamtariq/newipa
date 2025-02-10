@@ -1,9 +1,11 @@
+import 'dart:convert';
+
 class Constants {
   // API Base URLs
   static const bool useNewApi = true; // Feature flag for easy switching
   
   static String get apiBaseUrl => useNewApi
-      ? 'http://172.22.160.20:5264/api'  //'https://cbb7-78-95-59-4.ngrok-free.app/api'
+      ? 'https://172.22.160.20:5264/api'  //'https://cbb7-78-95-59-4.ngrok-free.app/api'
       : 'https://icreditdept.com/api';
   static String get authBaseUrl => '$apiBaseUrl/auth';
   static String get masterFetchUrl => '$apiBaseUrl/content/fetch';
@@ -248,6 +250,9 @@ class Constants {
   // Old: static const String endpointLoanDecision = '/api/v1/Finnone/GetCustomerCreate';
   static const String endpointLoanDecision = '/loan/decision';
   // Used in: LoanService (loan_service.dart) - getLoanDecision()
+  
+  // 💡 Bank API Endpoints
+  static const String endpointCreateCustomer = 'https://172.22.226.203:9443/api/Bank/CreateCustomer';
 
   // Old: static const String endpointUpdateLoanApplication = '/update_loan_application.php';
   static const String endpointUpdateLoanApplication = '/loan/update';
@@ -544,4 +549,20 @@ class Constants {
         'otp': otp.trim(),
         'userId': '1',
       };
+
+  // 💡 Bank API Configuration
+  static const String bankApiUsername = 'Nayifat'; // Change in production
+  static const String bankApiPassword = 'Nayifat@123'; // Change in production
+  static const String bankApiAppId = '3162C93C-3C9E-4613-A4D9-53BF99BB9CB1'; // Change in production
+  static const String bankApiKey = 'A624BA39-BFDA-4F09-829C-9F6294D6DF23'; // Change in production
+  static const String bankApiOrgNo = 'Nayifat'; // Change in production
+
+  // 💡 Bank API Headers
+  static Map<String, String> get bankApiHeaders => {
+    'Content-Type': 'application/json',
+    'Authorization': 'Basic TmF5aWZhdDpOYXlpZmF0QDEyMw==',
+    'X-APP-ID': bankApiAppId,
+    'X-API-KEY': bankApiKey,
+    'X-Organization-No': bankApiOrgNo,
+  };
 }

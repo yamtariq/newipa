@@ -86,12 +86,14 @@ class _CardOfferScreenState extends State<CardOfferScreen> {
       print('Food Expense: $foodExpense');
       print('Transport Expense: $transportExpense');
       print('Total Expenses: ${foodExpense + transportExpense}');
+      print('Phone: ${userData['phone']}');
 
       final response = await cardService.getCardDecision(
         salary: salary,
         liabilities: totalLiabilities,
         expenses: foodExpense + transportExpense,
         nationalId: userData['national_id'],
+        phone: userData['phone'] ?? '',
       );
 
       print('DEBUG - Card Decision Response:');

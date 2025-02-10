@@ -108,8 +108,8 @@ Example Audit Log Entry:
     },
     "title_en": "Loan Update",
     "body_en": "Your loan application status has changed",
-    "title_ar": "تحديث القرض",
-    "body_ar": "تم تغيير حالة طلب القرض الخاص بك"
+    "title_ar": "تحديث التمويل",
+    "body_ar": "تم تغيير حالة طلب التمويليل الخاص بك"
 }
 ```
 

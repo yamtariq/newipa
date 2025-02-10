@@ -10,6 +10,7 @@ import 'dart:io';
 class RegistrationService {
   // Check if user exists and validate identity
   Future<Map<String, dynamic>> validateIdentity(String id, String phone) async {
+    HttpClient? client;
     try {
       print('🚀 Checking if ID already registered...');
       
@@ -17,27 +18,27 @@ class RegistrationService {
       final deviceInfo = await _getDeviceInfo();
       print('📱 Device Info: $deviceInfo');
       
-      // Check if ID exists using signin endpoint
-      final checkResponse = await http.post(
-        Uri.parse('${Constants.authBaseUrl}/signin'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'x-api-key': Constants.apiKey
-        },
-        body: json.encode({
-          'nationalId': id,
-          'deviceId': deviceInfo['deviceId']
-        }),
-      );
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+      
+      final request = await client.postUrl(Uri.parse('${Constants.authBaseUrl}/signin'));
+      request.headers.contentType = ContentType.json;
+      request.headers.add('Accept', 'application/json');
+      request.headers.add('x-api-key', Constants.apiKey);
+      request.write(json.encode({
+        'nationalId': id,
+        'deviceId': deviceInfo['deviceId']
+      }));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
-      print('📥 Check registration response: ${checkResponse.statusCode}');
-      print('📥 Check registration body: ${checkResponse.body}');
+      print('📥 Check registration response: ${response.statusCode}');
+      print('📥 Check registration body: $responseBody');
 
-      if (checkResponse.statusCode == 401) {
-        final errorResponse = json.decode(checkResponse.body);
-        
-        // If error code is CUSTOMER_NOT_FOUND, it means user is not registered
+      if (response.statusCode == 401) {
+        final errorResponse = json.decode(responseBody);
         if (errorResponse['details']?['code'] == 'CUSTOMER_NOT_FOUND') {
           print('✅ ID is valid and not registered');
           return {
@@ -47,29 +48,10 @@ class RegistrationService {
         }
       }
       
-      // If we get here, user exists
       print('❌ This ID is already registered');
       return {
         'status': 'error',
         'message': 'This ID is already registered'
-      };
-      
-      // Add more detailed error information
-      if (checkResponse.statusCode == 400) {
-        final errorResponse = json.decode(checkResponse.body);
-        print('❌ Error: ${errorResponse['error'] ?? 'Failed to validate identity'}');
-        return {
-          'status': 'error',
-          'message': errorResponse['error'] ?? 'Failed to validate identity',
-          'details': 'Status code: ${checkResponse.statusCode}, Body: ${checkResponse.body}'
-        };
-      }
-      
-      print('❌ Failed to validate identity');
-      return {
-        'status': 'error',
-        'message': 'Failed to validate identity. Please try again later.',
-        'details': 'Status code: ${checkResponse.statusCode}'
       };
     } catch (e) {
       print('❌ Error validating identity: $e');
@@ -77,6 +59,8 @@ class RegistrationService {
         'status': 'error',
         'message': 'Connection error. Please check your internet connection.'
       };
+    } finally {
+      client?.close();
     }
   }
 
@@ -235,25 +219,31 @@ class RegistrationService {
 
   // Set password
   Future<Map<String, dynamic>> setPassword(String id, String password) async {
+    HttpClient? client;
     try {
       print('🔒 Setting password...');
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointSetPassword}'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'x-api-key': Constants.apiKey
-        },
-        body: json.encode({
-          'national_id': id,
-          'password': password,
-        }),
-      );
+      
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+      
+      final request = await client.postUrl(Uri.parse('${Constants.apiBaseUrl}${Constants.endpointSetPassword}'));
+      request.headers.contentType = ContentType.json;
+      request.headers.add('Accept', 'application/json');
+      request.headers.add('x-api-key', Constants.apiKey);
+      
+      request.write(json.encode({
+        'national_id': id,
+        'password': password,
+      }));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
       print('📥 Response Status Code: ${response.statusCode}');
       if (response.statusCode == 200) {
         print('✅ Password set successfully');
-        return json.decode(response.body);
+        return json.decode(responseBody);
       }
       print('❌ Failed to set password');
       return {
@@ -266,6 +256,8 @@ class RegistrationService {
         'status': 'error',
         'message': e.toString()
       };
+    } finally {
+      client?.close();
     }
   }
 
@@ -295,6 +287,7 @@ class RegistrationService {
 
   // Check if user is already registered
   Future<Map<String, dynamic>> checkRegistration(String nationalId) async {
+    HttpClient? client;
     try {
       print('🔍 Checking if user is already registered...');
       final url = Uri.parse('${Constants.apiBaseUrl}${Constants.endpointRegistration}');
@@ -311,32 +304,35 @@ class RegistrationService {
 
       print('📤 Request Body: ${json.encode(requestBody)}');
 
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'x-api-key': Constants.apiKey
-        },
-        body: json.encode(requestBody),
-      );
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+      
+      final request = await client.postUrl(url);
+      request.headers.contentType = ContentType.json;
+      request.headers.add('Accept', 'application/json');
+      request.headers.add('x-api-key', Constants.apiKey);
+      request.write(json.encode(requestBody));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
       print('📥 Response Status Code: ${response.statusCode}');
-      print('📥 Response Body: ${response.body}');
+      print('📥 Response Body: $responseBody');
 
       if (response.statusCode == 200) {
         print('✅ User is not registered');
-        return json.decode(response.body);
+        return json.decode(responseBody);
       }
       
       // Add more detailed error information
       if (response.statusCode == 400) {
-        final errorResponse = json.decode(response.body);
+        final errorResponse = json.decode(responseBody);
         print('❌ Error: ${errorResponse['error'] ?? 'ID already registered'}');
         return {
           'status': 'error',
           'message': errorResponse['error'] ?? 'ID already registered',
-          'details': 'Status code: ${response.statusCode}, Body: ${response.body}'
+          'details': 'Status code: ${response.statusCode}, Body: $responseBody'
         };
       }
       
@@ -344,11 +340,13 @@ class RegistrationService {
       return {
         'status': 'error',
         'message': 'Failed to check registration',
-        'details': 'Status code: ${response.statusCode}, Body: ${response.body}'
+        'details': 'Status code: ${response.statusCode}, Body: $responseBody'
       };
     } catch (e) {
       print('❌ Registration Check Error: $e');
       return {'status': 'error', 'message': e.toString()};
+    } finally {
+      client?.close();
     }
   }
 
@@ -566,6 +564,7 @@ class RegistrationService {
     required String mpin,
     required bool enableBiometric,
   }) async {
+    HttpClient? client;
     try {
       print('🔒 Starting complete registration...');
       
@@ -627,6 +626,7 @@ class RegistrationService {
         "registrationDate": DateTime.now().toIso8601String(),
         "consent": true,
         "consentDate": DateTime.now().toIso8601String(),
+        "Dependents": userData['totalNumberOfCurrentDependents'] as int? ?? 0,
         "deviceInfo": {
           "deviceId": deviceInfo['deviceId'],
           "platform": deviceInfo['platform'],
@@ -673,55 +673,55 @@ class RegistrationService {
         'x-api-key': Constants.apiKey
       })}');
 
-      final client = http.Client();
-      try {
-        // Try up to 3 times with exponential backoff
-        for (int i = 0; i < 3; i++) {
-          try {
-            final response = await client.post(
-              Uri.parse('${Constants.apiBaseUrl}${Constants.endpointRegistration}'),
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'x-api-key': Constants.apiKey
-              },
-              body: json.encode(registrationRequest),
-            ).timeout(const Duration(seconds: 30)); // 30 second timeout
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
 
-            print('📥 Response Status: ${response.statusCode}');
-            print('📥 Response Body: ${response.body}');
+      // Try up to 3 times with exponential backoff
+      for (int i = 0; i < 3; i++) {
+        try {
+          final request = await client.postUrl(Uri.parse('${Constants.apiBaseUrl}${Constants.endpointRegistration}'));
+          request.headers.contentType = ContentType.json;
+          request.headers.add('Accept', 'application/json');
+          request.headers.add('x-api-key', Constants.apiKey);
+          request.write(json.encode(registrationRequest));
+          
+          final response = await request.close().timeout(const Duration(seconds: 30));
+          final responseBody = await response.transform(utf8.decoder).join();
 
-            if (response.statusCode == 200) {
-              print('✅ Registration successful!');
-              return true;
-            }
-            
-            // Add more detailed error information
-            if (response.statusCode == 400) {
-              final errorResponse = json.decode(response.body);
-              print('❌ Registration Error: ${errorResponse['error'] ?? 'Failed to complete registration'}');
-              return false;
-            }
-            
-            // If we get here, it's a 500 error or other server error
-            print('❌ Registration request failed (Attempt ${i + 1}/3). Retrying in ${(i + 1) * 2} seconds...');
-            if (i < 2) { // Don't delay on the last attempt
-              await Future.delayed(Duration(seconds: (i + 1) * 2)); // 2s, 4s, 6s
-            }
-          } catch (e) {
-            print('❌ Registration request failed: $e');
-            if (i < 2) { // Don't delay on the last attempt
-              await Future.delayed(Duration(seconds: (i + 1) * 2)); // 2s, 4s, 6s
-            }
+          print('📥 Response Status: ${response.statusCode}');
+          print('📥 Response Body: $responseBody');
+
+          if (response.statusCode == 200) {
+            print('✅ Registration successful!');
+            return true;
+          }
+          
+          // Add more detailed error information
+          if (response.statusCode == 400) {
+            final errorResponse = json.decode(responseBody);
+            print('❌ Registration Error: ${errorResponse['error'] ?? 'Failed to complete registration'}');
+            return false;
+          }
+          
+          // If we get here, it's a 500 error or other server error
+          print('❌ Registration request failed (Attempt ${i + 1}/3). Retrying in ${(i + 1) * 2} seconds...');
+          if (i < 2) { // Don't delay on the last attempt
+            await Future.delayed(Duration(seconds: (i + 1) * 2)); // 2s, 4s, 6s
+          }
+        } catch (e) {
+          print('❌ Registration request failed: $e');
+          if (i < 2) { // Don't delay on the last attempt
+            await Future.delayed(Duration(seconds: (i + 1) * 2)); // 2s, 4s, 6s
           }
         }
-        return false;
-      } finally {
-        client.close();
       }
+      return false;
     } catch (e) {
       print('❌ Error completing registration: $e');
       return false;
+    } finally {
+      client?.close();
     }
   }
 

@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import './navigation_service.dart';
 import 'package:flutter/services.dart';
 import '../utils/constants.dart';
+import 'dart:io';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -230,6 +231,7 @@ class NotificationService {
   }
 
   Future<List<Map<String, dynamic>>> fetchNotifications(String nationalId) async {
+    HttpClient? client;
     try {
       debugPrint('\n=== Fetching Notifications from API ===');
       final List<Map<String, dynamic>> allNotifications = [];
@@ -253,6 +255,11 @@ class NotificationService {
 
       // Save updated seen notifications
       if (newAllNotifications.isNotEmpty) {
+        // 💡 Limit seen notifications to 100
+        if (seenAllNotifications.length > 100) {
+          seenAllNotifications.removeRange(0, seenAllNotifications.length - 100);
+          debugPrint('Trimmed seen notifications to latest 100');
+        }
         await prefs.setStringList('seen_all_notifications', seenAllNotifications);
       }
 
@@ -266,6 +273,7 @@ class NotificationService {
   }
 
   Future<List<Map<String, dynamic>>> _fetchFromApi(String nationalId, bool markAsRead) async {
+    HttpClient? client;
     try {
       final url = '${Constants.apiBaseUrl}${Constants.endpointGetNotifications}';
       final body = {
@@ -278,19 +286,32 @@ class NotificationService {
       debugPrint('Headers: ${Constants.defaultHeaders}');
       debugPrint('Body: ${jsonEncode(body)}');
       
-      final response = await http.post(
-        Uri.parse(url),
-        headers: Constants.defaultHeaders,
-        body: jsonEncode(body),
-      );
+      // 💡 Create HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+
+      final uri = Uri.parse(url);
+      final request = await client.postUrl(uri);
+      
+      // Add headers
+      Constants.defaultHeaders.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+      request.headers.contentType = ContentType.json;
+
+      // Add body
+      request.write(jsonEncode(body));
+
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
       debugPrint('\nAPI Response Details:');
       debugPrint('Status Code: ${response.statusCode}');
       debugPrint('Response Headers: ${response.headers}');
-      debugPrint('Response Body: ${response.body}');
+      debugPrint('Response Body: $responseBody');
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = jsonDecode(responseBody);
         debugPrint('\nParsed Response Data: $data');
         
         if (data['success'] == true && data['data'] != null) {
@@ -318,10 +339,6 @@ class NotificationService {
               largeIconUrl = null;
             }
 
-            debugPrint('Processing notification images:');
-            debugPrint('Big Picture URL: $bigPictureUrl');
-            debugPrint('Large Icon URL: $largeIconUrl');
-
             return {
               ...notification,
               'bigPictureUrl': bigPictureUrl,
@@ -329,9 +346,6 @@ class NotificationService {
             };
           }).toList();
           
-          if (transformedNotifications.isNotEmpty) {
-            debugPrint('Notifications with images: $transformedNotifications');
-          }
           return transformedNotifications;
         }
       }
@@ -339,6 +353,8 @@ class NotificationService {
     } catch (e) {
       debugPrint('Error in API call: $e');
       return [];
+    } finally {
+      client?.close();
     }
   }
 
@@ -354,32 +370,23 @@ class NotificationService {
     String? bigPictureUrl,
     String? largeIconUrl,
   }) async {
+    HttpClient? client;
     try {
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointSendNotification}'),
-        headers: Constants.defaultHeaders,
-        body: jsonEncode({
-          if (nationalId != null) 'nationalId': nationalId,
-          if (nationalIds != null) 'nationalIds': nationalIds,
-          if (filters != null) 'filters': filters,
-          if (isArabic == true) ...<String, String>{
-            'titleAr': title,
-            'bodyAr': body,
-          } else ...<String, String>{
-            'titleEn': title,
-            'bodyEn': body,
-          },
-          if (route != null) 'route': route,
-          if (additionalData != null) 'additionalData': additionalData,
-          if (bigPictureUrl != null) 'bigPictureUrl': bigPictureUrl,
-          if (largeIconUrl != null) 'largeIconUrl': largeIconUrl,
-        }),
-      );
+      // 💡 Create HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
 
-      debugPrint('Sending notification:');
-      debugPrint('URL: ${Constants.apiBaseUrl}${Constants.endpointSendNotification}');
-      debugPrint('Headers: ${Constants.defaultHeaders}');
-      debugPrint('Body: ${jsonEncode({
+      final uri = Uri.parse('${Constants.apiBaseUrl}${Constants.endpointSendNotification}');
+      final request = await client.postUrl(uri);
+      
+      // Add headers
+      Constants.defaultHeaders.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+      request.headers.contentType = ContentType.json;
+
+      // Prepare request body
+      final requestBody = {
         if (nationalId != null) 'nationalId': nationalId,
         if (nationalIds != null) 'nationalIds': nationalIds,
         if (filters != null) 'filters': filters,
@@ -394,18 +401,31 @@ class NotificationService {
         if (additionalData != null) 'additionalData': additionalData,
         if (bigPictureUrl != null) 'bigPictureUrl': bigPictureUrl,
         if (largeIconUrl != null) 'largeIconUrl': largeIconUrl,
-      })}');
+      };
+
+      // Add body
+      request.write(jsonEncode(requestBody));
+
+      debugPrint('Sending notification:');
+      debugPrint('URL: ${Constants.apiBaseUrl}${Constants.endpointSendNotification}');
+      debugPrint('Headers: ${request.headers}');
+      debugPrint('Body: ${jsonEncode(requestBody)}');
+
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        debugPrint('Response: ${response.body}');
+        final data = jsonDecode(responseBody);
+        debugPrint('Response: $responseBody');
         return data['success'] == true;
       }
-      debugPrint('Error response: ${response.body}');
+      debugPrint('Error response: $responseBody');
       return false;
     } catch (e) {
       debugPrint('Error sending notification: $e');
       return false;
+    } finally {
+      client?.close();
     }
   }
 
@@ -541,15 +561,22 @@ class NotificationService {
       if (bigPictureUrl != null) debugPrint('Step S4.1: Big Picture URL: $bigPictureUrl');
       if (largeIconUrl != null) debugPrint('Step S4.2: Large Icon URL: $largeIconUrl');
 
-      // 💡 Validate URLs before using them
+      // 💡 Validate and clean URLs
       String? validatedBigPictureUrl = bigPictureUrl;
       String? validatedLargeIconUrl = largeIconUrl;
 
-      if (bigPictureUrl != null && !bigPictureUrl.startsWith('http')) {
-        validatedBigPictureUrl = null;
+      if (validatedBigPictureUrl != null) {
+        if (!validatedBigPictureUrl.startsWith('http://') && !validatedBigPictureUrl.startsWith('https://')) {
+          debugPrint('Step S4.3: Invalid big picture URL format: $validatedBigPictureUrl');
+          validatedBigPictureUrl = null;
+        }
       }
-      if (largeIconUrl != null && !largeIconUrl.startsWith('http')) {
-        validatedLargeIconUrl = null;
+
+      if (validatedLargeIconUrl != null) {
+        if (!validatedLargeIconUrl.startsWith('http://') && !validatedLargeIconUrl.startsWith('https://')) {
+          debugPrint('Step S4.4: Invalid large icon URL format: $validatedLargeIconUrl');
+          validatedLargeIconUrl = null;
+        }
       }
 
       Map<String, dynamic> payloadData;
@@ -582,7 +609,7 @@ class NotificationService {
       final encodedPayload = jsonEncode(notificationPayload);
       debugPrint('Step S8: Final Encoded Payload: $encodedPayload');
 
-      // Create local notification with background handling
+      // 💡 Create local notification with proper image handling
       await AwesomeNotifications().createNotification(
         content: NotificationContent(
           id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
@@ -590,7 +617,9 @@ class NotificationService {
           title: title,
           body: body,
           payload: {'data': encodedPayload},
-          notificationLayout: validatedBigPictureUrl != null ? NotificationLayout.BigPicture : NotificationLayout.Default,
+          notificationLayout: validatedBigPictureUrl != null 
+              ? NotificationLayout.BigPicture 
+              : NotificationLayout.Default,
           displayOnForeground: true,
           displayOnBackground: true,
           wakeUpScreen: true,
@@ -599,13 +628,14 @@ class NotificationService {
           category: NotificationCategory.Message,
           autoDismissible: false,
           // 💡 Platform-specific icon handling
-          largeIcon: Platform.isIOS 
-              ? validatedLargeIconUrl 
-              : (validatedLargeIconUrl ?? 'resource://drawable/notification_icon'),
+          icon: Platform.isAndroid ? 'resource://mipmap/ic_launcher' : null,
+          largeIcon: validatedLargeIconUrl,
           bigPicture: validatedBigPictureUrl,
-          // 💡 iOS-specific settings - using groupKey instead of threadIdentifier
+          // 💡 iOS-specific settings
           groupKey: Platform.isIOS ? 'basic_channel' : null,
           summary: Platform.isIOS ? title : null,
+          // 💡 Hide large icon when expanded on Android only
+          hideLargeIconOnExpand: Platform.isAndroid && validatedBigPictureUrl != null,
         ),
       );
 

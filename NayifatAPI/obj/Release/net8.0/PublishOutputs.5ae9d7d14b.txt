@@ -1,4 +1,7 @@
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\NayifatAPI.exe
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\publish\publish\publish\publish\web.config
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\publish\publish\publish\web.config
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\publish\publish\web.config
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\publish\web.config
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\web.config
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\web.config
@@ -20,6 +23,21 @@ C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\publish\NayifatAPI.deps.json
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\publish\NayifatAPI.runtimeconfig.json
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\publish\NayifatAPI.staticwebassets.endpoints.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\publish\publish\appsettings.Development.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\publish\publish\appsettings.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\publish\publish\NayifatAPI.deps.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\publish\publish\NayifatAPI.runtimeconfig.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\publish\publish\NayifatAPI.staticwebassets.endpoints.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\publish\publish\publish\appsettings.Development.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\publish\publish\publish\appsettings.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\publish\publish\publish\NayifatAPI.deps.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\publish\publish\publish\NayifatAPI.runtimeconfig.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\publish\publish\publish\NayifatAPI.staticwebassets.endpoints.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\publish\publish\publish\publish\appsettings.Development.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\publish\publish\publish\publish\appsettings.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\publish\publish\publish\publish\NayifatAPI.deps.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\publish\publish\publish\publish\NayifatAPI.runtimeconfig.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\publish\publish\publish\publish\publish\publish\NayifatAPI.staticwebassets.endpoints.json
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\NayifatAPI.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\NayifatAPI.runtimeconfig.json
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\NayifatAPI.pdb
@@ -55,6 +73,7 @@ C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\Serilog.Sinks.Console.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\Serilog.Sinks.Debug.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\Serilog.Sinks.File.dll
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\SixLabors.ImageSharp.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\Swashbuckle.AspNetCore.Swagger.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\Swashbuckle.AspNetCore.SwaggerGen.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\publish\Swashbuckle.AspNetCore.SwaggerUI.dll

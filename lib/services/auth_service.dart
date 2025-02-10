@@ -358,18 +358,31 @@ class AuthService {
       print('- Request Body: ${json.encode(requestBody)}');
 
       print('\nStep 4: Making Sign In API Call');
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}/auth/signin'),
-        headers: headers,
-        body: json.encode(requestBody),
-      );
+      
+      // Create a custom HttpClient that accepts self-signed certificates
+      final client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+      
+      final uri = Uri.parse('${Constants.apiBaseUrl}/auth/signin');
+      final request = await client.postUrl(uri);
+      
+      // Add headers
+      headers.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+      
+      // Add body
+      request.write(json.encode(requestBody));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
       print('\nStep 5: Processing Response');
       print('- Status Code: ${response.statusCode}');
       print('- Response Headers: ${response.headers}');
-      print('- Raw Response Body: ${response.body}');
+      print('- Raw Response Body: $responseBody');
 
-      final Map<String, dynamic> parsedResponse = json.decode(response.body);
+      final Map<String, dynamic> parsedResponse = json.decode(responseBody);
       print('- Parsed Response: ${json.encode(parsedResponse)}');
 
       if (parsedResponse['success'] == true && parsedResponse['data'] != null) {
@@ -430,6 +443,7 @@ class AuthService {
             'lastName': userData['name'] != null && userData['name'].toString().split(' ').length > 1 
                 ? userData['name'].toString().split(' ').sublist(1).join(' ')
                 : '', // Extract last name safely with null check and preserve full last name
+            'totalNumberOfCurrentDependents': userData['totalNumberOfCurrentDependents'] ?? 0, // 💡 Store dependents count
           };
 
           print('\n3. Enhanced User Data to Store:');
@@ -490,6 +504,7 @@ class AuthService {
     required String nationalId,
     required Map<String, dynamic> deviceInfo,
   }) async {
+    HttpClient? client;
     try {
       print('\n=== DEVICE REGISTRATION START ===');
       print('Step 1: Initial Parameters');
@@ -505,35 +520,30 @@ class AuthService {
         'manufacturer': deviceInfo['manufacturer']
       };
 
-      final headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'x-api-key': Constants.apiKey,
-      };
-
-      print('API Call Details:');
-      print('- Endpoint: ${Constants.apiBaseUrl}/device');
-      print('- Headers: ${json.encode(headers)}');
-      print('- Request Body: ${json.encode(requestBody)}');
-
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+      
+      final request = await client.postUrl(Uri.parse('${Constants.apiBaseUrl}/device'));
+      request.headers.contentType = ContentType.json;
+      request.headers.add('Accept', 'application/json');
+      request.headers.add('x-api-key', Constants.apiKey);
+      
+      request.write(jsonEncode(requestBody));
+      
       print('\nStep 3: Making API Call');
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}/device'),
-        headers: headers,
-        body: json.encode(requestBody),
-      );
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
       print('\nStep 4: Processing Response');
       print('- Status Code: ${response.statusCode}');
-      print('- Response Headers: ${response.headers}');
-      print('- Raw Response Body: ${response.body}');
+      print('- Response Body: $responseBody');
 
-      final parsedResponse = json.decode(response.body);
+      final parsedResponse = json.decode(responseBody);
       print('- Parsed Response: ${json.encode(parsedResponse)}');
 
       print('\n=== DEVICE REGISTRATION END ===');
       
-      // Ensure we always return a success boolean
       return {
         'success': parsedResponse['success'] ?? false,
         ...parsedResponse,
@@ -546,6 +556,8 @@ class AuthService {
         'success': false,
         'error': e.toString(),
       };
+    } finally {
+      client?.close();
     }
   }
 
@@ -743,7 +755,9 @@ class AuthService {
     }
   }
 
+  // Check registration status
   Future<Map<String, dynamic>> checkRegistrationStatus(String nationalId) async {
+    HttpClient? client;
     try {
       final requestBody = {
         'national_id': nationalId
@@ -751,17 +765,27 @@ class AuthService {
       
       print('Checking registration status for ID: $nationalId');
       
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointUserRegistration}'),
-        headers: Constants.userHeaders,
-        body: jsonEncode(requestBody),
-      );
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+      
+      final request = await client.postUrl(Uri.parse('${Constants.apiBaseUrl}${Constants.endpointUserRegistration}'));
+      request.headers.contentType = ContentType.json;
+      request.headers.add('Accept', 'application/json');
+      Constants.userHeaders.forEach((key, value) {
+        request.headers.add(key, value);
+      });
+      
+      request.write(jsonEncode(requestBody));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
       print('Response Status: ${response.statusCode}');
-      print('Response Body: ${response.body}');
+      print('Response Body: $responseBody');
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = jsonDecode(responseBody);
         print('API Response: $data');
         return data;
       } else {
@@ -770,24 +794,39 @@ class AuthService {
     } catch (e) {
       print('Error checking registration status: $e');
       throw Exception('Error checking registration status: $e');
+    } finally {
+      client?.close();
     }
   }
 
   // Get government data
   Future<Map<String, dynamic>> getGovernmentData(String nationalId) async {
+    HttpClient? client;
     try {
       print('=== GOVERNMENT API CALL START ===');
       print('Calling government API for ID: $nationalId');
-      final response = await http.get(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointGetGovernmentData}?national_id=$nationalId'),
-        headers: Constants.userHeaders,
+      
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+      
+      final request = await client.getUrl(
+        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointGetGovernmentData}?national_id=$nationalId')
       );
+      request.headers.contentType = ContentType.json;
+      request.headers.add('Accept', 'application/json');
+      Constants.userHeaders.forEach((key, value) {
+        request.headers.add(key, value);
+      });
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
       print('Government API response status: ${response.statusCode}');
-      print('Government API raw response body: ${response.body}');
+      print('Government API raw response body: $responseBody');
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = jsonDecode(responseBody);
         print('Government API parsed response: $data');
         
         if (data['status'] == 'success') {
@@ -800,10 +839,9 @@ class AuthService {
           print('Government API returned error status: ${data['status']}');
           print('Error message if any: ${data['message']}');
           print('=== GOVERNMENT API CALL END ===');
-          // If government data is not found, use arabic name for both fields
           return {
-            'name': 'User $nationalId',  // Default English name
-            'arabic_name': 'مستخدم $nationalId',  // Default Arabic name
+            'name': 'User $nationalId',
+            'arabic_name': 'مستخدم $nationalId',
           };
         }
       } else {
@@ -815,11 +853,12 @@ class AuthService {
     } catch (e) {
       print('Error getting government data: $e');
       print('Stack trace: ${StackTrace.current}');
-      // Return default values if there's an error
       return {
-        'name': 'User $nationalId',  // Default English name
-        'arabic_name': 'مستخدم $nationalId',  // Default Arabic name
+        'name': 'User $nationalId',
+        'arabic_name': 'مستخدم $nationalId',
       };
+    } finally {
+      client?.close();
     }
   }
 
@@ -830,6 +869,7 @@ class AuthService {
     required String phone,
     required String password,
   }) async {
+    HttpClient? client;
     try {
       final deviceInfo = await getDeviceInfo();
       
@@ -843,17 +883,27 @@ class AuthService {
 
       print('Registration Request Body: ${jsonEncode(requestBody)}');
       
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointUserRegistration}'),
-        headers: Constants.userHeaders,
-        body: jsonEncode(requestBody),
-      );
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+      
+      final request = await client.postUrl(Uri.parse('${Constants.apiBaseUrl}${Constants.endpointUserRegistration}'));
+      request.headers.contentType = ContentType.json;
+      request.headers.add('Accept', 'application/json');
+      Constants.userHeaders.forEach((key, value) {
+        request.headers.add(key, value);
+      });
+      
+      request.write(jsonEncode(requestBody));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
       print('Registration Response Status: ${response.statusCode}');
-      print('Registration Response Body: ${response.body}');
+      print('Registration Response Body: $responseBody');
 
       // If response contains HTML error, extract the JSON part
-      String jsonStr = response.body;
+      String jsonStr = responseBody;
       if (jsonStr.contains('<br />')) {
         jsonStr = jsonStr.substring(jsonStr.lastIndexOf('{'));
       }
@@ -867,6 +917,8 @@ class AuthService {
         'status': 'continue',
         'message': 'Proceeding to next step'
       };
+    } finally {
+      client?.close();
     }
   }
 
@@ -1025,6 +1077,7 @@ class AuthService {
 
   // Modify signOutDevice to not throw on 404
   Future<void> signOutDevice() async {
+    HttpClient? client;
     try {
       print('Signing out device completely...');
       
@@ -1034,17 +1087,26 @@ class AuthService {
         final deviceInfo = await getDeviceInfo();
         
         try {
-          // Call server to unregister device
-          final response = await http.post(
-            Uri.parse('${Constants.apiBaseUrl}${Constants.endpointUnregisterDevice}'),
-            headers: Constants.deviceHeaders,
-            body: jsonEncode({
-              'national_id': userId,
-              'device_info': deviceInfo,
-            }),
-          );
+          // 💡 Create a custom HttpClient that accepts self-signed certificates
+          client = HttpClient()
+            ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+          
+          final request = await client.postUrl(Uri.parse('${Constants.apiBaseUrl}${Constants.endpointUnregisterDevice}'));
+          request.headers.contentType = ContentType.json;
+          request.headers.add('Accept', 'application/json');
+          Constants.deviceHeaders.forEach((key, value) {
+            request.headers.add(key, value);
+          });
+          
+          request.write(jsonEncode({
+            'national_id': userId,
+            'device_info': deviceInfo,
+          }));
+          
+          final response = await request.close();
+          final responseBody = await response.transform(utf8.decoder).join();
 
-          print('Device unregister response: ${response.body}');
+          print('Device unregister response: $responseBody');
           // Don't throw on 404, just log it
           if (response.statusCode != 200 && response.statusCode != 404) {
             print('Server returned status code: ${response.statusCode}');
@@ -1052,6 +1114,8 @@ class AuthService {
         } catch (e) {
           print('Error calling unregister endpoint: $e');
           // Continue with local cleanup even if server call fails
+        } finally {
+          client?.close();
         }
       }
       
@@ -1111,6 +1175,7 @@ class AuthService {
 
   // Device validation method
   Future<Map<String, dynamic>> validateDeviceRegistration(String nationalId) async {
+    HttpClient? client;
     try {
       print('Validating device registration for user: $nationalId');
       
@@ -1118,7 +1183,6 @@ class AuthService {
       final deviceRegistered = await _secureStorage.read(key: 'device_registered');
       final deviceInfo = await getDeviceInfo();
       
-      // Check local registration
       if (deviceRegistered != 'true' || deviceUserId != nationalId) {
         return {
           'isValid': false,
@@ -1127,15 +1191,24 @@ class AuthService {
         };
       }
 
-      // Verify with server
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointCheckDeviceRegistration}'),
-        headers: Constants.deviceHeaders,
-        body: jsonEncode({
-          'national_id': nationalId,
-          'device_info': deviceInfo,
-        }),
-      );
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+      
+      final request = await client.postUrl(Uri.parse('${Constants.apiBaseUrl}${Constants.endpointCheckDeviceRegistration}'));
+      request.headers.contentType = ContentType.json;
+      request.headers.add('Accept', 'application/json');
+      Constants.deviceHeaders.forEach((key, value) {
+        request.headers.add(key, value);
+      });
+      
+      request.write(jsonEncode({
+        'national_id': nationalId,
+        'device_info': deviceInfo,
+      }));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
       if (response.statusCode != 200) {
         return {
@@ -1145,7 +1218,7 @@ class AuthService {
         };
       }
 
-      final data = jsonDecode(response.body);
+      final data = jsonDecode(responseBody);
       
       if (data['status'] == 'device_mismatch') {
         return {
@@ -1174,6 +1247,8 @@ class AuthService {
     } catch (e) {
       print('Error validating device registration: $e');
       throw Exception('Failed to validate device registration: $e');
+    } finally {
+      client?.close();
     }
   }
 
@@ -1208,48 +1283,65 @@ class AuthService {
   Future<Map<String, dynamic>> initiateDeviceTransition({
     required String nationalId,
   }) async {
+    HttpClient? client;
     try {
       print('Initiating device transition for user: $nationalId');
       
-      // First verify credentials before proceeding
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointVerifyCredentials}'),
-        headers: Constants.authHeaders,
-        body: jsonEncode({
-          'national_id': nationalId,
-          'device_info': await getDeviceInfo(),
-        }),
-      );
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+      
+      // First verify credentials
+      final verifyRequest = await client.postUrl(Uri.parse('${Constants.apiBaseUrl}${Constants.endpointVerifyCredentials}'));
+      verifyRequest.headers.contentType = ContentType.json;
+      verifyRequest.headers.add('Accept', 'application/json');
+      Constants.authHeaders.forEach((key, value) {
+        verifyRequest.headers.add(key, value);
+      });
+      
+      verifyRequest.write(jsonEncode({
+        'national_id': nationalId,
+        'device_info': await getDeviceInfo(),
+      }));
+      
+      final verifyResponse = await verifyRequest.close();
+      final verifyResponseBody = await verifyResponse.transform(utf8.decoder).join();
 
-      if (response.statusCode != 200) {
+      if (verifyResponse.statusCode != 200) {
         throw Exception('Failed to verify credentials');
       }
 
-      final data = jsonDecode(response.body);
-      if (data['status'] != 'success') {
-        throw Exception(data['message'] ?? 'Invalid credentials');
+      final verifyData = jsonDecode(verifyResponseBody);
+      if (verifyData['status'] != 'success') {
+        throw Exception(verifyData['message'] ?? 'Invalid credentials');
       }
 
       // Clear old device data
       await clearDeviceRegistration();
       
-      // Register new device with server
+      // Register new device
       final deviceInfo = await getDeviceInfo();
-      final registerResponse = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointRegisterDevice}'),
-        headers: Constants.deviceHeaders,
-        body: jsonEncode({
-          'register_device_only': true,
-          'national_id': nationalId,
-          'device_info': deviceInfo,
-        }),
-      );
+      final registerRequest = await client.postUrl(Uri.parse('${Constants.apiBaseUrl}${Constants.endpointRegisterDevice}'));
+      registerRequest.headers.contentType = ContentType.json;
+      registerRequest.headers.add('Accept', 'application/json');
+      Constants.deviceHeaders.forEach((key, value) {
+        registerRequest.headers.add(key, value);
+      });
+      
+      registerRequest.write(jsonEncode({
+        'register_device_only': true,
+        'national_id': nationalId,
+        'device_info': deviceInfo,
+      }));
+      
+      final registerResponse = await registerRequest.close();
+      final registerResponseBody = await registerResponse.transform(utf8.decoder).join();
 
       if (registerResponse.statusCode != 200) {
         throw Exception('Failed to register new device');
       }
 
-      final registerData = jsonDecode(registerResponse.body);
+      final registerData = jsonDecode(registerResponseBody);
       if (registerData['status'] != 'success') {
         throw Exception(registerData['message'] ?? 'Device registration failed');
       }
@@ -1266,31 +1358,43 @@ class AuthService {
     } catch (e) {
       print('Error during device transition: $e');
       throw Exception('Device transition failed: $e');
+    } finally {
+      client?.close();
     }
   }
 
-  // Unregister current device for a user
+  // Unregister current device
   Future<Map<String, dynamic>> unregisterCurrentDevice(String nationalId) async {
+    HttpClient? client;
     try {
       print('Unregistering current device for user: $nationalId');
       
       final deviceInfo = await getDeviceInfo();
       
-      // Send unregister request to server
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointUnregisterDevice}'),
-        headers: Constants.deviceHeaders,
-        body: jsonEncode({
-          'national_id': nationalId,
-          'device_info': deviceInfo,
-        }),
-      );
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+      
+      final request = await client.postUrl(Uri.parse('${Constants.apiBaseUrl}${Constants.endpointUnregisterDevice}'));
+      request.headers.contentType = ContentType.json;
+      request.headers.add('Accept', 'application/json');
+      Constants.deviceHeaders.forEach((key, value) {
+        request.headers.add(key, value);
+      });
+      
+      request.write(jsonEncode({
+        'national_id': nationalId,
+        'device_info': deviceInfo,
+      }));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
       if (response.statusCode != 200) {
         throw Exception('Failed to unregister device with server');
       }
 
-      final data = jsonDecode(response.body);
+      final data = jsonDecode(responseBody);
       if (data['status'] != 'success') {
         throw Exception(data['message'] ?? 'Device unregistration failed');
       }
@@ -1306,26 +1410,39 @@ class AuthService {
     } catch (e) {
       print('Error unregistering device: $e');
       throw Exception('Failed to unregister device: $e');
+    } finally {
+      client?.close();
     }
   }
 
   // Check if ID exists
   Future<Map<String, dynamic>> checkIdExists(String nationalId) async {
+    HttpClient? client;
     try {
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointUserRegistration}'),
-        headers: Constants.userHeaders,
-        body: jsonEncode({
-          'national_id': nationalId,
-          'check_only': true  // Flag to indicate we only want to check ID
-        }),
-      );
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+      
+      final request = await client.postUrl(Uri.parse('${Constants.apiBaseUrl}${Constants.endpointUserRegistration}'));
+      request.headers.contentType = ContentType.json;
+      request.headers.add('Accept', 'application/json');
+      Constants.userHeaders.forEach((key, value) {
+        request.headers.add(key, value);
+      });
+      
+      request.write(jsonEncode({
+        'national_id': nationalId,
+        'check_only': true
+      }));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
       print('ID Check Response Status: ${response.statusCode}');
-      print('ID Check Response Body: ${response.body}');
+      print('ID Check Response Body: $responseBody');
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = jsonDecode(responseBody);
         return data;
       } else {
         throw Exception('Failed to check ID: ${response.statusCode}');
@@ -1333,6 +1450,8 @@ class AuthService {
     } catch (e) {
       print('Error checking ID: $e');
       throw Exception('Error checking ID: $e');
+    } finally {
+      client?.close();
     }
   }
 
@@ -1357,6 +1476,7 @@ class AuthService {
 
   // Get user data from secure storage or fetch from server
   Future<Map<String, dynamic>?> getUserData([String? nationalId]) async {
+    HttpClient? client;
     try {
       // If no national ID provided, try to get from secure storage
       if (nationalId == null) {
@@ -1368,17 +1488,27 @@ class AuthService {
       }
 
       // If national ID provided, fetch from server
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointSignIn}'),
-        headers: Constants.authHeaders,
-        body: jsonEncode({
-          'national_id': nationalId,
-          'get_user_data': true,
-        }),
-      );
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+      
+      final request = await client.postUrl(Uri.parse('${Constants.apiBaseUrl}${Constants.endpointSignIn}'));
+      request.headers.contentType = ContentType.json;
+      request.headers.add('Accept', 'application/json');
+      Constants.authHeaders.forEach((key, value) {
+        request.headers.add(key, value);
+      });
+      
+      request.write(jsonEncode({
+        'national_id': nationalId,
+        'get_user_data': true,
+      }));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = jsonDecode(responseBody);
         if (data['status'] == 'success' && data['user'] != null) {
           return data['user'];
         }
@@ -1387,6 +1517,8 @@ class AuthService {
     } catch (e) {
       print('Error getting user data: $e');
       throw Exception('Failed to get user data: $e');
+    } finally {
+      client?.close();
     }
   }
 
@@ -1457,16 +1589,28 @@ class AuthService {
     }
   }
 
-  // Get government services data
+  // Get government services
   Future<Map<String, dynamic>> getGovernmentServices(String nationalId) async {
+    HttpClient? client;
     try {
-      final response = await http.get(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointGetGovernmentData}?national_id=$nationalId'),
-        headers: Constants.userHeaders,
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+      
+      final request = await client.getUrl(
+        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointGetGovernmentData}?national_id=$nationalId')
       );
+      request.headers.contentType = ContentType.json;
+      request.headers.add('Accept', 'application/json');
+      Constants.userHeaders.forEach((key, value) {
+        request.headers.add(key, value);
+      });
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        return jsonDecode(responseBody);
       } else {
         throw Exception('Failed to get government services: ${response.statusCode}');
       }
@@ -1476,6 +1620,8 @@ class AuthService {
         'status': 'error',
         'message': 'Failed to get government services',
       };
+    } finally {
+      client?.close();
     }
   }
 
@@ -1542,12 +1688,16 @@ class AuthService {
   // Get user's mobile number from stored data
   Future<String?> getStoredMobileNumber() async {
     try {
+      print('T_ResetPass_B1: Starting to retrieve stored mobile number');
       final prefs = await SharedPreferences.getInstance();
       final userDataStr = prefs.getString('user_data');
       
+      print('T_ResetPass_B2: Retrieved user data string: ${userDataStr ?? 'null'}');
+      
       if (userDataStr != null) {
         final userData = json.decode(userDataStr);
-        print('Retrieved user data for mobile number: ${json.encode(userData)}');
+        print('T_ResetPass_B3: Parsed user data: ${json.encode(userData)}');
+        print('T_ResetPass_B4: Available keys in user data: ${userData.keys.toList()}');
         
         // Try different possible keys for mobile number
         String? mobileNo = userData['mobile_no'] ?? 
@@ -1556,110 +1706,175 @@ class AuthService {
                          userData['phoneNumber'] ??
                          userData['mobile'];
                          
+        print('T_ResetPass_B5: Found mobile number: ${mobileNo ?? 'null'}');
+        
         if (mobileNo != null) {
           // Clean the number: remove any non-digit characters and ensure it starts with 966
           String cleanNumber = mobileNo.toString().replaceAll(RegExp(r'[^\d]'), '');
+          print('T_ResetPass_B6: Cleaned number (removed non-digits): $cleanNumber');
           
           // Remove leading zeros
           cleanNumber = cleanNumber.replaceAll(RegExp(r'^0+'), '');
+          print('T_ResetPass_B7: Removed leading zeros: $cleanNumber');
           
           // Remove 966 if it exists at the start
           if (cleanNumber.startsWith('966')) {
             cleanNumber = cleanNumber.substring(3);
+            print('T_ResetPass_B8: Removed 966 prefix: $cleanNumber');
           }
           
           // Add 966 prefix
           final formattedNumber = '966$cleanNumber';
-          
-          print('Formatted mobile number: $formattedNumber');
+          print('T_ResetPass_B9: Final formatted number: $formattedNumber');
           return formattedNumber;
         } else {
-          print('No mobile number found in user data. Available keys: ${userData.keys.toList()}');
+          print('T_ResetPass_B10: No mobile number found in user data');
         }
       } else {
-        print('No user data found in SharedPreferences');
+        print('T_ResetPass_B11: No user data found in SharedPreferences');
       }
+
+      // Try getting from secure storage as fallback
+      print('T_ResetPass_B12: Trying to get phone from secure storage');
+      final securePhone = await _secureStorage.read(key: 'user_phone');
+      if (securePhone != null) {
+        print('T_ResetPass_B13: Found phone in secure storage: $securePhone');
+        return securePhone;
+      }
+      print('T_ResetPass_B14: No phone found in secure storage');
+
       return null;
     } catch (e) {
-      print('Error getting stored mobile number: $e');
+      print('T_ResetPass_B15: Error getting stored mobile number: $e');
       return null;
     }
   }
 
   // Generate OTP
   Future<Map<String, dynamic>> generateOTP(String nationalId) async {
+    HttpClient? client;
     try {
-      final mobileNo = await getStoredMobileNumber();
+      print('T_ResetPass_A1: Starting OTP generation in AuthService');
       
-      if (mobileNo == null) {
-        throw Exception('Mobile number not found in stored user data');
-      }
-
-      final requestBody = Constants.otpGenerateRequestBody(
-        nationalId, 
-        mobileNo,
-        purpose: 'Login'
-      );
+      // 💡 First get user data from backend for password reset
+      print('T_ResetPass_A2: Getting user data from backend');
       
-      print('Generating OTP for:');
-      print('National ID: $nationalId');
-      print('Mobile Number: $mobileNo');
-
+      // Get device info first
+      final deviceInfo = await getDeviceInfo();
+      print('T_ResetPass_A2.1: Got device info: ${json.encode(deviceInfo)}');
+      
       // 💡 Create a custom HttpClient that accepts self-signed certificates
-      final client = HttpClient()
+      client = HttpClient()
         ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
       
-      final uri = Uri.parse(Constants.proxyOtpGenerateUrl);
-      final request = await client.postUrl(uri);
+      final userDataRequest = await client.postUrl(Uri.parse('${Constants.apiBaseUrl}/auth/signin'));
+      userDataRequest.headers.contentType = ContentType.json;
+      userDataRequest.headers.add('Accept', 'application/json');
+      userDataRequest.headers.add('x-api-key', Constants.apiKey);
       
-      // Add headers
-      Constants.defaultHeaders.forEach((key, value) {
-        request.headers.set(key, value);
-      });
+      userDataRequest.write(jsonEncode({
+        'nationalId': nationalId,
+        'deviceId': deviceInfo['deviceId'],
+        'password': null // This will trigger OTP flow
+      }));
+
+      final userDataResponse = await userDataRequest.close();
+      final userDataResponseBody = await userDataResponse.transform(utf8.decoder).join();
+
+      print('T_ResetPass_A3: User data response: $userDataResponseBody');
+      final userData = json.decode(userDataResponseBody);
+
+      if (userData['success'] != true) {
+        print('T_ResetPass_A4: User data fetch failed');
+        return {
+          'success': false,
+          'code': userData['code'] ?? 'USER_NOT_FOUND',
+          'message': userData['message'] ?? 'User not found'
+        };
+      }
+
+      final mobileNo = userData['data']?['user']?['phone'];
+      print('T_ResetPass_A5: Got phone number from backend: $mobileNo');
+
+      if (mobileNo == null) {
+        print('T_ResetPass_A6: No phone number in backend response');
+        return {
+          'success': false,
+          'code': 'INVALID_PHONE',
+          'message': 'No phone number found for this ID'
+        };
+      }
+
+      final requestBody = {
+        'nationalId': nationalId,
+        'mobileNo': mobileNo,
+        'type': 'reset_password',
+        'purpose': 'RESET_PASSWORD',
+        'userId': nationalId
+      };
       
-      // Add body
-      request.write(jsonEncode(requestBody));
+      print('T_ResetPass_A7: Preparing OTP request');
+      print('T_ResetPass_A8: Request Body: ${json.encode(requestBody)}');
+
+      final otpRequest = await client.postUrl(Uri.parse(Constants.proxyOtpGenerateUrl));
+      otpRequest.headers.contentType = ContentType.json;
+      otpRequest.headers.add('Accept', 'application/json');
+      otpRequest.headers.add('x-api-key', Constants.apiKey);
       
-      final response = await request.close();
+      otpRequest.write(jsonEncode(requestBody));
+      
+      print('T_ResetPass_A11: Sending OTP request');
+      final response = await otpRequest.close();
       final responseBody = await response.transform(utf8.decoder).join();
 
-      print('OTP Generation Response Status: ${response.statusCode}');
-      print('OTP Generation Response Body: $responseBody');
+      print('T_ResetPass_A12: OTP Response Status: ${response.statusCode}');
+      print('T_ResetPass_A13: OTP Response Body: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = json.decode(responseBody);
-        print('OTP Generation Response: $responseData');
-        return responseData;
+        print('T_ResetPass_A14: OTP Generation Response: $responseData');
+        
+        // 💡 Store phone number
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('user_phone', mobileNo);
+        print('T_ResetPass_A15: Stored phone number in SharedPreferences');
+        
+        return {
+          ...responseData,
+          'success': true,
+          'phone': mobileNo
+        };
       } else {
+        print('T_ResetPass_A16: Failed to generate OTP: ${response.statusCode}');
         throw Exception('Failed to generate OTP: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error generating OTP: $e');
+      print('T_ResetPass_A17: Error generating OTP: $e');
       return {
         'success': false,
         'message': e.toString(),
       };
+    } finally {
+      client?.close();
     }
   }
 
   // Verify OTP
   Future<Map<String, dynamic>> verifyOTP(String nationalId, String otp) async {
+    HttpClient? client;
     print('\n=== VERIFY OTP ===');
     print('📤 National ID: $nationalId');
     print('📤 OTP: $otp');
 
     try {
       // 💡 Create a custom HttpClient that accepts self-signed certificates
-      final client = HttpClient()
+      client = HttpClient()
         ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
       
-      final uri = Uri.parse(Constants.proxyOtpVerifyUrl);
-      final request = await client.postUrl(uri);
-      
-      // Add headers
-      Constants.defaultHeaders.forEach((key, value) {
-        request.headers.set(key, value);
-      });
+      final request = await client.postUrl(Uri.parse(Constants.proxyOtpVerifyUrl));
+      request.headers.contentType = ContentType.json;
+      request.headers.add('Accept', 'application/json');
+      request.headers.add('x-api-key', Constants.apiKey);
       
       // Add body
       final requestBody = Constants.otpVerifyRequestBody(nationalId, otp);
@@ -1714,6 +1929,7 @@ class AuthService {
         'message_ar': 'حدث خطأ أثناء التحقق من رمز التحقق'
       };
     } finally {
+      client?.close();
       print('=== END VERIFY OTP ===\n');
     }
   }

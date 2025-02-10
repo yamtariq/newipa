@@ -109,7 +109,7 @@ namespace NayifatAPI.Controllers
                             device_id = request.DeviceId,
                             date_of_birth = customer.DateOfBirth?.ToString("yyyy-MM-dd"),
                             iban = customer.Iban,
-                            dependents = customer.Dependents
+                            dependents = customer.Dependents ?? 0
                         }
                     });
                 }
@@ -120,7 +120,8 @@ namespace NayifatAPI.Controllers
                     {
                         code = "CUSTOMER_VERIFIED",
                         message = "Customer verified, proceed with OTP",
-                        require_otp = true
+                        require_otp = true,
+                        user = new { phone = customer.Phone }
                     });
                 }
             }
@@ -174,6 +175,15 @@ namespace NayifatAPI.Controllers
 
             try
             {
+                // Get customer phone number
+                var customer = await _context.Customers
+                    .FirstOrDefaultAsync(c => c.NationalId == request.NationalId);
+
+                if (customer == null)
+                {
+                    return Error("Customer not found", 404, new { code = "USER_NOT_FOUND" });
+                }
+
                 // Rate limiting: Check for unexpired OTP
                 var hasUnexpiredOtp = await _context.OtpCodes
                     .AnyAsync(o => 
@@ -209,6 +219,7 @@ namespace NayifatAPI.Controllers
                 return Success(new
                 {
                     message = "OTP generated successfully and sent to the user phone",
+                    phone = customer.Phone, // 💡 Include phone number in response
                     otp_code = otp // Remove in production
                 });
             }
@@ -423,7 +434,10 @@ namespace NayifatAPI.Controllers
         {
             try
             {
-                return BCrypt.Net.BCrypt.Verify(password, hashedPassword);
+                using var sha256 = SHA256.Create();
+                var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
+                var hashedInputPassword = Convert.ToBase64String(hashedBytes);
+                return hashedInputPassword == hashedPassword;
             }
             catch (Exception ex)
             {
