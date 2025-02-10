@@ -28,7 +28,7 @@ jobs:
       - name: Clean Environment
         run: |
           flutter clean
-          rm -rf ios/Podfile.lock ios/Pods ios/Flutter/Flutter.framework ios/Flutter/Flutter.podspec
+          rm -rf ios/Podfile.lock ios/Pods
 
       - name: Install Dependencies
         run: |
