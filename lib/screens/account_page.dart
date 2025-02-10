@@ -24,6 +24,7 @@ import 'splash_screen.dart';
 import '../screens/main_page.dart';
 import '../utils/constants.dart';
 import '../services/theme_service.dart';
+import 'auth/forget_password_screen.dart';
 
 class AccountPage extends StatefulWidget {
   final bool isArabic;
@@ -46,7 +47,7 @@ class _AccountPageState extends State<AccountPage> {
   int _tabIndex = 4;  // For Account tab (settings)
 
   // Add ThemeProvider getter
-  ThemeProvider get themeProvider => Provider.of<ThemeProvider>(context);
+  ThemeProvider get themeProvider => Provider.of<ThemeProvider>(context, listen: false);
 
   double get screenHeight => MediaQuery.of(context).size.height;
 
@@ -314,329 +315,14 @@ class _AccountPageState extends State<AccountPage> {
   }
 
   Future<void> _changePassword() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final nationalId = prefs.getString('national_id') ?? '';
-      
-      // First verify biometrics if enabled
-      if (_isBiometricsEnabled && _isBiometricsAvailable) {
-        final bool didAuthenticate = await _localAuth.authenticate(
-          localizedReason: widget.isArabic 
-              ? 'يرجى المصادقة لتغيير كلمة المرور'
-              : 'Please authenticate to change password',
-          options: const AuthenticationOptions(
-            stickyAuth: true,
-            biometricOnly: true,
-          ),
-        );
-
-        if (!didAuthenticate || !mounted) return;
-      }
-
-      // Show password change dialog
-      final result = await showDialog<Map<String, String>>(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          final currentPasswordController = TextEditingController();
-          final newPasswordController = TextEditingController();
-          final confirmPasswordController = TextEditingController();
-          final formKey = GlobalKey<FormState>();
-          bool obscureCurrentPassword = true;
-          bool obscureNewPassword = true;
-          bool obscureConfirmPassword = true;
-          final themeProvider = Provider.of<ThemeProvider>(context);
-
-          return StatefulBuilder(
-            builder: (context, setState) {
-              return AlertDialog(
-                backgroundColor: themeProvider.surfaceColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                  side: BorderSide(
-                    color: themeProvider.primaryColor,
-                  ),
-                ),
-                title: Text(
-                  widget.isArabic ? 'تغيير كلمة المرور' : 'Change Password',
-                  textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
-                  style: TextStyle(
-                    color: themeProvider.primaryColor,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                content: Form(
-                  key: formKey,
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildStyledFormField(
-                            controller: currentPasswordController,
-                              labelText: widget.isArabic ? 'كلمة المرور الحالية' : 'Current Password',
-                          obscureText: obscureCurrentPassword,
-                          isArabic: widget.isArabic,
-                          setDialogState: setState,
-                          themeProvider: themeProvider,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return widget.isArabic 
-                                    ? 'يرجى إدخال كلمة المرور الحالية'
-                                    : 'Please enter current password';
-                              }
-                              return null;
-                            },
-                          ),
-                        _buildStyledFormField(
-                            controller: newPasswordController,
-                              labelText: widget.isArabic ? 'كلمة المرور الجديدة' : 'New Password',
-                          obscureText: obscureNewPassword,
-                          isArabic: widget.isArabic,
-                          setDialogState: setState,
-                          themeProvider: themeProvider,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return widget.isArabic 
-                                    ? 'يرجى إدخال كلمة المرور الجديدة'
-                                    : 'Please enter new password';
-                              }
-                              if (value.length < 8) {
-                                return widget.isArabic
-                                    ? 'كلمة المرور يجب أن تكون 8 أحرف على الأقل'
-                                    : 'Password must be at least 8 characters';
-                              }
-                              if (!value.contains(RegExp(r'[A-Z]'))) {
-                                return widget.isArabic
-                                    ? 'كلمة المرور يجب أن تحتوي على حرف كبير'
-                                    : 'Password must contain uppercase letter';
-                              }
-                              if (!value.contains(RegExp(r'[a-z]'))) {
-                                return widget.isArabic
-                                    ? 'كلمة المرور يجب أن تحتوي على حرف صغير'
-                                    : 'Password must contain lowercase letter';
-                              }
-                              if (!value.contains(RegExp(r'[0-9]'))) {
-                                return widget.isArabic
-                                    ? 'كلمة المرور يجب أن تحتوي على رقم'
-                                    : 'Password must contain number';
-                              }
-                              return null;
-                            },
-                          ),
-                        _buildStyledFormField(
-                            controller: confirmPasswordController,
-                              labelText: widget.isArabic ? 'تأكيد كلمة المرور الجديدة' : 'Confirm New Password',
-                          obscureText: obscureConfirmPassword,
-                          isArabic: widget.isArabic,
-                          setDialogState: setState,
-                          themeProvider: themeProvider,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return widget.isArabic
-                                    ? 'يرجى تأكيد كلمة المرور الجديدة'
-                                    : 'Please confirm new password';
-                              }
-                              if (value != newPasswordController.text) {
-                                return widget.isArabic
-                                    ? 'كلمة المرور غير متطابقة'
-                                    : 'Passwords do not match';
-                              }
-                              return null;
-                            },
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: Text(
-                      widget.isArabic ? 'إلغاء' : 'Cancel',
-                      style: TextStyle(
-                        color: themeProvider.primaryColor.withOpacity(0.7),
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      if (formKey.currentState!.validate()) {
-                        Navigator.of(context).pop({
-                          'currentPassword': currentPasswordController.text,
-                          'newPassword': newPasswordController.text,
-                        });
-                      }
-                    },
-                    child: Text(
-                      widget.isArabic ? 'تغيير' : 'Change',
-                      style: TextStyle(
-                        color: themeProvider.primaryColor,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      );
-
-      if (result == null || !mounted) return;
-
-      // First verify current password
-      final loginResponse = await _authService.signIn(
-        nationalId: nationalId,
-        password: result['currentPassword']!,
-      );
-
-      if (loginResponse['status'] != 'success') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.isArabic 
-                  ? 'كلمة المرور الحالية غير صحيحة'
-                  : 'Current password is incorrect',
-              style: TextStyle(
-                color: themeProvider.isDarkMode ? Colors.black : Colors.white,
-              ),
-            ),
-            backgroundColor: themeProvider.primaryColor,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-        return;
-      }
-
-      // Generate OTP
-      final otpResponse = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPGenerate}'),
-        headers: Constants.authHeaders,
-        body: {
-          'national_id': nationalId,
-          'type': 'change_password',
-        },
-      );
-
-      final otpData = json.decode(otpResponse.body);
-      
-      if (otpData['status'] != 'success' || !mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.isArabic 
-                  ? (otpData['message_ar'] ?? 'فشل في إرسال رمز التحقق')
-                  : (otpData['message'] ?? 'Failed to send OTP'),
-              style: TextStyle(
-                color: themeProvider.isDarkMode ? Colors.black : Colors.white,
-              ),
-            ),
-            backgroundColor: themeProvider.primaryColor,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-        return;
-      }
-
-      // Verify OTP
-      final otpVerified = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => OTPDialog(
-          nationalId: nationalId,
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ForgetPasswordScreen(
           isArabic: widget.isArabic,
-          onResendOTP: () async {
-            final response = await http.post(
-              Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPGenerate}'),
-              headers: Constants.authHeaders,
-              body: {
-                'national_id': nationalId,
-                'type': 'change_password',
-              },
-            );
-            return json.decode(response.body);
-          },
-          onVerifyOTP: (otp) async {
-            final response = await http.post(
-              Uri.parse('${Constants.apiBaseUrl}${Constants.endpointOTPVerification}'),
-              headers: Constants.authHeaders,
-              body: {
-                'national_id': nationalId,
-                'otp_code': otp,
-                'type': 'change_password',
-              },
-            );
-            return json.decode(response.body);
-          },
         ),
-      );
-
-      if (otpVerified != true || !mounted) return;
-
-      // Change password
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointPasswordChange}'),
-        headers: Constants.authHeaders,
-        body: {
-          'national_id': nationalId,
-          'new_password': result['newPassword'],
-          'type': 'change_password',
-        },
-      );
-
-      final data = json.decode(response.body);
-      
-      if (data['status'] == 'success') {
-        // Update stored password
-        await prefs.setString('password', result['newPassword']!);
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.isArabic 
-                  ? 'تم تغيير كلمة المرور بنجاح'
-                  : 'Password changed successfully',
-              style: TextStyle(
-                color: themeProvider.isDarkMode ? Colors.black : Colors.white,
-              ),
-            ),
-            backgroundColor: themeProvider.primaryColor,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.isArabic 
-                  ? (data['message_ar'] ?? 'حدث خطأ أثناء تغيير كلمة المرور')
-                  : (data['message'] ?? 'Error changing password'),
-              style: TextStyle(
-                color: themeProvider.isDarkMode ? Colors.black : Colors.white,
-              ),
-            ),
-            backgroundColor: themeProvider.primaryColor,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            widget.isArabic 
-                ? 'حدث خطأ أثناء تغيير كلمة المرور'
-                : 'Error changing password',
-            style: TextStyle(
-              color: themeProvider.isDarkMode ? Colors.black : Colors.white,
-            ),
-          ),
-          backgroundColor: themeProvider.primaryColor,
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    }
+      ),
+    );
   }
 
   void _toggleLanguage() async {
@@ -796,14 +482,10 @@ class _AccountPageState extends State<AccountPage> {
       final prefs = await SharedPreferences.getInstance();
       final nationalId = prefs.getString('national_id') ?? '';
 
-      // Clear biometric status
-      await prefs.remove('biometrics_enabled_$nationalId');
-      await prefs.remove('biometrics_enabled'); // Clear old key too
-      
-      // First clear auth service data
-      print('2. Calling AuthService.signOff()');
-      await _authService.signOff();
-      print('3. AuthService.signOff() completed');
+      // Call the complete signOut method
+      print('2. Calling AuthService.signOut()');
+      await _authService.signOut();
+      print('3. AuthService.signOut() completed');
 
       if (!mounted) return;
       
