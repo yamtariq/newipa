@@ -247,140 +247,147 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
     try {
       print('T_ResetPass_24: Sending password reset request');
       print('T_ResetPass_25: National ID: ${_nationalIdController.text}');
-      // Send request
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointPasswordChange}'),
-        headers: Constants.authHeaders,
-        body: json.encode({
-          'nationalId': _nationalIdController.text,
-          'newPassword': _newPasswordController.text,
-        }),
-      );
-
-      print('T_ResetPass_26: Response Status Code: ${response.statusCode}');
-      print('T_ResetPass_27: Response Body: ${response.body}');
-
-      final data = json.decode(response.body);
       
-      if (data['success'] == true) {
-        print('T_ResetPass_28: Password reset successful');
-        _showSuccessBanner(
-          widget.isArabic
-              ? data['data']['message']
-              : data['data']['message']
+      // 💡 Create HTTP client that bypasses SSL verification
+      final client = Constants.createHttpClient(validateCertificate: false);
+      try {
+        // Send request
+        final response = await client.post(
+          Uri.parse('${Constants.apiBaseUrl}${Constants.endpointPasswordChange}'),
+          headers: Constants.authHeaders,
+          body: json.encode({
+            'nationalId': _nationalIdController.text,
+            'newPassword': _newPasswordController.text,
+          }),
         );
         
-        // Sign in with the new password to get user data
-        print('T_ResetPass_29: Attempting sign in with new password');
-        final signInResponse = await AuthService().signIn(
-          nationalId: _nationalIdController.text,
-          password: _newPasswordController.text,
-        );
+        print('T_ResetPass_26: Response Status Code: ${response.statusCode}');
+        print('T_ResetPass_27: Response Body: ${response.body}');
 
-        print('T_ResetPass_30: Sign in response: ${json.encode(signInResponse)}');
-
-        if (signInResponse['success'] == true && signInResponse['data'] != null) {
-          // Register device
-          final deviceInfo = await AuthService().getDeviceInfo();
-          final registerResponse = await AuthService().registerDevice(
+        final data = json.decode(response.body);
+        
+        if (data['success'] == true) {
+          print('T_ResetPass_28: Password reset successful');
+          _showSuccessBanner(
+            widget.isArabic
+                ? data['data']['message']
+                : data['data']['message']
+          );
+          
+          // Sign in with the new password to get user data
+          print('T_ResetPass_29: Attempting sign in with new password');
+          final signInResponse = await AuthService().signIn(
             nationalId: _nationalIdController.text,
-            deviceInfo: deviceInfo,
+            password: _newPasswordController.text,
           );
 
-          print('T_ResetPass_31: Device registration response: ${json.encode(registerResponse)}');
+          print('T_ResetPass_30: Sign in response: ${json.encode(signInResponse)}');
 
-          if (registerResponse['success'] == true) {
-            // Reset manual sign off flag in session provider
-            if (mounted) {
-              Provider.of<SessionProvider>(context, listen: false).resetManualSignOff();
-            }
+          if (signInResponse['success'] == true && signInResponse['data'] != null) {
+            // Register device
+            final deviceInfo = await AuthService().getDeviceInfo();
+            final registerResponse = await AuthService().registerDevice(
+              nationalId: _nationalIdController.text,
+              deviceInfo: deviceInfo,
+            );
 
-            // Store user data in local storage
-            await AuthService().storeUserData(signInResponse['data']['user']);
+            print('T_ResetPass_31: Device registration response: ${json.encode(registerResponse)}');
 
-            // Set session as active
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setBool('isSessionActive', true);
-
-            // Navigate to MPIN setup after 1 second
-            Future.delayed(const Duration(seconds: 1), () {
+            if (registerResponse['success'] == true) {
+              // Reset manual sign off flag in session provider
               if (mounted) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => MPINSetupScreen(
-                      nationalId: _nationalIdController.text,
-                      password: _newPasswordController.text,
-                      user: signInResponse['data']['user'],
-                      isArabic: widget.isArabic,
-                      showSteps: false,
-                    ),
-                  ),
-                );
+                Provider.of<SessionProvider>(context, listen: false).resetManualSignOff();
               }
-            });
+
+              // Store user data in local storage
+              await AuthService().storeUserData(signInResponse['data']['user']);
+
+              // Set session as active
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('isSessionActive', true);
+
+              // Navigate to MPIN setup after 1 second
+              Future.delayed(const Duration(seconds: 1), () {
+                if (mounted) {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MPINSetupScreen(
+                        nationalId: _nationalIdController.text,
+                        password: _newPasswordController.text,
+                        user: signInResponse['data']['user'],
+                        isArabic: widget.isArabic,
+                        showSteps: false,
+                      ),
+                    ),
+                  );
+                }
+              });
+            } else {
+              print('T_ResetPass_32: Device registration failed with code: ${registerResponse['code']}');
+              String errorMessage;
+              
+              switch (registerResponse['code']) {
+                case 'DEVICE_ALREADY_REGISTERED':
+                  errorMessage = widget.isArabic
+                      ? 'هذا الجهاز مسجل بالفعل لمستخدم آخر'
+                      : 'This device is already registered to another user';
+                  break;
+                case 'MAX_DEVICES_REACHED':
+                  errorMessage = widget.isArabic
+                      ? 'لقد وصلت إلى الحد الأقصى من الأجهزة المسجلة'
+                      : 'You have reached the maximum number of registered devices';
+                  break;
+                default:
+                  errorMessage = widget.isArabic
+                      ? (registerResponse['message_ar'] ?? 'فشل في تسجيل الجهاز')
+                      : (registerResponse['message'] ?? 'Failed to register device');
+              }
+              
+              _showErrorBanner(errorMessage);
+            }
           } else {
-            print('T_ResetPass_32: Device registration failed with code: ${registerResponse['code']}');
+            print('T_ResetPass_33: Sign in failed with code: ${signInResponse['code']}');
             String errorMessage;
             
-            switch (registerResponse['code']) {
-              case 'DEVICE_ALREADY_REGISTERED':
+            switch (signInResponse['code']) {
+              case 'INVALID_CREDENTIALS':
                 errorMessage = widget.isArabic
-                    ? 'هذا الجهاز مسجل بالفعل لمستخدم آخر'
-                    : 'This device is already registered to another user';
+                    ? 'بيانات الدخول غير صحيحة'
+                    : 'Invalid credentials';
                 break;
-              case 'MAX_DEVICES_REACHED':
+              case 'USER_NOT_FOUND':
                 errorMessage = widget.isArabic
-                    ? 'لقد وصلت إلى الحد الأقصى من الأجهزة المسجلة'
-                    : 'You have reached the maximum number of registered devices';
+                    ? 'رقم الهوية غير مسجل في النظام'
+                    : 'National ID is not registered in the system';
+                break;
+              case 'ACCOUNT_LOCKED':
+                errorMessage = widget.isArabic
+                    ? 'تم قفل الحساب مؤقتاً. يرجى المحاولة لاحقاً'
+                    : 'Account temporarily locked. Please try again later';
+                break;
+              case 'DEVICE_NOT_REGISTERED':
+                errorMessage = widget.isArabic
+                    ? 'الجهاز غير مسجل'
+                    : 'Device not registered';
                 break;
               default:
                 errorMessage = widget.isArabic
-                    ? (registerResponse['message_ar'] ?? 'فشل في تسجيل الجهاز')
-                    : (registerResponse['message'] ?? 'Failed to register device');
+                    ? (signInResponse['message_ar'] ?? 'حدث خطأ أثناء تسجيل الدخول')
+                    : (signInResponse['message'] ?? 'Error during sign in process');
             }
             
             _showErrorBanner(errorMessage);
           }
         } else {
-          print('T_ResetPass_33: Sign in failed with code: ${signInResponse['code']}');
-          String errorMessage;
-          
-          switch (signInResponse['code']) {
-            case 'INVALID_CREDENTIALS':
-              errorMessage = widget.isArabic
-                  ? 'بيانات الدخول غير صحيحة'
-                  : 'Invalid credentials';
-              break;
-            case 'USER_NOT_FOUND':
-              errorMessage = widget.isArabic
-                  ? 'رقم الهوية غير مسجل في النظام'
-                  : 'National ID is not registered in the system';
-              break;
-            case 'ACCOUNT_LOCKED':
-              errorMessage = widget.isArabic
-                  ? 'تم قفل الحساب مؤقتاً. يرجى المحاولة لاحقاً'
-                  : 'Account temporarily locked. Please try again later';
-              break;
-            case 'DEVICE_NOT_REGISTERED':
-              errorMessage = widget.isArabic
-                  ? 'الجهاز غير مسجل'
-                  : 'Device not registered';
-              break;
-            default:
-              errorMessage = widget.isArabic
-                  ? (signInResponse['message_ar'] ?? 'حدث خطأ أثناء تسجيل الدخول')
-                  : (signInResponse['message'] ?? 'Error during sign in process');
-          }
-          
-          _showErrorBanner(errorMessage);
+          _showErrorBanner(
+            widget.isArabic
+                ? data['message_ar']
+                : data['message']
+          );
         }
-      } else {
-        _showErrorBanner(
-          widget.isArabic
-              ? data['message_ar']
-              : data['message']
-        );
+      } finally {
+        client.close(); // 💡 Always close the client
       }
     } catch (e) {
       print('T_ResetPass_34: Error during password reset: $e');

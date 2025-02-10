@@ -540,10 +540,43 @@ class LoanService {
       print('\n=== LOAN APPLICATION OFFER REQUEST - START ===');
       print('Timestamp: ${DateTime.now()}');
 
-      // Step 1: Get data from SharedPreferences
-      print('\n1. FETCHING DATA FROM STORAGE');
+      // Log all storage contents first
+      print('\n1. CHECKING ALL STORAGE DATA:');
+      print('--Secure Storage Contents--');
+      final allSecureItems = await _secureStorage.readAll();
+      allSecureItems.forEach((key, value) {
+        print('$key: $value');
+      });
+
+      print('\n--Shared Preferences Contents--');
       final prefs = await SharedPreferences.getInstance();
+      final allKeys = prefs.getKeys();
+      for (String key in allKeys) {
+        print('$key: ${prefs.get(key)}');
+      }
+
+      // Get user data from secure storage
+      final userDataStr = await _secureStorage.read(key: 'user_data');
+      final selectedSalaryDataStr = await _secureStorage.read(key: 'selected_salary_data');
       final registrationDataStr = prefs.getString('registration_data');
+
+      print('\n2. CHECKING REQUIRED DATA AVAILABILITY:');
+      print('• user_data exists: ${userDataStr != null}');
+      print('• selected_salary_data exists: ${selectedSalaryDataStr != null}');
+      print('• registration_data exists: ${registrationDataStr != null}');
+
+      if (userDataStr != null) {
+        print('\nUser Data Content:');
+        print(const JsonEncoder.withIndent('  ').convert(jsonDecode(userDataStr)));
+      }
+
+      if (selectedSalaryDataStr != null) {
+        print('\nSelected Salary Data Content:');
+        print(const JsonEncoder.withIndent('  ').convert(jsonDecode(selectedSalaryDataStr)));
+      }
+
+      // Continue with existing code...
+      print('\n3. FETCHING REGISTRATION DATA');
       
       if (registrationDataStr == null) {
         throw Exception('Registration data not found');
@@ -553,9 +586,8 @@ class LoanService {
       final registrationData = jsonDecode(registrationDataStr);
       final userData = registrationData['userData'];
 
-      print('\n2. PREPARING REQUEST DATA');
-      print('Registration data found:');
-      print(const JsonEncoder.withIndent('  ').convert(userData));
+      // Get user data from secure storage for missing fields
+      final userDataContent = userDataStr != null ? jsonDecode(userDataStr) : null;
 
       // Format dates to match API requirements (yyyy/mm/dd)
       String formatHijriDate(String inputDate) {
@@ -575,30 +607,45 @@ class LoanService {
       }
 
       // Log all available data before preparing request
-      print('\n3. AVAILABLE DATA FOR REQUEST:');
-      print('National ID: ${userData['nationalId']}');
+      print('\n4. AVAILABLE DATA FOR REQUEST:');
+      print('National ID: ${userDataContent?['national_id']}');
       print('Date of Birth: ${userData['dateOfBirth']}');
       print('ID Expiry Date: ${userData['idExpiryDate']}');
-      print('Phone: ${userData['phone']}');
-      print('Email: ${userData['email']}');
+      print('Phone: ${userDataContent?['phone']}');
+      print('Email: ${userDataContent?['email']}');
 
-      // Step 2: Prepare request data with default values
+      // 💡 Step 2: Prepare request data with default values and user data content
       final requestData = {
-        "nationalID": userData['nationalId'],
+        "nationnalID": userDataContent?['national_id'],
         "dob": formatHijriDate(userData['dateOfBirth']),
         "doe": formatHijriDate(userData['idExpiryDate']),
         "finPurpose": "BUF",
         "language": isArabic ? 1 : 0,
         "productType": 0,
-        "mobileNo": formatPhone(userData['phone'] ?? ''),
-        "emailId": userData['email']?.toString().toLowerCase() ?? '',
+        "mobileNo": formatPhone(userDataContent?['phone'] ?? ''),
+        "emailId": userDataContent?['email']?.toString().toLowerCase() ?? '',
         "finAmount": 10000,
         "tenure": 60,
         "propertyStatus": 1,
-        "effRate": 1
+        "effRate": 1,
+        // 💡 Adding extra parameters with dummy data
+        "param1": "TEST001",           // string max 20
+        "param2": "TEST002",           // string max 20
+        "param3": "TEST003",           // string max 20
+        "param4": "TEST004",           // string max 50
+        "param5": "TEST005",           // string max 100
+        "param6": "TEST006",           // string max 500
+        "param7": 1234567.89,          // decimal 10 digits with 2 decimal points
+        "param8": 9876543.21,          // decimal 10 digits with 2 decimal points
+        "param9": "2025-02-10T10:02:34.269Z",  // datetime
+        "param10": "2025-02-10T10:02:34.269Z", // datetime
+        "param11": 123456,             // integer max 6 digits
+        "param12": 654321,             // integer max 6 digits
+        "param13": true,               // boolean
+        "param14": false               // boolean
       };
 
-      print('\n4. PREPARED REQUEST DATA:');
+      print('\n5. PREPARED REQUEST DATA:');
       print('National ID: ${requestData['nationalID']}');
       print('Date of Birth (formatted): ${requestData['dob']} (Original: ${userData['dateOfBirth']})');
       print('ID Expiry Date (formatted): ${requestData['doe']} (Original: ${userData['idExpiryDate']})');
@@ -612,14 +659,14 @@ class LoanService {
       print('Property Status: ${requestData['propertyStatus']}');
       print('Effective Rate: ${requestData['effRate']}');
 
-      print('\n5. REQUEST DETAILS:');
+      print('\n6. REQUEST DETAILS:');
       print('Endpoint: ${Constants.endpointCreateCustomer}');
       print('Headers: ${Constants.bankApiHeaders.map((key, value) => MapEntry(key, key.toLowerCase() == 'authorization' ? '[REDACTED]' : value))}');
       print('Request Body (JSON):');
       print(const JsonEncoder.withIndent('  ').convert(requestData));
 
       // Step 3: Make API call
-      print('\n6. MAKING API CALL');
+      print('\n7. MAKING API CALL');
       final client = HttpClient()
         ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
 
@@ -636,7 +683,7 @@ class LoanService {
       final response = await request.close();
       final responseBody = await response.transform(utf8.decoder).join();
 
-      print('\n7. API RESPONSE:');
+      print('\n8. API RESPONSE:');
       print('Status Code: ${response.statusCode}');
       print('Response Headers:');
       response.headers.forEach((name, values) {
@@ -662,7 +709,7 @@ class LoanService {
         key: 'loan_offer_data',
         value: jsonEncode(responseData),
       );
-      print('\n8. Response saved to secure storage with key: loan_offer_data');
+      print('\n9. Response saved to secure storage with key: loan_offer_data');
 
       print('\n=== LOAN APPLICATION OFFER REQUEST - END ===\n');
       return responseData;

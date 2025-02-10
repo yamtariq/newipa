@@ -4,6 +4,8 @@ using NayifatAPI.Services;
 using Serilog;
 using Serilog.Events;
 using NayifatAPI.Controllers;
+using Microsoft.OpenApi.Models;
+using Swashbuckle.AspNetCore.SwaggerUI;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -47,7 +49,16 @@ builder.Services.AddSwaggerGen(c =>
         Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
         In = Microsoft.OpenApi.Models.ParameterLocation.Header,
         Name = "x-api-key",
-        Description = "API Key authentication"
+        Description = "API Key authentication required for all endpoints"
+    });
+
+    // Add Feature Header definition
+    c.AddSecurityDefinition("FeatureHeader", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Name = "x-feature",
+        Description = "Feature-specific header required for certain endpoints (e.g., 'auth', 'user')"
     });
 
     c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
@@ -61,9 +72,17 @@ builder.Services.AddSwaggerGen(c =>
                     Id = "ApiKey"
                 }
             },
-            new string[] {}
+            Array.Empty<string>()
         }
     });
+
+    // Configure Swagger to use the XML file
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+    {
+        c.IncludeXmlComments(xmlPath);
+    }
 });
 
 // Add DbContext configuration
@@ -81,23 +100,26 @@ if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
     app.UseSwagger(c =>
     {
         c.SerializeAsV2 = false;
-        c.PreSerializeFilters.Add((swaggerDoc, httpReq) => 
-            swaggerDoc.Servers = new List<OpenApiServer> { 
-                new() { Url = $"{httpReq.Scheme}://{httpReq.Host.Value}" }
-            });
+        c.RouteTemplate = "swagger/{documentName}/swagger.json";
     });
+    
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Nayifat API V1");
         c.RoutePrefix = string.Empty;
         c.EnableDeepLinking();
         c.DisplayRequestDuration();
+        c.DefaultModelsExpandDepth(-1);
+        c.DocExpansion(DocExpansion.List);
+        c.EnableFilter();
+        c.EnableTryItOutByDefault();
     });
 }
 
+// CORS must be before Auth and other middleware
 app.UseCors("AllowAll");
 
-// Add exception handling middleware
+// Exception handling middleware
 app.Use(async (context, next) =>
 {
     try
@@ -107,11 +129,13 @@ app.Use(async (context, next) =>
     catch (Exception ex)
     {
         Log.Error(ex, "Unhandled exception");
-        throw;
+        context.Response.StatusCode = 500;
+        await context.Response.WriteAsJsonAsync(new { error = "An internal server error occurred.", details = ex.Message });
     }
 });
 
 app.UseHttpsRedirection();
+app.UseRouting();
 app.UseAuthorization();
 app.MapControllers();
 

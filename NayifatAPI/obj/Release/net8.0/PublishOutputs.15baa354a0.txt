@@ -1,4 +1,7 @@
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\NayifatAPI.exe
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\web.config
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\web.config
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\web.config
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\web.config
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\web.config
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\web.config
@@ -80,6 +83,21 @@ C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\pu
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\NayifatAPI.deps.json
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\NayifatAPI.runtimeconfig.json
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\NayifatAPI.staticwebassets.endpoints.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\appsettings.Development.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\appsettings.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\NayifatAPI.deps.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\NayifatAPI.runtimeconfig.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\NayifatAPI.staticwebassets.endpoints.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\appsettings.Development.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\appsettings.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\NayifatAPI.deps.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\NayifatAPI.runtimeconfig.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\NayifatAPI.staticwebassets.endpoints.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\appsettings.Development.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\appsettings.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\NayifatAPI.deps.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\NayifatAPI.runtimeconfig.json
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\NayifatAPI.staticwebassets.endpoints.json
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\NayifatAPI.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\NayifatAPI.runtimeconfig.json
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\NayifatAPI.pdb
@@ -139,4 +157,5 @@ C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\runtimes\w
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\runtimes\win\lib\net6.0\System.Runtime.Caching.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\runtimes\win\lib\net6.0\System.Security.Cryptography.ProtectedData.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\runtimes\win\lib\net6.0\System.Windows.Extensions.dll
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\NayifatAPI.xml
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\publish\NayifatAPI.deps.json

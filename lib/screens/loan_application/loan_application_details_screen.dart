@@ -10,6 +10,8 @@ import '../../providers/theme_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/document_upload_service.dart';
 import '../../services/loan_service.dart';
+import 'package:lottie/lottie.dart';
+import 'loan_application_status_screen.dart';
 
 class LoanApplicationDetailsScreen extends StatefulWidget {
   final bool isArabic;
@@ -19,7 +21,7 @@ class LoanApplicationDetailsScreen extends StatefulWidget {
   State<LoanApplicationDetailsScreen> createState() => _LoanApplicationDetailsScreenState();
 }
 
-class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScreen> {
+class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScreen> with SingleTickerProviderStateMixin {
   final _secureStorage = const FlutterSecureStorage();
   bool _isLoading = true;
   Map<String, dynamic> _userData = {};
@@ -27,11 +29,22 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
   bool _salaryChanged = false;
   bool _consentAccepted = false;
   bool get isArabic => widget.isArabic;
+  late final AnimationController _rotationController;
 
   @override
   void initState() {
     super.initState();
     _fetchUserData();
+    _rotationController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _rotationController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchUserData() async {
@@ -1142,6 +1155,101 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
     }
   }
 
+  Widget _buildLoadingOverlay() {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final surfaceColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
+    final textColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
+
+    return Stack(
+      children: [
+        // Semi-transparent background
+        Container(
+          color: Colors.black.withOpacity(0.5),
+        ),
+        // Loading content
+        Center(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: surfaceColor,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: primaryColor.withOpacity(0.2),
+                  blurRadius: 20,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Top fading logo
+                SizedBox(
+                  width: 150,
+                  height: 150,
+                  child: Lottie.asset(
+                    'assets/animations/loan_processing.json',
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      print('Error loading animation: $error');
+                      return const CircularProgressIndicator();
+                    },
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  isArabic ? 'جاري معالجة طلبك' : 'Processing Your Application',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  isArabic 
+                    ? 'يرجى الانتظار بينما نقوم بتجهيز عرض التمويل الخاص بك'
+                    : 'Please wait while we prepare your finance offer',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: textColor.withOpacity(0.7),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                // Bottom rotating logo
+                SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: RotationTransition(
+                    turns: _rotationController,
+                    child: Image.asset(
+                      themeProvider.isDarkMode
+                        ? 'assets/images/nayifat-circle-grey.png'
+                        : 'assets/images/nayifatlogocircle-nobg.png',
+                      width: 40,
+                      height: 40,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
@@ -1161,7 +1269,7 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
     if (_isLoading) {
       return Scaffold(
         backgroundColor: backgroundColor,
-        body: Center(child: CircularProgressIndicator(color: primaryColor)),
+        body: _buildLoadingOverlay(),
       );
     }
 
@@ -1411,12 +1519,27 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                                     );
                                     
                                     if (!mounted) return;
-                                    
+
+                                    // 💡 Handle different response types
                                     if (response['status'] == 'error') {
-                                      throw Exception(response['message']);
+                                      // Check if it's a rejection (2-203) or other error
+                                      final errorCode = response['errorCode'] as String?;
+                                      final isRejection = errorCode == '2-203';
+
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => LoanApplicationStatusScreen(
+                                            isArabic: isArabic,
+                                            isRejected: isRejection,
+                                            errorCode: errorCode,
+                                          ),
+                                        ),
+                                      );
+                                      return;
                                     }
                                     
-                                    // Navigate to offer screen with response data
+                                    // If we reach here, it's an approval - navigate to offer screen
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(

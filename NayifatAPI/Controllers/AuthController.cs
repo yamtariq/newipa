@@ -430,14 +430,31 @@ namespace NayifatAPI.Controllers
             return Convert.ToBase64String(hashedBytes);
         }
 
-        private bool VerifyPassword(string password, string hashedPassword)
+        private bool VerifyPassword(string password, string storedHash)
         {
             try
             {
-                using var sha256 = SHA256.Create();
-                var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
-                var hashedInputPassword = Convert.ToBase64String(hashedBytes);
-                return hashedInputPassword == hashedPassword;
+                // Split the stored hash into its components
+                var parts = storedHash.Split(':', 3);
+                if (parts.Length != 3)
+                {
+                    return false;
+                }
+
+                var salt = Convert.FromBase64String(parts[0]);
+                var iterations = int.Parse(parts[1]);
+                var hash = Convert.FromBase64String(parts[2]);
+
+                // Generate hash from the provided password
+                using var pbkdf2 = new Rfc2898DeriveBytes(
+                    password,
+                    salt,
+                    iterations,
+                    HashAlgorithmName.SHA256);
+                var testHash = pbkdf2.GetBytes(32); // 256 bits
+
+                // Compare the hashes
+                return hash.SequenceEqual(testHash);
             }
             catch (Exception ex)
             {
@@ -448,9 +465,26 @@ namespace NayifatAPI.Controllers
 
         private string HashPassword(string password)
         {
-            using var sha256 = SHA256.Create();
-            var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
-            return Convert.ToBase64String(hashedBytes);
+            // Generate a random salt
+            byte[] salt = new byte[16];
+            using (var rng = new RNGCryptoServiceProvider())
+            {
+                rng.GetBytes(salt);
+            }
+
+            // Set number of iterations (can be increased in the future for better security)
+            int iterations = 10000;
+
+            // Generate the hash
+            using var pbkdf2 = new Rfc2898DeriveBytes(
+                password,
+                salt,
+                iterations,
+                HashAlgorithmName.SHA256);
+            var hash = pbkdf2.GetBytes(32); // 256 bits
+
+            // Combine salt, iterations, and hash
+            return $"{Convert.ToBase64String(salt)}:{iterations}:{Convert.ToBase64String(hash)}";
         }
 
         private string GenerateSessionToken(string nationalId)

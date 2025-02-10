@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using NayifatAPI.Data;
 using NayifatAPI.Models;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace NayifatAPI.Controllers
@@ -186,7 +188,26 @@ namespace NayifatAPI.Controllers
 
         private string HashPassword(string password)
         {
-            return BCrypt.Net.BCrypt.HashPassword(password);
+            // Generate a random salt
+            byte[] salt = new byte[16];
+            using (var rng = new RNGCryptoServiceProvider())
+            {
+                rng.GetBytes(salt);
+            }
+
+            // Set number of iterations (can be increased in the future for better security)
+            int iterations = 10000;
+
+            // Generate the hash
+            using var pbkdf2 = new Rfc2898DeriveBytes(
+                password,
+                salt,
+                iterations,
+                HashAlgorithmName.SHA256);
+            var hash = pbkdf2.GetBytes(32); // 256 bits
+
+            // Combine salt, iterations, and hash
+            return $"{Convert.ToBase64String(salt)}:{iterations}:{Convert.ToBase64String(hash)}";
         }
     }
 

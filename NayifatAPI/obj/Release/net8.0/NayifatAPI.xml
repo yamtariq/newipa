@@ -1,0 +1,140 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>NayifatAPI</name>
+    </assembly>
+    <members>
+        <member name="T:NayifatAPI.Migrations.InitialCreate">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.InitialCreate.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.InitialCreate.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.InitialCreate.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:NayifatAPI.Migrations.UpdateAuthLogIdType">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.UpdateAuthLogIdType.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.UpdateAuthLogIdType.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.UpdateAuthLogIdType.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:NayifatAPI.Migrations.CreateOtpCodesTable">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.CreateOtpCodesTable.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.CreateOtpCodesTable.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.CreateOtpCodesTable.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:NayifatAPI.Migrations.InitialMigration">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.InitialMigration.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.InitialMigration.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.InitialMigration.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:NayifatAPI.Migrations.CreateNayifatSchema">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.CreateNayifatSchema.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.CreateNayifatSchema.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.CreateNayifatSchema.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:NayifatAPI.Migrations.AddApiKeysTable">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.AddApiKeysTable.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.AddApiKeysTable.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.AddApiKeysTable.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:NayifatAPI.Migrations.AddYakeenCitizenInfo">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.AddYakeenCitizenInfo.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.AddYakeenCitizenInfo.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.AddYakeenCitizenInfo.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:NayifatAPI.Migrations.AddYakeenCitizenAddress">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.AddYakeenCitizenAddress.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.AddYakeenCitizenAddress.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.AddYakeenCitizenAddress.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:NayifatAPI.Migrations.AddNotificationImageUrls">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.AddNotificationImageUrls.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.AddNotificationImageUrls.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.AddNotificationImageUrls.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:NayifatAPI.Migrations.CreateBankCustomersTable">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.CreateBankCustomersTable.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.CreateBankCustomersTable.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.CreateBankCustomersTable.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:NayifatAPI.Migrations.RenameApiKeyColumn">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.RenameApiKeyColumn.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.RenameApiKeyColumn.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:NayifatAPI.Migrations.RenameApiKeyColumn.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+    </members>
+</doc>

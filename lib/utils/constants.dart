@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
+import 'dart:io';
 
 class Constants {
   // API Base URLs
@@ -565,4 +568,14 @@ class Constants {
     'X-API-KEY': bankApiKey,
     'X-Organization-No': bankApiOrgNo,
   };
+
+  // 💡 HTTP Client for development (bypasses SSL verification)
+  static http.Client createHttpClient({bool validateCertificate = false}) {
+    if (!validateCertificate) {
+      final httpClient = HttpClient()
+        ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+      return IOClient(httpClient);
+    }
+    return http.Client();
+  }
 }
