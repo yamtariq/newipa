@@ -842,4 +842,49 @@ class RegistrationService {
       client?.close();
     }
   }
+
+  // 💡 Store registration data in local storage only
+  Future<void> saveRegistrationDataLocally({
+    required String nationalId,
+    required String email,
+    required String phone,
+    required Map<String, dynamic> userData,
+    Map<String, dynamic>? addressData,
+    String? password,
+    Map<String, dynamic>? nafathData,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final secureStorage = const FlutterSecureStorage();
+    
+    final secureData = {
+      'national_id': nationalId,
+      'full_name': '${userData['englishFirstName']} ${userData['englishLastName']}',
+      'arabic_name': '${userData['firstName']} ${userData['familyName']}',
+      'email': email,
+      'dob': userData['dateOfBirth'],
+      'salary': userData['salary'],
+      'employment_status': userData['employmentStatus'],
+      'employer_name': userData['employerName'],
+      'employment_date': userData['employmentDate'],
+      'national_address': addressData?['citizenaddresslists']?[0] ?? userData['nationalAddress'],
+      'updated_at': DateTime.now().toIso8601String(),
+      if (nafathData != null) 'nafath_data': nafathData,
+    };
+    
+    print('🔒 Storing in Secure Storage: ${json.encode(secureData)}');
+    await secureStorage.write(key: 'user_data', value: json.encode(secureData));
+
+    final registrationData = {
+      'national_id': nationalId,
+      'email': email,
+      'phone': '966' + phone,
+      'userData': userData,
+      if (addressData != null) 'addressData': addressData,
+      if (password != null) 'password': password,
+      if (nafathData != null) 'nafath_data': nafathData,
+      'registration_timestamp': DateTime.now().toIso8601String(),
+    };
+    print('📝 Storing in SharedPreferences: ${json.encode(registrationData)}');
+    await prefs.setString('registration_data', json.encode(registrationData));
+  }
 }

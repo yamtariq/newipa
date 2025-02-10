@@ -350,29 +350,41 @@ class _NafathVerificationDialogState extends State<NafathVerificationDialog> {
           ),
         ),
         actions: [
-          if (_errorMessage != null)
-            // TextButton(
-            //   onPressed: _initializeNafathRequest,
-            //   style: TextButton.styleFrom(
-            //     foregroundColor: themeColor,
-            //   ),
-            //   child: Text(widget.isArabic ? 'إعادة المحاولة' : 'Try Again'),
-            // ),
-          TextButton(
-            onPressed: () {
-              _statusCheckTimer?.cancel();
-              widget.onCancel();
-              Navigator.of(context).pop({
-                'verified': false,
-                'transId': _transId,
-                'random': _random,
-                'response': null
-              });
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: hintTextColor,
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: ElevatedButton(
+              onPressed: () {
+                _statusCheckTimer?.cancel();
+                widget.onCancel();
+                Navigator.of(context).pop({
+                  'verified': false,
+                  'transId': _transId,
+                  'random': _random,
+                  'response': null
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isDarkMode ? Color(Constants.darkSurfaceColor) : Color(Constants.lightSurfaceColor),
+                foregroundColor: themeColor,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                side: BorderSide(
+                  color: themeColor.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                widget.isArabic ? 'إلغاء' : 'Cancel',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: labelTextColor,
+                ),
+              ),
             ),
-            child: Text(widget.isArabic ? 'إلغاء' : 'Cancel'),
           ),
         ],
       ),

@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/document_upload_service.dart';
+import '../../services/card_service.dart';
 
 class CardApplicationDetailsScreen extends StatefulWidget {
   final bool isArabic;
@@ -21,6 +22,7 @@ class CardApplicationDetailsScreen extends StatefulWidget {
 
 class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScreen> {
   final _secureStorage = const FlutterSecureStorage();
+  final _cardService = CardService();
   bool _isLoading = true;
   Map<String, dynamic> _userData = {};
   Map<String, String> _uploadedFiles = {};
@@ -1011,6 +1013,87 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
     }
   }
 
+  Future<void> _handleNextButtonClick() async {
+    try {
+      setState(() => _isLoading = true);
+
+      print('\n=== CARD APPLICATION REQUEST START ===');
+      print('Preparing request data...');
+      
+      // Log all user data being sent
+      print('\nUser Data being sent:');
+      print('- Name: ${_userData['name']}');
+      print('- Arabic Name: ${_userData['arabic_name']}');
+      print('- National ID: ${_userData['national_id']}');
+      print('- Email: ${_userData['email']}');
+      print('- Phone: ${_userData['phone']}');
+      print('- Date of Birth: ${_userData['date_of_birth']}');
+      print('- Salary: ${_userData['salary']}');
+      print('- Food Expense: ${_userData['food_expense']}');
+      print('- Transportation Expense: ${_userData['transportation_expense']}');
+      print('- Other Liabilities: ${_userData['other_liabilities']}');
+      print('- Dependents: ${_userData['dependents']}');
+      
+      print('\nUploaded Documents:');
+      _uploadedFiles.forEach((key, value) {
+        print('- $key: $value');
+      });
+
+      // Call the card service to create customer request
+      print('\nCalling CardService.createCustomerCardRequest...');
+      final response = await _cardService.createCustomerCardRequest(_userData, isArabic);
+      
+      print('\nAPI Response received:');
+      print('Response Data: $response');
+
+      if (!mounted) return;
+
+      setState(() => _isLoading = false);
+
+      if (response['status'] == 'error') {
+        print('\nError in response:');
+        print('Status: ${response['status']}');
+        print('Message: ${response['message']}');
+        print('=== CARD APPLICATION REQUEST END (WITH ERROR) ===\n');
+        
+        _showError(isArabic 
+          ? 'حدث خطأ أثناء إنشاء طلب البطاقة' 
+          : response['message'] ?? 'Error creating card request');
+        return;
+      }
+
+      print('\nSuccessful response:');
+      print('Credit Limit: ${response['credit_limit']}');
+      print('Application Number: ${response['application_number']}');
+      print('=== CARD APPLICATION REQUEST END (SUCCESS) ===\n');
+
+      // Navigate to offer screen
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CardOfferScreen(
+            userData: _userData,
+            isArabic: isArabic,
+            maxCreditLimit: response['credit_limit']?.toDouble() ?? 0,
+            minCreditLimit: 0,
+          ),
+        ),
+      );
+
+    } catch (e) {
+      print('\nException caught:');
+      print('Error: $e');
+      print('Stack trace: ${StackTrace.current}');
+      print('=== CARD APPLICATION REQUEST END (WITH EXCEPTION) ===\n');
+      
+      setState(() => _isLoading = false);
+      _showError(isArabic 
+        ? 'حدث خطأ أثناء إنشاء طلب البطاقة' 
+        : 'Error creating card request: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
@@ -1264,41 +1347,12 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                             SizedBox(
                               width: double.infinity,
                               height: 56,
-                              child: ElevatedButton(
-                                onPressed: canProceed ? () {
-                                  double salary = double.parse(_userData['salary']?.toString() ?? '0');
-                                  double minCreditLimit = 2000;
-                                  double maxCreditLimit = math.min(50000, (salary * 0.15 * 20));
-
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => CardOfferScreen(
-                                        maxCreditLimit: maxCreditLimit,
-                                        minCreditLimit: minCreditLimit,
-                                        isArabic: isArabic,
-                                        userData: _userData,
-                                      ),
-                                    ),
-                                  );
-                                } : null,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: primaryColor,
-                                  disabledBackgroundColor: primaryColor.withOpacity(0.5),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(15),
-                                  ),
-                                  elevation: 5,
-                                  shadowColor: primaryColor.withOpacity(0.5),
-                                ),
-                                child: Text(
-                                  isArabic ? 'التالي' : 'Next',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: themeProvider.isDarkMode ? backgroundColor : surfaceColor,
-                                  ),
-                                ),
+                              child: CustomButton(
+                                onPressed: (_isLoading || !canProceed) ? null : _handleNextButtonClick,
+                                text: isArabic ? 'التالي' : 'Next',
+                                backgroundColor: primaryColor,
+                                textColor: Colors.white,
+                                width: double.infinity,
                               ),
                             ),
                           ],

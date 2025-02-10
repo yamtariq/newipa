@@ -49,17 +49,6 @@ class _CardApplicationNafathScreenState extends State<CardApplicationNafathScree
       if (salaries.isEmpty) {
         print('⚠️ No salary data found');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                widget.isArabic
-                    ? 'لم يتم العثور على بيانات الراتب، يرجى إدخال الراتب يدوياً'
-                    : 'No salary data found, please enter salary manually',
-              ),
-              backgroundColor: Colors.orange,
-            ),
-          );
-          
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -74,17 +63,6 @@ class _CardApplicationNafathScreenState extends State<CardApplicationNafathScree
         // Single salary found, save it and proceed
         await _dakhliService.getSavedSalaryData();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                widget.isArabic
-                    ? 'تم التحقق من الراتب بنجاح'
-                    : 'Salary verified successfully',
-              ),
-              backgroundColor: Colors.green,
-            ),
-          );
-          
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -117,77 +95,20 @@ class _CardApplicationNafathScreenState extends State<CardApplicationNafathScree
         return;
       }
       
-      String errorMessage = e.toString();
-      String userMessage = widget.isArabic
-          ? _getArabicDakhliErrorMessage(errorMessage)
-          : _getEnglishDakhliErrorMessage(errorMessage);
-      
-      print('⚠️ Showing error message to user: $userMessage');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(userMessage),
-          backgroundColor: Colors.orange,
-          duration: const Duration(seconds: 5),
-          action: SnackBarAction(
-            label: widget.isArabic ? 'متابعة' : 'Continue',
-            textColor: Colors.white,
-            onPressed: () {
-              print('👆 User tapped Continue on error message');
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => CardApplicationDetailsScreen(
-                    isArabic: widget.isArabic,
-                  ),
-                ),
-              );
-            },
+      // 💡 Simply navigate to manual entry screen on any error
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CardApplicationDetailsScreen(
+            isArabic: widget.isArabic,
           ),
         ),
       );
-      
-      // Auto-navigate after showing error
-      print('⏳ Starting auto-navigation delay after error');
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) {
-          print('🔄 Auto-navigating to details screen after error');
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => CardApplicationDetailsScreen(
-                isArabic: widget.isArabic,
-              ),
-            ),
-          );
-        } else {
-          print('⚠️ Widget not mounted during auto-navigation');
-        }
-      });
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
       print('🏁 Dakhli verification process completed');
-    }
-  }
-
-  String _getArabicDakhliErrorMessage(String error) {
-    if (error.contains('timeout')) {
-      return 'انتهت مهلة الاتصال بخدمة التحقق من الراتب';
-    } else if (error.contains('connection')) {
-      return 'فشل الاتصال بخدمة التحقق من الراتب';
-    } else {
-      return 'حدث خطأ أثناء التحقق من الراتب';
-    }
-  }
-
-  String _getEnglishDakhliErrorMessage(String error) {
-    if (error.contains('timeout')) {
-      return 'Connection timeout while verifying salary';
-    } else if (error.contains('connection')) {
-      return 'Failed to connect to salary verification service';
-    } else {
-      return 'Error occurred while verifying salary';
     }
   }
 
