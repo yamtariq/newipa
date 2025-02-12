@@ -29,7 +29,7 @@ class NotificationWorker(
             val useNewApi = prefs.getBoolean("flutter.useNewApi", true)
             // 💡 Read development URL from SharedPreferences, with fallback
             return if (useNewApi) {
-                prefs.getString("flutter.apiBaseUrl", "https://172.22.160.20:5264/api") ?: "https://172.22.160.20:5264/api"
+                prefs.getString("flutter.apiBaseUrl", "https://tmappuat.nayifat.com/api") ?: "https://tmappuat.nayifat.com/api"
             } else {
                 "https://icreditdept.com/api"
             }

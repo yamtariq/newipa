@@ -8,7 +8,7 @@ class Constants {
   static const bool useNewApi = true; // Feature flag for easy switching
   
   static String get apiBaseUrl => useNewApi
-      ? 'https://172.22.160.20:5264/api'  //'https://cbb7-78-95-59-4.ngrok-free.app/api'
+      ? 'https://tmappuat.nayifat.com/api'  //'https://172.22.160.20:5264/api'
       : 'https://icreditdept.com/api';
   static String get authBaseUrl => '$apiBaseUrl/auth';
   static String get masterFetchUrl => '$apiBaseUrl/content/fetch';
@@ -28,53 +28,18 @@ class Constants {
 
   // Proxy Endpoints
   static const String proxyBaseUrl = 'https://icreditdept.com/api/testasp';
-  static String get proxyOtpGenerateUrl => 'https://172.22.226.203:6445/api/otp/GetOtp';
-  static String get proxyOtpVerifyUrl => 'https://172.22.226.203:6445/api/otp/GetVerifyOtp';
-//   static String get proxyOtpGenerateUrl =>
-//       '$proxyBaseUrl/test_local_generate_otp.php';
-//   static String get proxyOtpVerifyUrl =>
-//       '$proxyBaseUrl/test_local_verify_otp.php';
+  static String get proxyOtpGenerateUrl => '$apiBaseUrl/proxy/forward?url=https://172.22.226.203:6445/api/otp/GetOtp';
+  static String get proxyOtpVerifyUrl => '$apiBaseUrl/proxy/forward?url=https://172.22.226.203:6445/api/otp/GetVerifyOtp';
+
 
   // 💡 Add Dakhli salary endpoint
-  static String get dakhliSalaryEndpoint => '$apiBaseUrl/api/Proxy/dakhli/salary';
+  static const String dakhliBaseUrl = 'https://172.22.226.190:4043/api/Dakhli/GetDakhliPubPriv';
+  static String get dakhliSalaryEndpoint => '$apiBaseUrl/proxy/forward?url=$dakhliBaseUrl';
 
-  // 💡 Test Data (Development Only)
-  // 💡 Feature flag for using test data
-  static const bool useTestData = true; // Set to false in production
-  static const Map<String, dynamic> testUserData = {
-    'nationalId': '1064448614',
-    'dateOfBirth': '1975-09-04'
-  };
+// 💡 Add Dakhli salary endpoint
+//   static String get dakhliSalaryEndpoint => '$apiBaseUrl/api/Proxy/dakhli/salary';
 
-  static const Map<String, dynamic> testDakhliResponse = {
-    "success": true,
-    "errors": [],
-    "result": {
-      "requestNumber": "afc4fc6d-8015-4e17-a3a5-ad611348531d",
-      "message": "Information Retreived from GOSI",
-      "employmentStatusInfo": [
-        {
-          "fullName": "طارق مبارك سعد اليامي",
-          "basicWage": "3407.0",
-          "housingAllowance": "852.0",
-          "otherAllowance": "0.0",
-          "employerName": "حلاق نون يامي للحلاقة",
-          "workingMonths": "282",
-          "employmentStatus": "نشيط"
-        },
-        {
-          "fullName": "طارق مبارك سعد اليامي",
-          "basicWage": "32593.0",
-          "housingAllowance": "8148.0",
-          "otherAllowance": "3259.0",
-          "employerName": "شركة النايفات للتمويل",
-          "workingMonths": "282",
-          "employmentStatus": "نشيط"
-        }
-      ]
-    },
-    "type": "P"
-  };
+  
 
   // API Key
   static const String apiKey = '7ca7427b418bdbd0b3b23d7debf69bf7';
@@ -130,16 +95,18 @@ class Constants {
   static const String endpointUserRegistration =
       endpointRegistration; // Alias for backward compatibility
       
-  static const String endpointGetGovernmentData =
-    'https://172.22.226.203:663/api/Yakeen/getCitizenInfo/json'; // 💡 Using proxy controller for Yakeen
-  static const String endpointGetGovernmentAddress =
-    'https://172.22.226.203:663/api/Yakeen/getCitizenAddressInfo/json'; // 💡 Yakeen address endpoint
+  static String endpointGetGovernmentData = 
+      '$apiBaseUrl/proxy/forward?url=https://172.22.226.203:663/api/Yakeen/getCitizenInfo/json';
+  static String endpointGetGovernmentAddress = 
+      '$apiBaseUrl/proxy/forward?url=https://172.22.226.203:663/api/Yakeen/getCitizenAddressInfo/json';
 
   
   
   // 💡 Yakeen API Endpoints
-  static const String endpointGetAlienInfo = 'https://172.22.226.203:663/api/Yakeen/getAlienInfoByIqama/json';
-  static const String endpointGetAlienAddress = 'https://172.22.226.203:663/api/Yakeen/getAlienAddressInfoByIqama/json';
+  static String endpointGetAlienInfo = 
+      '$apiBaseUrl/proxy/forward?url=https://172.22.226.203:663/api/Yakeen/getAlienInfoByIqama/json';
+  static String endpointGetAlienAddress = 
+      '$apiBaseUrl/proxy/forward?url=https://172.22.226.203:663/api/Yakeen/getAlienAddressInfoByIqama/json';
 
 
 /* ==========================================
@@ -255,7 +222,8 @@ class Constants {
   // Used in: LoanService (loan_service.dart) - getLoanDecision()
   
   // 💡 Bank API Endpoints
-  static const String endpointCreateCustomer = 'https://172.22.226.203:9443/api/Bank/CreateCustomer';
+  static String endpointCreateCustomer = 
+      '$apiBaseUrl/proxy/forward?url=https://172.22.226.203:9443/api/Bank/CreateCustomer';
 
   // Old: static const String endpointUpdateLoanApplication = '/update_loan_application.php';
   static const String endpointUpdateLoanApplication = '/loan/update';
@@ -578,4 +546,31 @@ class Constants {
     }
     return http.Client();
   }
+
+  static const String endpointSubmitCustomerCare = '/api/CustomerCare/Submit';
+
+  // Notification Configuration
+  static const notificationConfig = NotificationConfig(
+    maxRetries: 3,
+    retryDelay: Duration(seconds: 2),
+    maxStored: 100,
+    fetchInterval: Duration(minutes: 15),
+    minFetchInterval: Duration(minutes: 13),
+  );
+}
+
+class NotificationConfig {
+  final int maxRetries;
+  final Duration retryDelay;
+  final int maxStored;
+  final Duration fetchInterval;
+  final Duration minFetchInterval;
+
+  const NotificationConfig({
+    required this.maxRetries,
+    required this.retryDelay,
+    required this.maxStored,
+    required this.fetchInterval,
+    required this.minFetchInterval,
+  });
 }

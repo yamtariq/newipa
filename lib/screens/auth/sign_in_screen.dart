@@ -297,128 +297,37 @@ class _SignInScreenState extends State<SignInScreen> {
 
     if (response['success'] == true && response['data'] != null) {
       final responseData = response['data'];
-      final userData = responseData['user'];
       
       try {
-        // Store user data in local storage
-        final prefs = await SharedPreferences.getInstance();
-        final secureStorage = const FlutterSecureStorage();
-        
-        // Store access token securely FIRST
-        final token = responseData['token'];
-        print('\n=== TOKEN STORAGE ===');
-        print('Token from response: $token');
-        
-        if (token != null) {
-          await secureStorage.write(key: 'auth_token', value: token);
-          print('✅ Auth Token stored successfully');
-          
-          // Verify token was stored
-          final storedToken = await secureStorage.read(key: 'auth_token');
-          print('Verification - Stored token exists: ${storedToken != null}');
-        } else {
-          print('❌ No token found in response data');
-          print('Response data structure: ${json.encode(responseData)}');
-          throw Exception('No auth token in response');
-        }
-        
-        // Store refresh token securely if available
-        final refreshToken = responseData['refresh_token'];
-        if (refreshToken != null) {
-          await secureStorage.write(key: 'refresh_token', value: refreshToken);
-          print('✅ Refresh Token stored successfully');
+        // Step 1: Generate OTP without storing any data
+        print('\n=== GENERATING OTP ===');
+        final otpGenResult = await _authService.generateOTP(_nationalIdController.text);
+        if (otpGenResult['success'] != true) {
+          throw Exception(widget.isArabic 
+            ? (otpGenResult['message_ar'] ?? 'فشل في إرسال رمز التحقق')
+            : (otpGenResult['message'] ?? 'Failed to send OTP'));
         }
 
-        // Store session data
-        await secureStorage.write(key: 'session_active', value: 'true');
-        await secureStorage.write(key: 'session_user_id', value: userData['id']?.toString() ?? _nationalIdController.text);
-        print('✅ Session data stored');
-        
-        // Store user data
-        final userDataJson = json.encode(userData);
-        await prefs.setString('user_data', userDataJson);
-        await secureStorage.write(
-          key: 'user_data',
-          value: userDataJson
+        // Step 2: Show OTP dialog and verify
+        final otpVerified = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => OTPDialog(
+            nationalId: _nationalIdController.text,
+            isArabic: widget.isArabic,
+            onResendOTP: _resendOTP,
+            onVerifyOTP: (otp) => _verifyOTPCode(otp, responseData),
+          ),
         );
-        print('\n=== STORED USER DATA ===');
-        print('User Data: $userDataJson');
-        
-        // Store other response data
-        final lastLogin = DateTime.now().toIso8601String();
-        await prefs.setString('last_login', lastLogin);
-        print('Last Login: $lastLogin');
-        
-        if (responseData['settings'] != null) {
-          await prefs.setString('user_settings', json.encode(responseData['settings']));
-          print('Settings: ${json.encode(responseData['settings'])}');
-        }
-        if (responseData['preferences'] != null) {
-          await prefs.setString('user_preferences', json.encode(responseData['preferences']));
-          print('Preferences: ${json.encode(responseData['preferences'])}');
-        }
-        print('=== LOCAL STORAGE UPDATED SUCCESSFULLY ===\n');
 
-        // Update session provider state BEFORE starting session
-        final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
-        sessionProvider.resetManualSignOff();
-        sessionProvider.setSignedIn(true);
-        await sessionProvider.initializeSession();
-
-        // Then start session
-        await _authService.startSession(_nationalIdController.text, userId: userData['id']?.toString());
-        print('Session started successfully');
-        
-        // For quick sign-in (MPIN/biometric), go directly to main page
-        if (!_isPasswordMode) {
-          print('Quick sign-in successful, navigating to main page');
-          if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => MainPage(
-                  isArabic: widget.isArabic,
-                  userData: userData,
-                  isDarkMode: Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
-                ),
-              ),
-            );
-          }
-          return;
-        }
-
-        // Register device
-        print('\n=== REGISTERING DEVICE ===');
-        final deviceInfo = await _authService.getDeviceInfo();
-        print('Device Info: ${json.encode(deviceInfo)}');
-        
-        final registerResponse = await _authService.registerDevice(
-          nationalId: _nationalIdController.text,
-          deviceInfo: deviceInfo,
-        );
-        print('Register Response: ${json.encode(registerResponse)}');
-
-        if (registerResponse['success'] == true) {
-          await _authService.storeDeviceRegistration(_nationalIdController.text);
-          print('Device registration stored locally');
-          
-          if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => MPINSetupScreen(
-                  isArabic: widget.isArabic,
-                  nationalId: _nationalIdController.text,
-                  password: _passwordController.text,
-                  user: userData,
-                  showSteps: false,
-                ),
-              ),
-            );
-          }
+        if (otpVerified == true) {
+          print('✅ OTP verification completed, MPIN setup will start automatically');
         } else {
-          print('Device registration failed: ${registerResponse['message']}');
-          throw Exception(registerResponse['message'] ?? 'Failed to register device');
+          _showErrorBanner(
+            widget.isArabic
+                ? 'فشل في التحقق من رمز OTP'
+                : 'OTP verification failed'
+          );
         }
       } catch (e, stackTrace) {
         print('Error during sign in process: $e\n$stackTrace');
@@ -1015,12 +924,11 @@ class _SignInScreenState extends State<SignInScreen> {
           nationalId: _nationalIdController.text,
           isArabic: widget.isArabic,
           onResendOTP: _resendOTP,
-          onVerifyOTP: _verifyOTPCode,
+          onVerifyOTP: (otp) => _verifyOTPCode(otp, signInResult['data']),
         ),
       );
 
       if (otpVerified == true) {
-        // Step 4: Save user data and proceed with device registration
         print('✅ OTP verification completed, MPIN setup will start automatically');
       } else {
         _showErrorBanner(
@@ -1124,7 +1032,7 @@ class _SignInScreenState extends State<SignInScreen> {
     }
   }
 
-  Future<Map<String, dynamic>> _verifyOTPCode(String otp) async {
+  Future<Map<String, dynamic>> _verifyOTPCode(String otp, [Map<String, dynamic>? signInData]) async {
     int maxRetries = 3;
     int currentTry = 0;
     
@@ -1143,84 +1051,162 @@ class _SignInScreenState extends State<SignInScreen> {
         
         print('OTP Verification Response: ${json.encode(response)}');
         
-        if (response['status'] == 'success') {
+        if (response['status'] == 'success' && signInData != null) {
           print('✅ OTP verified successfully');
 
-          if (mounted) {
-            try {
-              // Return success before showing dialog to close OTP dialog
-              Navigator.of(context).pop(true);
+          // Now initialize session and store data after OTP verification
+          final responseData = signInData;
+          final userData = responseData['user'];
+          
+          try {
+            // Store user data in local storage
+            final prefs = await SharedPreferences.getInstance();
+            final secureStorage = const FlutterSecureStorage();
+            
+            // Store access token securely FIRST
+            final token = responseData['token'];
+            print('\n=== TOKEN STORAGE ===');
+            print('Token from response: $token');
+            
+            if (token != null) {
+              await secureStorage.write(key: 'auth_token', value: token);
+              print('✅ Auth Token stored successfully');
               
-              // Show success dialog and navigate
-              if (mounted) {
-                await showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (BuildContext context) {
-                    return _buildCustomDialog(
-                      title: widget.isArabic ? 'تم التحقق بنجاح' : 'Verification Successful',
-                      message: widget.isArabic
-                          ? 'سنقوم الآن بإعداد رمز الدخول السريع والسمات الحيوية لتسهيل تسجيل الدخول في المستقبل'
-                          : 'We will now set up your MPIN and biometrics for easier sign-in in the future',
-                      icon: Icons.check_circle_outline,
-                      iconColor: Colors.green[700],
-                      actions: [
-                        Directionality(
-                          textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              SizedBox(
-                                width: 200,
-                                child: ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.of(context).pop();
-                                    // Navigate to MPIN setup screen
-                                    Navigator.pushReplacement(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => MPINSetupScreen(
-                                          isArabic: widget.isArabic,
-                                          nationalId: _nationalIdController.text,
-                                          password: _passwordController.text,
-                                          user: response['data'],
-                                          showSteps: false,
+              // Verify token was stored
+              final storedToken = await secureStorage.read(key: 'auth_token');
+              print('Verification - Stored token exists: ${storedToken != null}');
+            } else {
+              print('❌ No token found in response data');
+              print('Response data structure: ${json.encode(responseData)}');
+              throw Exception('No auth token in response');
+            }
+            
+            // Store refresh token securely if available
+            final refreshToken = responseData['refresh_token'];
+            if (refreshToken != null) {
+              await secureStorage.write(key: 'refresh_token', value: refreshToken);
+              print('✅ Refresh Token stored successfully');
+            }
+
+            // Store session data
+            await secureStorage.write(key: 'session_active', value: 'true');
+            await secureStorage.write(key: 'session_user_id', value: userData['id']?.toString() ?? _nationalIdController.text);
+            print('✅ Session data stored');
+            
+            // Store user data
+            final userDataJson = json.encode(userData);
+            await prefs.setString('user_data', userDataJson);
+            await secureStorage.write(
+              key: 'user_data',
+              value: userDataJson
+            );
+            print('\n=== STORED USER DATA ===');
+            print('User Data: $userDataJson');
+            
+            // Store other response data
+            final lastLogin = DateTime.now().toIso8601String();
+            await prefs.setString('last_login', lastLogin);
+            print('Last Login: $lastLogin');
+            
+            if (responseData['settings'] != null) {
+              await prefs.setString('user_settings', json.encode(responseData['settings']));
+              print('Settings: ${json.encode(responseData['settings'])}');
+            }
+            if (responseData['preferences'] != null) {
+              await prefs.setString('user_preferences', json.encode(responseData['preferences']));
+              print('Preferences: ${json.encode(responseData['preferences'])}');
+            }
+            print('=== LOCAL STORAGE UPDATED SUCCESSFULLY ===\n');
+
+            // Update session provider state AFTER OTP verification
+            final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
+            sessionProvider.resetManualSignOff();
+            sessionProvider.setSignedIn(true);
+            await sessionProvider.initializeSession();
+
+            // Then start session
+            await _authService.startSession(_nationalIdController.text, userId: userData['id']?.toString());
+            print('Session started successfully');
+
+            if (mounted) {
+              try {
+                // Return success before showing dialog to close OTP dialog
+                Navigator.of(context).pop(true);
+                
+                // Show success dialog and navigate
+                if (mounted) {
+                  await showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (BuildContext context) {
+                      return _buildCustomDialog(
+                        title: widget.isArabic ? 'تم التحقق بنجاح' : 'Verification Successful',
+                        message: widget.isArabic
+                            ? 'سنقوم الآن بإعداد رمز الدخول السريع والسمات الحيوية لتسهيل تسجيل الدخول في المستقبل'
+                            : 'We will now set up your MPIN and biometrics for easier sign-in in the future',
+                        icon: Icons.check_circle_outline,
+                        iconColor: Colors.green[700],
+                        actions: [
+                          Directionality(
+                            textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 200,
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.of(context).pop();
+                                      // Navigate to MPIN setup screen
+                                      Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => MPINSetupScreen(
+                                            isArabic: widget.isArabic,
+                                            nationalId: _nationalIdController.text,
+                                            password: _passwordController.text,
+                                            user: userData,
+                                            showSteps: false,
+                                          ),
                                         ),
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF0077B6),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
-                                    );
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF0077B6),
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
                                     ),
-                                  ),
-                                  child: Text(
-                                    widget.isArabic ? 'متابعة' : 'Continue',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
+                                    child: Text(
+                                      widget.isArabic ? 'متابعة' : 'Continue',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
-                    );
-                  },
-                );
+                        ],
+                      );
+                    },
+                  );
+                }
+              } catch (error) {
+                print('Error in OTP verification flow: $error');
+                throw Exception(widget.isArabic 
+                  ? 'حدث خطأ أثناء عملية التحقق'
+                  : 'Error during verification process');
               }
-            } catch (error) {
-              print('Error in OTP verification flow: $error');
-              throw Exception(widget.isArabic 
-                ? 'حدث خطأ أثناء عملية التحقق'
-                : 'Error during verification process');
             }
+          } catch (e) {
+            print('Error during session initialization: $e');
+            throw e;
           }
           return response;
         }

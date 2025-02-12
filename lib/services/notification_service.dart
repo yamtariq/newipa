@@ -10,6 +10,8 @@ import './navigation_service.dart';
 import 'package:flutter/services.dart';
 import '../utils/constants.dart';
 import 'dart:io';
+import 'package:synchronized/synchronized.dart';
+import 'package:path_provider/path_provider.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -17,6 +19,8 @@ class NotificationService {
   static GlobalKey<NavigatorState>? navigatorKey;
   bool _isArabic = false;
   Timer? _iosBackgroundTimer;
+  final _lock = Lock();
+  bool _isChecking = false;
   
   factory NotificationService() {
     return _instance;
@@ -24,7 +28,7 @@ class NotificationService {
 
   NotificationService._internal();
 
-  static const platform = MethodChannel('com.nayifat.nayifat_app_2025_new/background_service');
+  static const platform = MethodChannel('com.nayifat.app/background_service');
 
   Future<void> startBackgroundService() async {
     try {
@@ -63,7 +67,7 @@ class NotificationService {
     _iosBackgroundTimer = Timer.periodic(const Duration(minutes: 15), (timer) async {
       final bool canFetch = await _canPerformBackgroundFetch();
       if (canFetch) {
-        await _checkForNewNotifications();
+        await checkForNewNotifications();
       }
     });
   }
@@ -95,7 +99,7 @@ class NotificationService {
       // Set up method channel handler for iOS background fetch
       platform.setMethodCallHandler((call) async {
         if (call.method == 'checkNotifications') {
-          await _checkForNewNotifications();
+          await checkForNewNotifications();
         }
       });
 
@@ -162,71 +166,186 @@ class NotificationService {
     }
   }
 
-  Future<void> _checkForNewNotifications() async {
+  Future<bool> checkForNewNotifications() async {
+    if (_isChecking) return false;
+    
+    return await _lock.synchronized(() async {
+      _isChecking = true;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final lastCheck = prefs.getInt('last_notification_check') ?? 0;
+        final now = DateTime.now().millisecondsSinceEpoch;
+        
+        if (now - lastCheck < const Duration(minutes: 13).inMilliseconds) {
+          return true;
+        }
+
+        final nationalId = prefs.getString('national_id');
+        if (nationalId == null) return false;
+
+        final notifications = await _fetchNotificationsWithRetry(nationalId);
+        if (notifications.isEmpty) return true;
+
+        await _processNotifications(notifications);
+        await prefs.setInt('last_notification_check', now);
+        return true;
+      } catch (e) {
+        debugPrint('Error checking notifications: $e');
+        return false;
+      } finally {
+        _isChecking = false;
+      }
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchNotificationsWithRetry(String nationalId) async {
+    int attempts = 0;
+    while (attempts < Constants.notificationConfig.maxRetries) {
+      try {
+        return await fetchNotifications(nationalId);
+      } catch (e) {
+        attempts++;
+        if (attempts == Constants.notificationConfig.maxRetries) rethrow;
+        await Future.delayed(Constants.notificationConfig.retryDelay * attempts);
+      }
+    }
+    return [];
+  }
+
+  Future<void> _processNotifications(List<Map<String, dynamic>> notifications) async {
+    final prefs = await SharedPreferences.getInstance();
+    final seenIds = prefs.getStringList('seen_notification_ids') ?? [];
+    
+    for (final notification in notifications) {
+      final id = notification['id']?.toString();
+      if (id == null || seenIds.contains(id)) continue;
+      
+      await _showNotification(notification);
+      seenIds.add(id);
+    }
+    
+    // Keep last 100 notifications
+    if (seenIds.length > Constants.notificationConfig.maxStored) {
+      seenIds.removeRange(0, seenIds.length - Constants.notificationConfig.maxStored);
+    }
+    
+    await prefs.setStringList('seen_notification_ids', seenIds);
+  }
+
+  Future<void> _showNotification(Map<String, dynamic> notification) async {
     try {
-      debugPrint('Checking for new notifications...');
+      // Get the appropriate title and body
+      final String title = _isArabic ? 
+        (notification['title_ar'] ?? notification['title'] ?? 'Nayifat Notification') :
+        (notification['title_en'] ?? notification['title'] ?? 'Nayifat Notification');
       
-      final prefs = await SharedPreferences.getInstance();
-      final nationalId = prefs.getString('national_id');
-      
-      if (nationalId == null) {
-        debugPrint('No national ID found, cannot fetch notifications');
-        return;
+      final String body = _isArabic ?
+        (notification['body_ar'] ?? notification['body'] ?? '') :
+        (notification['body_en'] ?? notification['body'] ?? '');
+
+      // Prepare notification content
+      final Map<String, dynamic> notificationContent = {
+        'title': title,
+        'body': body,
+        'payload': jsonEncode({
+          'route': notification['route'],
+          'data': {
+            'isArabic': _isArabic,
+            ...?notification['additionalData'],
+          },
+        }),
+      };
+
+      // Handle big picture
+      String? bigPictureFilePath;
+      if (notification['bigPictureUrl'] != null) {
+        try {
+          bigPictureFilePath = await _downloadAndSaveImage(
+            notification['bigPictureUrl'],
+            'notification_big_${notification['id']}'
+          );
+        } catch (e) {
+          debugPrint('Failed to download big picture: $e');
+        }
       }
 
-      debugPrint('Fetching notifications for ID: $nationalId');
-      final notifications = await fetchNotifications(nationalId);
-      debugPrint('Found ${notifications.length} notifications');
-
-      if (notifications.isEmpty) {
-        debugPrint('No new notifications found');
-        return;
+      // Handle large icon
+      String? largeIconFilePath;
+      if (notification['largeIconUrl'] != null) {
+        try {
+          largeIconFilePath = await _downloadAndSaveImage(
+            notification['largeIconUrl'],
+            'notification_icon_${notification['id']}'
+          );
+        } catch (e) {
+          debugPrint('Failed to download large icon: $e');
+        }
       }
 
-      for (final notification in notifications) {
-        debugPrint('Processing notification: ${notification['title']}');
-        
-        // Get the appropriate title and body based on language
-        String title;
-        String body;
-        
-        if (_isArabic) {
-          title = notification['title_ar'] ?? notification['title'] ?? 'Nayifat Notification';
-          body = notification['body_ar'] ?? notification['body'] ?? '';
-        } else {
-          title = notification['title_en'] ?? notification['title'] ?? 'Nayifat Notification';
-          body = notification['body_en'] ?? notification['body'] ?? '';
-        }
-
-        // Prepare additional data
-        final Map<String, dynamic> additionalData = {
-          'isArabic': _isArabic,
-        };
-
-        // Add route if available
-        if (notification['route'] != null) {
-          additionalData['route'] = notification['route'];
-        }
-
-        // Add any additional data from the notification
-        if (notification['additionalData'] != null) {
-          additionalData.addAll(Map<String, dynamic>.from(notification['additionalData']));
-        }
-
-        await showNotification(
+      // Show notification with downloaded images
+      await AwesomeNotifications().createNotification(
+        content: NotificationContent(
+          id: notification['id']?.hashCode ?? DateTime.now().millisecondsSinceEpoch.remainder(100000),
+          channelKey: 'basic_channel',
           title: title,
           body: body,
-          payload: jsonEncode({
-            'route': notification['route'],
-            'data': additionalData,
-          }),
-          bigPictureUrl: notification['bigPictureUrl'],
-          largeIconUrl: notification['largeIconUrl'],
-        );
-      }
-      debugPrint('Finished processing notifications');
+          payload: notificationContent['payload'],
+          bigPicture: bigPictureFilePath,
+          largeIcon: largeIconFilePath,
+          notificationLayout: bigPictureFilePath != null ? 
+            NotificationLayout.BigPicture : 
+            NotificationLayout.Default,
+        ),
+      );
+
+      // Cleanup old images
+      await _cleanupOldImages();
     } catch (e) {
-      debugPrint('Error checking for new notifications: $e');
+      debugPrint('Error showing notification: $e');
+    }
+  }
+
+  Future<String> _downloadAndSaveImage(String url, String filename) async {
+    final http.Client client = http.Client();
+    try {
+      final response = await client.get(Uri.parse(url));
+      if (response.statusCode != 200) {
+        throw Exception('Failed to download image');
+      }
+
+      // Get app's local storage directory
+      final directory = await getApplicationDocumentsDirectory();
+      final filePath = '${directory.path}/$filename.jpg';
+
+      // Save the image
+      final file = File(filePath);
+      await file.writeAsBytes(response.bodyBytes);
+
+      return filePath;
+    } finally {
+      client.close();
+    }
+  }
+
+  Future<void> _cleanupOldImages() async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final files = directory.listSync();
+      
+      // Keep only last 20 notification images
+      final notificationImages = files.where((f) => 
+        f.path.contains('notification_big_') || 
+        f.path.contains('notification_icon_')
+      ).toList()
+        ..sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
+
+      if (notificationImages.length > 20) {
+        for (var file in notificationImages.sublist(20)) {
+          await file.delete();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error cleaning up old images: $e');
     }
   }
 
@@ -275,7 +394,7 @@ class NotificationService {
   Future<List<Map<String, dynamic>>> _fetchFromApi(String nationalId, bool markAsRead) async {
     HttpClient? client;
     try {
-      final url = '${Constants.apiBaseUrl}${Constants.endpointGetNotifications}';
+      final url = '${Constants.apiBaseUrl}/notifications/list';
       final body = {
         'nationalId': nationalId,
         'markAsRead': markAsRead,
@@ -726,7 +845,7 @@ class NotificationService {
     debugPrint('Testing background fetch...');
     if (Platform.isIOS) {
       // Simulate background fetch
-      await _checkForNewNotifications();
+      await checkForNewNotifications();
       debugPrint('Background fetch test completed');
     } else {
       debugPrint('Test only available on iOS');

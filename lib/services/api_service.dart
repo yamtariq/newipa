@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import '../models/slide.dart';
 import '../models/contact_details.dart';
 import '../utils/constants.dart';
+import 'package:flutter/foundation.dart';
 
 class ApiService {
   final bool useMockData = false;
@@ -297,4 +298,107 @@ class ApiService {
       return {'success': false, 'data': {}};
     }
   }
+
+  Future<CustomerCareResponse> submitCustomerCare(CustomerCareRequest request) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${Constants.authBaseUrl}${Constants.endpointSubmitCustomerCare}'),
+        body: json.encode(request.toJson()),
+        headers: Constants.authHeaders,
+      );
+
+      if (response.statusCode == 200) {
+        return CustomerCareResponse.fromJson(json.decode(response.body));
+      } else {
+        throw Exception('Failed to submit request: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error submitting customer care: $e');
+      return CustomerCareResponse(
+        success: false,
+        message: 'Failed to submit request. Please try again.',
+      );
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchNotifications(String nationalId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${Constants.apiBaseUrl}/notifications/list'),
+        headers: {
+          ...Constants.defaultHeaders,
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'nationalId': nationalId,
+          'markAsRead': false,
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        throw ApiException('Failed to fetch notifications: ${response.statusCode}');
+      }
+
+      final data = jsonDecode(response.body);
+      return List<Map<String, dynamic>>.from(data['notifications'] ?? []);
+    } catch (e) {
+      debugPrint('Error fetching notifications: $e');
+      rethrow;
+    }
+  }
+}
+
+class CustomerCareRequest {
+  final String nationalId;
+  final String phone;
+  final String customerName;
+  final String subject;
+  final String? subSubject;
+  final String complaint;
+
+  CustomerCareRequest({
+    required this.nationalId,
+    required this.phone,
+    required this.customerName,
+    required this.subject,
+    this.subSubject,
+    required this.complaint,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'nationalId': nationalId,
+    'phone': phone,
+    'customerName': customerName,
+    'subject': subject,
+    'subSubject': subSubject,
+    'complaint': complaint,
+  };
+}
+
+class CustomerCareResponse {
+  final bool success;
+  final String? complaintNumber;
+  final String message;
+
+  CustomerCareResponse({
+    required this.success,
+    this.complaintNumber,
+    required this.message,
+  });
+
+  factory CustomerCareResponse.fromJson(Map<String, dynamic> json) {
+    return CustomerCareResponse(
+      success: json['success'] ?? false,
+      complaintNumber: json['complaintNumber']?.toString(),
+      message: json['message'] ?? '',
+    );
+  }
+}
+
+class ApiException implements Exception {
+  final String message;
+  ApiException(this.message);
+  
+  @override
+  String toString() => message;
 }

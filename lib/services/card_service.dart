@@ -81,7 +81,21 @@ class CardService {
         "tenure": 60,
         "propertyStatus": 1,
         "effRate": 1,
-        "ibanNo": userData['iban'] ?? "SA9750000000000555551111"
+        "ibanNo": userData['iban'] ?? "SA9750000000000555551111",
+        "param1": "TEST001",           // string max 20
+        "param2": "TEST002",           // string max 20
+        "param3": "TEST003",           // string max 20
+        "param4": "TEST004",           // string max 50
+        "param5": "TEST005",           // string max 100
+        "param6": "TEST006",           // string max 500
+        "param7": 1234567.89,          // decimal 10 digits with 2 decimal points
+        "param8": 9876543.21,          // decimal 10 digits with 2 decimal points
+        "param9": "2025-02-10T10:02:34.269Z",  // datetime
+        "param10": "2025-02-10T10:02:34.269Z", // datetime
+        "param11": 123456,             // integer max 6 digits
+        "param12": 654321,             // integer max 6 digits
+        "param13": true,               // boolean
+        "param14": false               // boolean
       };
 
       print('\n2. Prepared Request Data:');

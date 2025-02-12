@@ -8,8 +8,24 @@ using Microsoft.EntityFrameworkCore;
 using NayifatAPI.Data;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using System.Net.Http.Headers;
+using System.Net;
+
+// 💡 Disable SSL validation globally at application startup
+static class CertificateValidation
+{
+    public static void DisableValidation()
+    {
+        // Disable all certificate validation
+        ServicePointManager.ServerCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true;
+        // Use SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls
+        ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+    }
+}
 
 var builder = WebApplication.CreateBuilder(args);
+
+// 💡 Disable SSL validation globally before any HTTP clients are created
+CertificateValidation.DisableValidation();
 
 // Configure Serilog
 Log.Logger = new LoggerConfiguration()
@@ -39,11 +55,32 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddHttpClient("ProxyClient", client =>
 {
     client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+    // No SSL validation settings needed here as it's handled globally
 })
 .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
 {
-    AllowAutoRedirect = false,
-    AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate
+    // No SSL validation settings needed here as it's handled globally
+});
+
+// Add HttpClient for decompression
+builder.Services.AddHttpClient("DecompressClient", client =>
+{
+    client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+    // No SSL validation settings needed here as it's handled globally
+})
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    // No SSL validation settings needed here as it's handled globally
+});
+
+// Add default HttpClient with SSL validation disabled
+builder.Services.AddHttpClient("DefaultClient", client =>
+{
+    // No SSL validation settings needed here as it's handled globally
+})
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    // No SSL validation settings needed here as it's handled globally
 });
 
 var app = builder.Build();

@@ -43,6 +43,7 @@ import 'loans_page_ar.dart';
 import 'account_page.dart';
 import 'application_landing_screen.dart';
 import 'splash_screen.dart';
+import 'loan_application/loan_application_details_test_screen.dart';
 
 class MainPage extends StatefulWidget {
   final bool isArabic;
@@ -795,68 +796,46 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     );
   }
 
-  Future<void> _testNotification() async {
-    debugPrint('\n=== Checking Server Notifications ===');
-    
-    try {
-      // Get user ID
-      final prefs = await SharedPreferences.getInstance();
-      final nationalId = prefs.getString('national_id');
-      
-      if (nationalId == null) {
-        debugPrint('No national ID found in preferences');
-        return;
-      }
+  Widget _buildTestButton() {
+    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
+    final primaryColor = Color(isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final surfaceColor = Color(isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
 
-      debugPrint('Checking notifications for ID: $nationalId');
-      final NotificationService notificationService = NotificationService();
-      final notifications = await notificationService.fetchNotifications(nationalId);
-
-      debugPrint('Found ${notifications.length} notifications');
-      if (notifications.isEmpty) {
-        debugPrint('No notifications found');
-        return;
-      }
-
-      // Display each notification
-      for (final notification in notifications) {
-        debugPrint('Displaying notification: ${notification['title']}');
-        
-        // Get the appropriate title and body based on language
-        String title;
-        String body;
-        
-        if (widget.isArabic) {
-          title = notification['title_ar'] ?? notification['title'] ?? 'إشعار من النايفات';
-          body = notification['body_ar'] ?? notification['body'] ?? '';
-        } else {
-          title = notification['title_en'] ?? notification['title'] ?? 'Nayifat Notification';
-          body = notification['body_en'] ?? notification['body'] ?? '';
-        }
-
-        debugPrint('Using localized content:');
-        debugPrint('Title: $title');
-        debugPrint('Body: $body');
-
-        await _notificationService.showNotification(
-          title: title,
-          body: body,
-          payload: jsonEncode({
-            'route': notification['route'],
-            'data': {
-              'isArabic': widget.isArabic,
-              ...notification['additionalData'] ?? {},
-            },
-          }),
-        );
-      }
-      
-    } catch (e, stackTrace) {
-      debugPrint('ERROR: Failed to check notifications');
-      debugPrint('Error details: $e');
-      debugPrint('Stack trace:\n$stackTrace');
-    }
-    debugPrint('=== Notification Check Complete ===\n');
+    return Positioned(
+      bottom: 100,
+      right: 16,
+      child: Container(
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: primaryColor.withOpacity(0.2),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: IconButton(
+          icon: Icon(Icons.bug_report, color: primaryColor),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => LoanApplicationDetailsTestScreen(
+                  isArabic: widget.isArabic,
+                ),
+              ),
+            );
+          },
+          tooltip: widget.isArabic ? 'شاشة الاختبار' : 'Test Screen',
+        ),
+      ),
+    );
   }
 
   @override
@@ -1694,6 +1673,8 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                         ),
                       ),
                     ),
+                  if (kDebugMode)
+                    _buildTestButton(),
                 ],
               ),
             ),
@@ -2121,11 +2102,6 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
       throw Exception('National ID and Date of Birth are required');
     }
 
-    // 💡 Use test data if flag is true
-    if (Constants.useTestData) {
-      return Constants.testDakhliResponse;
-    }
-
     final response = await http.get(
       Uri.parse('${Constants.dakhliSalaryEndpoint}?customerId=$nationalId&dob=$dob&reason=$reason'),
     );
@@ -2143,63 +2119,56 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
       
       // Check local storage first for existing salary data
       final salaryData = await _getSavedSalaryData();
+      String? nationalId;
+      String? dob;
       
       if (salaryData == null) {
-        String? nationalId;
-        String? dob;
-        
-        // 💡 Use test data if flag is true
-        if (Constants.useTestData) {
-          nationalId = Constants.testUserData['nationalId'];
-          dob = Constants.testUserData['dateOfBirth'];
-        } else {
-          // First try to get data from widget.userData
-          if (widget.userData.isNotEmpty) {
-            print('DEBUG: Checking widget.userData: ${widget.userData}');
-            nationalId = widget.userData['national_id']?.toString();
-            dob = widget.userData['date_of_birth']?.toString();
-            
-            // If there's a nested user object
-            if (widget.userData['user'] != null) {
-              nationalId ??= widget.userData['user']['national_id']?.toString();
-              dob ??= widget.userData['user']['date_of_birth']?.toString();
-            }
-          }
+        // First try to get data from widget.userData
+        if (widget.userData.isNotEmpty) {
+          print('DEBUG: Checking widget.userData: ${widget.userData}');
+          nationalId = widget.userData['national_id']?.toString();
+          dob = widget.userData['date_of_birth']?.toString();
           
-          // If not found in widget.userData, try secure storage
-          if (nationalId == null || dob == null) {
-            print('DEBUG: Checking secure storage');
-            final storage = const FlutterSecureStorage();
-            final userDataStr = await storage.read(key: 'user_data');
-            nationalId ??= await storage.read(key: 'national_id');
-            
-            if (userDataStr != null) {
-              final userData = json.decode(userDataStr) as Map<String, dynamic>;
-              print('DEBUG: Secure storage data: $userData');
-              
-              // Try to get DOB from user object if it exists
-              if (userData['user'] != null) {
-                dob ??= userData['user']['date_of_birth']?.toString();
-              }
-              
-              // If not found in user object, try the root level
-              dob ??= userData['date_of_birth']?.toString() ?? 
-                     userData['dateOfBirth']?.toString() ?? 
-                     userData['dob']?.toString();
-            }
-          }
-          
-          print('DEBUG: Final values - NationalID: $nationalId, DOB: $dob');
-          
-          if (nationalId == null) {
-            throw Exception('User data not found');
-          }
-          
-          if (dob == null) {
-            throw Exception('Date of birth not found');
+          // If there's a nested user object
+          if (widget.userData['user'] != null) {
+            nationalId ??= widget.userData['user']['national_id']?.toString();
+            dob ??= widget.userData['user']['date_of_birth']?.toString();
           }
         }
         
+        // If not found in widget.userData, try secure storage
+        if (nationalId == null || dob == null) {
+          print('DEBUG: Checking secure storage');
+          final storage = const FlutterSecureStorage();
+          final userDataStr = await storage.read(key: 'user_data');
+          nationalId ??= await storage.read(key: 'national_id');
+          
+          if (userDataStr != null) {
+            final userData = json.decode(userDataStr) as Map<String, dynamic>;
+            print('DEBUG: Secure storage data: $userData');
+            
+            // Try to get DOB from user object if it exists
+            if (userData['user'] != null) {
+              dob ??= userData['user']['date_of_birth']?.toString();
+            }
+            
+            // If not found in user object, try the root level
+            dob ??= userData['date_of_birth']?.toString() ?? 
+                   userData['dateOfBirth']?.toString() ?? 
+                   userData['dob']?.toString();
+          }
+        }
+        
+        print('DEBUG: Final values - NationalID: $nationalId, DOB: $dob');
+        
+        if (nationalId == null) {
+          throw Exception('User data not found');
+        }
+        
+        if (dob == null) {
+          throw Exception('Date of birth not found');
+        }
+
         // Call proxy endpoint
         final response = await _getDakhliSalary(
           nationalId: nationalId,
@@ -2210,7 +2179,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
         // Save to local storage
         await _saveSalaryData(response);
       }
-      
+
       // Navigate to appropriate screen
       Navigator.push(
         context,

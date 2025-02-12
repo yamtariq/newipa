@@ -9,7 +9,7 @@
 		<key>CFBundleExecutable</key>
 		<string>$(EXECUTABLE_NAME)</string>
 		<key>CFBundleIdentifier</key>
-		<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+		<string>com.nayifat.app</string>
 		<key>CFBundleInfoDictionaryVersion</key>
 		<string>6.0</string>
 		<key>CFBundleName</key>
@@ -46,28 +46,25 @@
 		<key>UIApplicationSupportsIndirectInputEvents</key>
 		<true/>
 		<key>NSFaceIDUsageDescription</key>
-		<string>We need to use Face ID for secure authentication</string>
+			<string>This app needs face id access for biometric authentication</string>
 		<key>UIBackgroundModes</key>
 		<array>
 			<string>fetch</string>
 			<string>remote-notification</string>
 			<string>processing</string>
-			<string>audio</string>
 		</array>
 		<key>NSCameraUsageDescription</key>
-		<string>This app needs camera access to scan QR codes</string>
+			<string>We need access to camera to capture required documents</string>
 		<key>NSPhotoLibraryUsageDescription</key>
-		<string>This app needs photos access to get QR code from photo library</string>
+			<string>We need access to photo library to upload required documents</string>
 		<key>NSMicrophoneUsageDescription</key>
-		<string>This app needs microphone access for video recording</string>
-		<key>NSFaceIDUsageDescription</key>
-		<string>This app needs face id access for biometric authentication</string>
+			<string>We do not need microphone access</string>
 		<key>NSLocationWhenInUseUsageDescription</key>
-		<string>We need your location to show you nearby branches and provide better service.</string>
+			<string>We need your location to show you nearby branches and provide better service.</string>
 		<key>NSLocationAlwaysUsageDescription</key>
-		<string>We need your location to show you nearby branches and provide better service even when the app is in background.</string>
+			<string>We need your location to show you nearby branches and provide better service even when the app is in background.</string>
 		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-		<string>We need your location to show you nearby branches and provide better service.</string>
+			<string>We need your location to show you nearby branches and provide better service.</string>
 		<key>UIUserNotificationTypes</key>
 		<array>
 			<string>alert</string>
@@ -122,12 +119,6 @@
 				</dict>
 			</dict>
 		</dict>
-		<key>NSPhotoLibraryUsageDescription</key>
-		<string>We need access to photo library to upload required documents</string>
-		<key>NSCameraUsageDescription</key>
-		<string>We need access to camera to capture required documents</string>
-		<key>NSMicrophoneUsageDescription</key>
-		<string>We do not need microphone access</string>
 		<key>LSSupportsOpeningDocumentsInPlace</key>
 		<true/>
 		<key>UIFileSharingEnabled</key>

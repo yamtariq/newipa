@@ -317,185 +317,81 @@ class AuthService {
   // Core sign-in method
   Future<Map<String, dynamic>> signIn({
     required String nationalId,
-    String? password,
-    bool isQuickSignIn = false,
+    required String password,
   }) async {
+    HttpClient? client;
     try {
-      _isSigningIn = true;
-      
       print('\n=== SIGN IN PROCESS START ===');
       print('Step 1: Initial Parameters');
       print('- National ID: $nationalId');
-      print('- Sign in type: ${isQuickSignIn ? 'Quick Sign In' : 'Password Sign In'}');
-      print('- Password provided: ${password != null ? 'Yes' : 'No'}');
+      print('- Sign in type: Password Sign In');
+      print('- Password provided: ${password.isNotEmpty}');
 
-      print('\nStep 2: Getting Device Info');
+      // Step 2: Get device info
+      print('Step 2: Getting Device Info');
       final deviceInfo = await getDeviceInfo();
       print('- Raw Device Info: ${json.encode(deviceInfo)}');
       print('- Device ID: ${deviceInfo['deviceId']}');
       print('- Platform: ${deviceInfo['platform']}');
       print('- Model: ${deviceInfo['model']}');
 
-      print('\nStep 3: Preparing Sign In Request');
-      final Map<String, dynamic> requestBody = {
+      // Step 3: Prepare request
+      print('Step 3: Preparing Sign In Request');
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+
+      final request = await client.postUrl(Uri.parse('${Constants.apiBaseUrl}${Constants.endpointSignIn}'));
+      request.headers.contentType = ContentType.json;
+      request.headers.add('Accept', 'application/json');
+      Constants.authHeaders.forEach((key, value) {
+        request.headers.add(key, value);
+      });
+
+      final requestBody = {
         'nationalId': nationalId,
         'deviceId': deviceInfo['deviceId'],
-      };
-
-      if (password != null) {
-        requestBody['password'] = password;
-      }
-
-      final headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'x-api-key': Constants.apiKey,
+        'password': password,
       };
 
       print('API Call Details:');
-      print('- Endpoint: ${Constants.apiBaseUrl}/auth/signin');
-      print('- Headers: ${json.encode(headers)}');
+      print('- Endpoint: ${Constants.apiBaseUrl}${Constants.endpointSignIn}');
+      print('- Headers: ${json.encode(Constants.authHeaders)}');
       print('- Request Body: ${json.encode(requestBody)}');
 
-      print('\nStep 4: Making Sign In API Call');
-      
-      // Create a custom HttpClient that accepts self-signed certificates
-      final client = HttpClient()
-        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
-      
-      final uri = Uri.parse('${Constants.apiBaseUrl}/auth/signin');
-      final request = await client.postUrl(uri);
-      
-      // Add headers
-      headers.forEach((key, value) {
-        request.headers.set(key, value);
-      });
-      
-      // Add body
+      // Step 4: Make API call
+      print('Step 4: Making Sign In API Call');
       request.write(json.encode(requestBody));
-      
       final response = await request.close();
-      final responseBody = await response.transform(utf8.decoder).join();
 
-      print('\nStep 5: Processing Response');
+      // Step 5: Process response
+      print('Step 5: Processing Response');
+      final responseBody = await response.transform(utf8.decoder).join();
       print('- Status Code: ${response.statusCode}');
       print('- Response Headers: ${response.headers}');
       print('- Raw Response Body: $responseBody');
 
-      final Map<String, dynamic> parsedResponse = json.decode(responseBody);
+      final parsedResponse = json.decode(responseBody);
       print('- Parsed Response: ${json.encode(parsedResponse)}');
 
       if (parsedResponse['success'] == true && parsedResponse['data'] != null) {
         print('\nStep 6: Successful Sign In');
         print('- Processing user data and tokens');
 
-        // Store tokens immediately
-        if (parsedResponse['data']['token'] != null) {
-          await _secureStorage.write(
-            key: 'auth_token',
-            value: parsedResponse['data']['token']
-          );
-          print('✅ Auth token stored successfully');
-        }
-        
-        if (parsedResponse['data']['refresh_token'] != null) {
-          await _secureStorage.write(
-            key: 'refresh_token',
-            value: parsedResponse['data']['refresh_token']
-          );
-          print('✅ Refresh token stored successfully');
-        }
-
-        // Store session data
-        await _secureStorage.write(key: 'session_active', value: 'true');
-        if (parsedResponse['data']['user'] != null) {
-          final userData = parsedResponse['data']['user'];
-          await _secureStorage.write(
-            key: 'session_user_id',
-            value: userData['id']?.toString() ?? nationalId
-          );
-        }
-        print('✅ Session data stored');
-
-        // Verify token storage
-        final storedToken = await _secureStorage.read(key: 'auth_token');
-        print('Token verification:');
-        print('- Token exists: ${storedToken != null}');
-        if (storedToken != null) {
-          print('- Token length: ${storedToken.length}');
-          print('- First 10 chars: ${storedToken.substring(0, 10)}...');
-        }
-
-        final responseData = parsedResponse['data'];
-        final userData = responseData['user'];
-
-        if (userData != null) {
-          print('\n=== DETAILED USER DATA STORAGE LOGGING ===');
-          print('1. Original User Data from API:');
-          print(json.encode(userData));
-
-          // Store user data in both secure storage and shared preferences
-          final userDataToStore = {
-            ...userData,
-            'name': userData['name'] ?? '', // Ensure name is stored
-            'full_name': userData['name'] ?? '', // Store name as full_name for consistency
-            'firstName': userData['name']?.toString().split(' ').firstOrNull ?? '', // Extract first name safely
-            'lastName': userData['name'] != null && userData['name'].toString().split(' ').length > 1 
-                ? userData['name'].toString().split(' ').sublist(1).join(' ')
-                : '', // Extract last name safely with null check and preserve full last name
-            'totalNumberOfCurrentDependents': userData['totalNumberOfCurrentDependents'] ?? 0, // 💡 Store dependents count
-          };
-
-          print('\n3. Enhanced User Data to Store:');
-          print(json.encode(userDataToStore));
-
-          final prefs = await SharedPreferences.getInstance();
-          
-          // Store in SharedPreferences
-          await prefs.setString('user_data', json.encode(userDataToStore));
-          print('\n4. SharedPreferences Storage:');
-          print('- Stored at key: user_data');
-          print('- Verification - Retrieved data:');
-          print(prefs.getString('user_data'));
-          
-          // Store in SecureStorage
-          await _secureStorage.write(key: 'user_data', value: json.encode(userDataToStore));
-          print('\n5. Secure Storage:');
-          print('- Stored at key: user_data');
-          print('- Verification - Retrieved data:');
-          print(await _secureStorage.read(key: 'user_data'));
-          
-          // Set device registration status
-          await prefs.setBool('device_registered', true);
-          await prefs.setString('device_user_id', nationalId);
-          await _secureStorage.write(key: 'device_registered', value: 'true');
-          await _secureStorage.write(key: 'device_user_id', value: nationalId);
-          
-          print('\n6. Final Storage Check:');
-          print('- SharedPreferences user_data exists: ${prefs.getString('user_data') != null}');
-          print('- SecureStorage user_data exists: ${(await _secureStorage.read(key: 'user_data')) != null}');
-          print('- Device registration status: ${prefs.getBool('device_registered')}');
-          print('- Device user ID: ${prefs.getString('device_user_id')}');
-          print('=== END DETAILED STORAGE LOGGING ===\n');
-        }
-      } else {
-        print('\nStep 6: Sign In Failed');
-        print('- Error Code: ${parsedResponse['code']}');
-        print('- Error Message: ${parsedResponse['message']}');
+        // 💡 Return the response without storing any data
+        return parsedResponse;
       }
 
-      print('\n=== SIGN IN PROCESS END ===');
       return parsedResponse;
-    } catch (e, stackTrace) {
-      print('\n!!! ERROR IN SIGN IN PROCESS !!!');
-      print('Error: $e');
-      print('Stack trace: $stackTrace');
+    } catch (e) {
+      print('Error during sign in: $e');
       return {
         'success': false,
         'error': e.toString(),
+        'message': 'Error during sign in',
+        'message_ar': 'حدث خطأ أثناء تسجيل الدخول'
       };
     } finally {
-      _isSigningIn = false;
+      client?.close();
     }
   }
 

@@ -3,6 +3,7 @@ import '../../utils/constants.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
 import 'package:lottie/lottie.dart';
+import '../customer_service_screen.dart';
 
 class LoanApplicationStatusScreen extends StatelessWidget {
   final bool isArabic;
@@ -206,7 +207,14 @@ class LoanApplicationStatusScreen extends StatelessWidget {
                             child: ElevatedButton(
                               onPressed: () {
                                 // Navigate to customer service page
-                                Navigator.pushNamed(context, '/customer-service');
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => CustomerServiceScreen(
+                                      isArabic: isArabic,
+                                    ),
+                                  ),
+                                );
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: primaryColor,

@@ -648,8 +648,10 @@ class _CustomerFormState extends State<CustomerForm> {
   String requestType = 'loans';
   final TextEditingController bodyController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  bool _isSubmitting = false;
+  final ApiService _apiService = ApiService();
 
-  void _showSuccessDialog(BuildContext context) {
+  void _showSuccessDialog(BuildContext context, String complaintNumber) {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final textColor = Color(themeProvider.isDarkMode 
         ? Constants.darkLabelTextColor 
@@ -665,39 +667,45 @@ class _CustomerFormState extends State<CustomerForm> {
               : Constants.lightSurfaceColor),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
-            side: BorderSide(
-              color: Color(themeProvider.isDarkMode 
-                  ? Constants.darkFormBorderColor 
-                  : Constants.lightFormBorderColor),
-            ),
           ),
-          title: Column(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.check_circle,
-                color: textColor,
-                size: 48,
+              // Success animation
+              TweenAnimationBuilder(
+                duration: const Duration(milliseconds: 800),
+                tween: Tween<double>(begin: 0, end: 1),
+                builder: (context, double value, child) {
+                  return Transform.scale(
+                    scale: value,
+                    child: Icon(
+                      Icons.check_circle,
+                      color: Colors.green,
+                      size: 64 * value,
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 16),
               Text(
-                widget.isArabic ? 'تم الإرسال!' : 'Submitted!',
+                widget.isArabic ? 'تم الإرسال بنجاح!' : 'Successfully Submitted!',
                 style: TextStyle(
                   color: textColor,
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              const SizedBox(height: 8),
+              Text(
+                widget.isArabic 
+                    ? 'رقم الشكوى: $complaintNumber' 
+                    : 'Complaint Number: $complaintNumber',
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 16,
+                ),
+              ),
             ],
-          ),
-          content: Text(
-            widget.isArabic
-                ? 'تم إرسال النموذج بنجاح.'
-                : 'The form has been submitted successfully.',
-            textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
-            style: TextStyle(
-              color: textColor,
-              fontSize: 14,
-            ),
           ),
           actions: [
             TextButton(
@@ -705,15 +713,11 @@ class _CustomerFormState extends State<CustomerForm> {
                 Navigator.of(context).pop();
                 bodyController.clear();
               },
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              ),
               child: Text(
                 widget.isArabic ? 'حسناً' : 'OK',
                 style: TextStyle(
                   color: textColor,
                   fontWeight: FontWeight.bold,
-                  fontSize: 14,
                 ),
               ),
             ),
@@ -721,6 +725,58 @@ class _CustomerFormState extends State<CustomerForm> {
         ),
       ),
     );
+  }
+
+  void _showErrorDialog(String message) {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          widget.isArabic ? 'خطأ' : 'Error',
+          style: TextStyle(color: Colors.red),
+        ),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(widget.isArabic ? 'حسناً' : 'OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _submitForm() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final request = CustomerCareRequest(
+        nationalId: 'TODO: Get from user session', // You'll need to get this from your auth service
+        phone: 'TODO: Get from user session',      // You'll need to get this from your auth service
+        customerName: 'TODO: Get from user session', // You'll need to get this from your auth service
+        subject: formType,
+        subSubject: formType == 'request' ? requestType : null,
+        complaint: bodyController.text,
+      );
+
+      final response = await _apiService.submitCustomerCare(request);
+
+      if (response.success) {
+        _showSuccessDialog(context, response.complaintNumber!);
+      } else {
+        _showErrorDialog(response.message);
+      }
+    } catch (e) {
+      _showErrorDialog(widget.isArabic 
+          ? 'حدث خطأ. يرجى المحاولة مرة أخرى.'
+          : 'An error occurred. Please try again.');
+    } finally {
+      setState(() => _isSubmitting = false);
+    }
   }
 
   @override
@@ -1018,11 +1074,7 @@ class _CustomerFormState extends State<CustomerForm> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {
-                if (_formKey.currentState!.validate()) {
-                  _showSuccessDialog(context);
-                }
-              },
+              onPressed: _isSubmitting ? null : _submitForm,
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
                 padding: const EdgeInsets.symmetric(vertical: 16),
@@ -1034,16 +1086,29 @@ class _CustomerFormState extends State<CustomerForm> {
                   color: primaryColor,
                 ),
               ),
-              child: Text(
-                widget.isArabic ? 'إرسال' : 'Submit',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(themeProvider.isDarkMode 
-                      ? Constants.darkBackgroundColor 
-                      : Constants.lightSurfaceColor),
-                ),
-              ),
+              child: _isSubmitting
+                  ? SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(themeProvider.isDarkMode 
+                              ? Constants.darkBackgroundColor 
+                              : Constants.lightSurfaceColor),
+                        ),
+                      ),
+                    )
+                  : Text(
+                      widget.isArabic ? 'إرسال' : 'Submit',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(themeProvider.isDarkMode 
+                            ? Constants.darkBackgroundColor 
+                            : Constants.lightSurfaceColor),
+                      ),
+                    ),
             ),
           ),
         ],

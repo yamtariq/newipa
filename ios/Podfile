@@ -2,7 +2,7 @@ platform :ios, '14.0'
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
 project 'Runner', {
-  'Debug' => :debug,
+  'Debug'   => :debug,
   'Profile' => :release,
   'Release' => :release,
 }
@@ -24,8 +24,10 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 target 'Runner' do
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   
+  # Use static frameworks for Xcode 15+
   use_frameworks! :linkage => :static
-  
+
+  # Third-party pods
   pod 'PhoneNumberKit', '~> 3.3.4'
   pod 'DKImagePickerController', '~> 4.3'
 end
@@ -33,25 +35,13 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     target.build_configurations.each do |config|
+      # Set the deployment target and disable module interface generation
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+      config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'NO'
       config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
       config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
       config.build_settings['OTHER_SWIFT_FLAGS'] = '-DCOCOAPODS'
-      
-      # For targets with bridging headers, disable module interface generation.
-      if target.name == 'Runner' || target.name == 'syncfusion_flutter_pdfviewer'
-        config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'NO'
-      else
-        config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
-      end
     end
-
-    if target.name == 'syncfusion_flutter_pdfviewer'
-      target.build_configurations.each do |config|
-        config.build_settings['HEADER_SEARCH_PATHS'] = '$(inherited) $(PODS_ROOT)/Headers/Private/Flutter'
-      end
-    end
-
     flutter_additional_ios_build_settings(target)
   end
 end
