@@ -1,63 +1,39 @@
-name: iOS-ipa-build
+name: iOS Build
 
-on:
-  workflow_dispatch:
+on: [push]
 
 jobs:
-  build-ios:
+  build:
     runs-on: macos-latest
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-      - name: Force Xcode 15.4
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app
-
-      - name: Setup Flutter
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.27.1'
-          channel: stable
-          cache: true
 
-      - name: Install Exact CocoaPods Version
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate iOS directory
+        run: flutter create --platforms=ios .
+
+      - name: Set iOS Deployment Target
+        run: sed -i '' 's/platform :ios, '9.0'/platform :ios, '14.0'/g' ios/Podfile
+
+      - name: Install CocoaPods dependencies
         run: |
-          sudo gem install cocoapods -v 1.14.3 --conservative
-          pod setup
+          cd ios
+          pod install
+          cd ..
 
-      - name: Clean Environment
-        run: |
-          flutter clean
-          rm -rf ios/Podfile.lock ios/Pods ios/Flutter/Flutter.framework ios/Flutter/Flutter.podspec
+      - name: Build iOS (No Code Signing)
+        run: flutter build ipa --no-codesign
 
-      - name: Install Dependencies
-        run: |
-          flutter pub get
-          flutter pub run build_runner build --delete-conflicting-outputs
-
-      - name: Pod Install with Retry
-        working-directory: ios
-        run: |
-          pod repo update
-          pod deintegrate
-          pod cache clean --all
-          rm -rf Pods/
-          pod install --verbose
-
-      - name: Build iOS App
-        run: |
-          flutter precache --ios
-          flutter build ios --release --no-codesign
-
-      - name: Create IPA
-        working-directory: build/ios/iphoneos
-        run: |
-          mkdir Payload
-          mv Runner.app Payload/
-          zip -qr app.ipa Payload
-
-      - name: Upload Artifact
+      - name: Upload Unsigned IPA
         uses: actions/upload-artifact@v4
         with:
-          name: ios-build
-          path: build/ios/iphoneos/app.ipa
+          name: Unsigned-iOS-IPA
+          path: build/ios/ipa/*.ipa
