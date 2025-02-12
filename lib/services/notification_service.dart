@@ -63,13 +63,23 @@ class NotificationService {
     // Cancel any existing timer
     _iosBackgroundTimer?.cancel();
     
+    // 💡 Add random offset (between 0-60 seconds) to prevent synchronized calls
+    final randomOffset = Duration(seconds: DateTime.now().millisecond % 60);
+    
     // Create a new timer that runs every 15 minutes
-    _iosBackgroundTimer = Timer.periodic(const Duration(minutes: 15), (timer) async {
-      final bool canFetch = await _canPerformBackgroundFetch();
-      if (canFetch) {
-        await checkForNewNotifications();
-      }
+    _iosBackgroundTimer = Timer.periodic(
+      const Duration(minutes: 15) + randomOffset, 
+      (timer) async {
+        debugPrint('Background fetch timer triggered');
+        final bool canFetch = await _canPerformBackgroundFetch();
+        if (canFetch) {
+          await checkForNewNotifications();
+        } else {
+          debugPrint('Background fetch skipped - too soon since last fetch');
+        }
     });
+    
+    debugPrint('iOS background fetch scheduled with offset: ${randomOffset.inSeconds} seconds');
   }
 
   Future<bool> _canPerformBackgroundFetch() async {
@@ -79,12 +89,14 @@ class NotificationService {
     final lastFetchTime = prefs.getInt('last_fetch_time') ?? 0;
     final currentTime = DateTime.now().millisecondsSinceEpoch;
     
-    // Check if at least 15 minutes have passed since the last fetch
-    if (currentTime - lastFetchTime >= const Duration(minutes: 15).inMilliseconds) {
+    // 💡 Add buffer time to prevent edge cases (14 minutes instead of 15)
+    if (currentTime - lastFetchTime >= const Duration(minutes: 14).inMilliseconds) {
+      debugPrint('Background fetch allowed - sufficient time has passed');
       await prefs.setInt('last_fetch_time', currentTime);
       return true;
     }
     
+    debugPrint('Background fetch denied - too soon (${(currentTime - lastFetchTime) / 1000} seconds since last fetch)');
     return false;
   }
 
@@ -167,7 +179,10 @@ class NotificationService {
   }
 
   Future<bool> checkForNewNotifications() async {
-    if (_isChecking) return false;
+    if (_isChecking) {
+      debugPrint('Already checking for notifications, skipping...');
+      return false;
+    }
     
     return await _lock.synchronized(() async {
       _isChecking = true;
@@ -176,18 +191,31 @@ class NotificationService {
         final lastCheck = prefs.getInt('last_notification_check') ?? 0;
         final now = DateTime.now().millisecondsSinceEpoch;
         
+        // 💡 Add more detailed logging
+        debugPrint('Time since last check: ${(now - lastCheck) / 1000} seconds');
+        
+        // Prevent checking more frequently than every 13 minutes
         if (now - lastCheck < const Duration(minutes: 13).inMilliseconds) {
+          debugPrint('Skipping check - too soon since last check');
           return true;
         }
 
+        // Update last check time BEFORE fetching to prevent race conditions
+        await prefs.setInt('last_notification_check', now);
+
         final nationalId = prefs.getString('national_id');
-        if (nationalId == null) return false;
+        if (nationalId == null) {
+          debugPrint('No national ID found, skipping notification check');
+          return false;
+        }
 
         final notifications = await _fetchNotificationsWithRetry(nationalId);
-        if (notifications.isEmpty) return true;
+        if (notifications.isEmpty) {
+          debugPrint('No new notifications found');
+          return true;
+        }
 
         await _processNotifications(notifications);
-        await prefs.setInt('last_notification_check', now);
         return true;
       } catch (e) {
         debugPrint('Error checking notifications: $e');
@@ -393,88 +421,77 @@ class NotificationService {
 
   Future<List<Map<String, dynamic>>> _fetchFromApi(String nationalId, bool markAsRead) async {
     HttpClient? client;
-    try {
-      final url = '${Constants.apiBaseUrl}/notifications/list';
-      final body = {
-        'nationalId': nationalId,
-        'markAsRead': markAsRead,
-      };
+    int retryCount = 0;
+    const maxRetries = 3;
+    const retryDelay = Duration(seconds: 5);
 
-      debugPrint('API Request Details:');
-      debugPrint('URL: $url');
-      debugPrint('Headers: ${Constants.defaultHeaders}');
-      debugPrint('Body: ${jsonEncode(body)}');
-      
-      // 💡 Create HttpClient that accepts self-signed certificates
-      client = HttpClient()
-        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+    while (retryCount < maxRetries) {
+      try {
+        final url = '${Constants.apiBaseUrl}/notifications/list';
+        final body = {
+          'nationalId': nationalId,
+          'markAsRead': markAsRead,
+        };
 
-      final uri = Uri.parse(url);
-      final request = await client.postUrl(uri);
-      
-      // Add headers
-      Constants.defaultHeaders.forEach((key, value) {
-        request.headers.set(key, value);
-      });
-      request.headers.contentType = ContentType.json;
-
-      // Add body
-      request.write(jsonEncode(body));
-
-      final response = await request.close();
-      final responseBody = await response.transform(utf8.decoder).join();
-
-      debugPrint('\nAPI Response Details:');
-      debugPrint('Status Code: ${response.statusCode}');
-      debugPrint('Response Headers: ${response.headers}');
-      debugPrint('Response Body: $responseBody');
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(responseBody);
-        debugPrint('\nParsed Response Data: $data');
+        debugPrint('API Request Details:');
+        debugPrint('URL: $url');
+        debugPrint('Headers: ${Constants.defaultHeaders}');
+        debugPrint('Body: ${jsonEncode(body)}');
         
-        if (data['success'] == true && data['data'] != null) {
-          final notifications = List<Map<String, dynamic>>.from(data['data']['notifications']);
-          debugPrint('Found ${notifications.length} notifications');
-          
-          // Transform notifications to include image URLs
-          final transformedNotifications = notifications.map((notification) {
-            // 💡 Get image URLs with proper validation
-            String? bigPictureUrl = notification['bigPictureUrl'] ?? 
-                                  notification['BigPictureUrl'] ?? 
-                                  notification['image_url'] ?? 
-                                  notification['ImageUrl'];
-            
-            String? largeIconUrl = notification['largeIconUrl'] ?? 
-                                 notification['LargeIconUrl'] ?? 
-                                 notification['icon_url'] ?? 
-                                 notification['IconUrl'];
+        // 💡 Create HttpClient with custom timeout
+        client = HttpClient()
+          ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true)
+          ..connectionTimeout = const Duration(seconds: 30);
 
-            // Validate URLs
-            if (bigPictureUrl != null && !bigPictureUrl.startsWith('http')) {
-              bigPictureUrl = null;
-            }
-            if (largeIconUrl != null && !largeIconUrl.startsWith('http')) {
-              largeIconUrl = null;
-            }
+        final uri = Uri.parse(url);
+        final request = await client.postUrl(uri);
+        
+        // Add headers
+        Constants.defaultHeaders.forEach((key, value) {
+          request.headers.set(key, value);
+        });
+        request.headers.contentType = ContentType.json;
 
-            return {
-              ...notification,
-              'bigPictureUrl': bigPictureUrl,
-              'largeIconUrl': largeIconUrl,
-            };
-          }).toList();
+        // Add body
+        request.write(jsonEncode(body));
+
+        final response = await request.close();
+        final responseBody = await response.transform(utf8.decoder).join();
+
+        debugPrint('\nAPI Response Details:');
+        debugPrint('Status Code: ${response.statusCode}');
+        debugPrint('Response Headers: ${response.headers}');
+        debugPrint('Response Body: $responseBody');
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(responseBody);
+          debugPrint('\nParsed Response Data: $data');
           
-          return transformedNotifications;
+          if (data['success'] == true && data['data'] != null) {
+            final notifications = List<Map<String, dynamic>>.from(data['data']['notifications'] ?? []);
+            debugPrint('Found ${notifications.length} notifications');
+            return notifications;
+          }
         }
+        // If we get here with a non-200 status code, throw to trigger retry
+        if (response.statusCode != 200) {
+          throw Exception('API returned status code: ${response.statusCode}');
+        }
+        return [];
+      } catch (e) {
+        debugPrint('Error in API call: $e');
+        retryCount++;
+        if (retryCount < maxRetries) {
+          debugPrint('Retrying in ${retryDelay.inSeconds} seconds... (Attempt ${retryCount + 1}/$maxRetries)');
+          await Future.delayed(retryDelay * retryCount);
+          continue;
+        }
+        return [];
+      } finally {
+        client?.close();
       }
-      return [];
-    } catch (e) {
-      debugPrint('Error in API call: $e');
-      return [];
-    } finally {
-      client?.close();
     }
+    return [];
   }
 
   Future<bool> sendNotification({

@@ -528,37 +528,68 @@ class _LoanApplicationDetailsTestScreenState extends State<LoanApplicationDetail
   }
 
   Widget _buildInfoField(String label, String value, {bool editable = false, String? fieldName, bool isRequired = true}) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final textColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
+    final hintColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkHintTextColor 
+        : Constants.lightHintTextColor);
+    final borderColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkFormBorderColor 
+        : Constants.lightFormBorderColor);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isArabic ? _getArabicLabel(label) : label,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey,
-                  ),
-                ),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
+      child: TextFormField(
+        initialValue: value,
+        enabled: editable,
+        onChanged: (newValue) {
+          setState(() {
+            if (fieldName == 'salary') {
+              _userData[fieldName ?? label.toLowerCase().replaceAll(' ', '_')] = newValue;
+              double salaryValue = double.tryParse(newValue) ?? 0;
+              _userData['food_expense'] = (salaryValue * 0.08).round().toString();
+              _userData['transportation_expense'] = (salaryValue * 0.05).round().toString();
+              _salaryChanged = true;
+            } else if (fieldName == 'ibanNo') {
+              String formattedIban = newValue.startsWith('SA') ? newValue : 'SA$newValue';
+              _userData[fieldName ?? label.toLowerCase().replaceAll(' ', '_')] = formattedIban;
+            } else {
+              _userData[fieldName ?? label.toLowerCase().replaceAll(' ', '_')] = newValue;
+            }
+          });
+        },
+        style: TextStyle(
+          fontSize: 16,
+          color: textColor,
+        ),
+        decoration: InputDecoration(
+          labelText: '${isArabic ? _getArabicLabel(label) : label}${isRequired ? ' *' : ''}',
+          labelStyle: TextStyle(
+            color: hintColor,
+            fontSize: 14,
           ),
-          if (editable)
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () => _updateField(fieldName ?? label.toLowerCase().replaceAll(' ', '_'), value),
-            ),
-        ],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+            borderSide: BorderSide(color: borderColor),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+            borderSide: BorderSide(color: borderColor),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(Constants.formBorderRadius),
+            borderSide: BorderSide(color: primaryColor, width: 2),
+          ),
+          filled: true,
+          fillColor: Colors.transparent,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        ),
+        keyboardType: _getKeyboardType(fieldName ?? label.toLowerCase().replaceAll(' ', '_')),
       ),
     );
   }

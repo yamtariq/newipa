@@ -8,6 +8,7 @@ C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\NayifatAPI
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\Azure.Core.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\Azure.Identity.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\BCrypt.Net-Next.dll
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\Dapper.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\Microsoft.AspNetCore.Authentication.JwtBearer.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\Microsoft.AspNetCore.OpenApi.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\Microsoft.Bcl.AsyncInterfaces.dll
@@ -42,6 +43,7 @@ C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\Swashbuckl
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\Swashbuckle.AspNetCore.SwaggerGen.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\Swashbuckle.AspNetCore.SwaggerUI.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\System.Configuration.ConfigurationManager.dll
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\System.Data.SqlClient.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\System.Drawing.Common.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\System.IdentityModel.Tokens.Jwt.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\System.Memory.Data.dll
@@ -56,6 +58,11 @@ C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\runtimes\w
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\runtimes\win-x86\native\Microsoft.Data.SqlClient.SNI.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\runtimes\win\lib\net6.0\Microsoft.Win32.SystemEvents.dll
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\runtimes\win-arm64\native\sni.dll
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\runtimes\win-x64\native\sni.dll
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\runtimes\win-x86\native\sni.dll
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\runtimes\unix\lib\net8.0\System.Data.SqlClient.dll
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\runtimes\win\lib\net8.0\System.Data.SqlClient.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\runtimes\unix\lib\net6.0\System.Drawing.Common.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\runtimes\win\lib\net6.0\System.Drawing.Common.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\publish\runtimes\win\lib\net6.0\System.Runtime.Caching.dll

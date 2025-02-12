@@ -154,3 +154,10 @@ C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\SixLabors.ImageSharp.dll
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\bin\Release\net8.0\NayifatAPI.xml
 C:\Users\yamta\StudioProjects\nayifat_app_2025_new\NayifatAPI\obj\Release\net8.0\NayifatAPI.xml
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\bin\Release\net8.0\Dapper.dll
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\bin\Release\net8.0\System.Data.SqlClient.dll
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\bin\Release\net8.0\runtimes\win-arm64\native\sni.dll
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\bin\Release\net8.0\runtimes\win-x64\native\sni.dll
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\bin\Release\net8.0\runtimes\win-x86\native\sni.dll
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\bin\Release\net8.0\runtimes\unix\lib\net8.0\System.Data.SqlClient.dll
+C:\Users\yamta\StudioProjects\nayifat_app_2025_new\nayifatapi\bin\Release\net8.0\runtimes\win\lib\net8.0\System.Data.SqlClient.dll

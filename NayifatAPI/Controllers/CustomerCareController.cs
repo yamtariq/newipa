@@ -5,6 +5,7 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Threading.Tasks;
 using Dapper;
+using NayifatAPI.Models;
 
 namespace NayifatAPI.Controllers
 {

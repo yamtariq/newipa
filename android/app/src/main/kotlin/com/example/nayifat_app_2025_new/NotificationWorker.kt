@@ -18,6 +18,10 @@ import org.json.JSONArray
 import android.content.SharedPreferences
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
+import android.media.RingtoneManager
+import android.media.AudioAttributes
+import android.graphics.Color
+import com.example.nayifat_app_2025_new.R
 
 class NotificationWorker(
     private val context: Context,
@@ -59,52 +63,133 @@ class NotificationWorker(
 
     override fun doWork(): Result {
         Log.d(TAG, "Step 1: Worker Started - Time: ${System.currentTimeMillis()}")
-        try {
-            // Configure SSL to trust all certificates
-            configureSSL()
-
-            // Get national ID from SharedPreferences
+        
+        return try {
+            // Get SharedPreferences
             val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-            val baseUrl = getApiBaseUrl(prefs)
             Log.d(TAG, "Step 2: Checking SharedPreferences")
+            
+            // List all available keys for debugging
             Log.d(TAG, "Step 2.1: Available SharedPreferences keys:")
             prefs.all.forEach { (key, value) ->
                 Log.d(TAG, "Step 2.2: Found Key: $key, Value: $value")
             }
-            
+
+            // Check for national ID
             val nationalId = prefs.getString("flutter.national_id", null)
-            Log.d(TAG, "Step 3: National ID check - ${if (nationalId != null) "Found ID: $nationalId" else "No ID found"}")
-            
+            Log.d(TAG, "Step 3: National ID check - Found ID: $nationalId")
+
             if (nationalId == null) {
-                Log.d(TAG, "Step 3.1: No user-specific ID, checking 'all' notifications only")
+                Log.d(TAG, "Step 3.1: No national ID found, scheduling retry")
+                return Result.retry()
             }
 
-            // Fetch notifications from API
             Log.d(TAG, "Step 4: Starting API calls")
-            val notifications = fetchNotifications(nationalId)
+            Log.d(TAG, "Step 4.1: Setting up API calls")
+
+            // Fetch notifications for "all" users first
+            Log.d(TAG, "Step 4.2: Fetching notifications for ID: all")
+            val isArabic = prefs.getBoolean("flutter.isArabic", false)
+            Log.d(TAG, "Step 4.2.1: App language setting - isArabic: $isArabic")
+            
+            val allNotifications = fetchNotifications(nationalId)
+            Log.d(TAG, "Step 4.3: API Response code: ${allNotifications.first}")
+
+            // Then fetch user-specific notifications
+            Log.d(TAG, "Step 4.2: Fetching notifications for ID: $nationalId")
+            Log.d(TAG, "Step 4.2.1: App language setting - isArabic: $isArabic")
+            
+            val userNotifications = fetchNotifications(nationalId)
+            Log.d(TAG, "Step 4.3: API Response code: ${userNotifications.first}")
+
+            // Combine and process notifications
+            val notifications = processNotifications(allNotifications.second, userNotifications.second)
             Log.d(TAG, "Step 7: API calls complete - Found ${notifications.size} notifications")
 
-            if (notifications.isNotEmpty()) {
-                Log.d(TAG, "Step 8: Processing ${notifications.size} notifications")
-                notifications.forEachIndexed { index, notification ->
-                    Log.d(TAG, "Step 8.${index + 1}: Processing notification: ${notification["title"]}")
-                    showNotification(notification)
-                }
-            } else {
+            if (notifications.isEmpty()) {
                 Log.d(TAG, "Step 8: No notifications to display")
+                Log.d(TAG, "Step 9: Worker Completed Successfully")
+                return Result.success()
             }
-            
+
+            // Show notifications
+            notifications.forEach { notification ->
+                showNotification(notification)
+            }
+
             Log.d(TAG, "Step 9: Worker Completed Successfully")
-            return Result.success()
+            Result.success()
         } catch (e: Exception) {
-            Log.e(TAG, "Step Error: Worker failed with error: ${e.message}")
-            e.printStackTrace()
-            Log.d(TAG, "Step Error: Will retry worker")
-            return Result.retry()
+            Log.e(TAG, "Error in worker: ${e.message}", e)
+            // Only retry if it's a network error or similar recoverable error
+            if (e is java.net.UnknownHostException || 
+                e is java.net.SocketTimeoutException || 
+                e is java.io.IOException) {
+                Result.retry()
+            } else {
+                Result.failure()
+            }
         }
     }
 
-    private fun fetchNotifications(nationalId: String?): List<Map<String, String>> {
+    private fun fetchNotificationsWithRetry(nationalId: String, maxRetries: Int = 3): Pair<Int, List<Map<String, String>>> {
+        var retryCount = 0
+        var lastException: Exception? = null
+
+        while (retryCount < maxRetries) {
+            try {
+                return fetchNotifications(nationalId)
+            } catch (e: Exception) {
+                lastException = e
+                Log.e(TAG, "Error fetching notifications (attempt ${retryCount + 1}/$maxRetries): ${e.message}")
+                retryCount++
+                if (retryCount < maxRetries) {
+                    Thread.sleep(5000L * retryCount) // Exponential backoff
+                }
+            }
+        }
+
+        Log.e(TAG, "Failed to fetch notifications after $maxRetries attempts", lastException)
+        return Pair(500, emptyList()) // Return error status code and empty list
+    }
+
+    private fun processNotifications(
+        allNotifications: List<Map<String, String>>?,
+        userNotifications: List<Map<String, String>>?
+    ): List<Map<String, String>> {
+        val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        val seenNotifications = prefs.getStringSet("flutter.seen_notifications", mutableSetOf()) ?: mutableSetOf()
+        val newSeenNotifications = seenNotifications.toMutableSet()
+        
+        val result = mutableListOf<Map<String, String>>()
+
+        // Process all notifications
+        allNotifications?.forEach { notification ->
+            val id = notification["id"]
+            if (id != null && !seenNotifications.contains(id)) {
+                result.add(notification)
+                newSeenNotifications.add(id)
+            }
+        }
+
+        // Process user notifications
+        userNotifications?.forEach { notification ->
+            val id = notification["id"]
+            if (id != null && !seenNotifications.contains(id)) {
+                result.add(notification)
+                newSeenNotifications.add(id)
+            }
+        }
+
+        // Update seen notifications
+        if (newSeenNotifications.size > seenNotifications.size) {
+            prefs.edit().putStringSet("flutter.seen_notifications", newSeenNotifications).apply()
+        }
+
+        return result
+    }
+
+    private fun fetchNotifications(nationalId: String?): Pair<Int, List<Map<String, String>>> {
         Log.d(TAG, "Step 4.1: Setting up API calls")
         val allNotifications = mutableListOf<Map<String, String>>()
         val seenNotifications = getSeenNotifications()
@@ -140,7 +225,7 @@ class NotificationWorker(
             Log.e(TAG, "Error fetching notifications: ${e.message}")
         }
         
-        return allNotifications
+        return Pair(200, allNotifications)  // Return success status code and notifications
     }
 
     private fun fetchFromApi(nationalId: String, markAsRead: Boolean): List<Map<String, String>>? {
@@ -281,14 +366,12 @@ class NotificationWorker(
         return notifications
     }
 
-    private fun showNotification(notification: Map<String, String>) {
-        Log.d(TAG, "Step 8: Starting notification display process")
-        val channelId = "nayifat_channel"
+    private fun showNotification(notificationData: Map<String, String>) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
+        val channelId = "nayifat_notifications"
+        
         // Create notification channel for Android O and above
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Log.d(TAG, "Step 8.2: Creating notification channel")
             val channel = NotificationChannel(
                 channelId,
                 "Nayifat Notifications",
@@ -296,134 +379,66 @@ class NotificationWorker(
             ).apply {
                 description = "Notifications from Nayifat App"
                 enableLights(true)
+                lightColor = Color.GREEN
                 enableVibration(true)
-                setShowBadge(true)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-                setBypassDnd(true)
+                vibrationPattern = longArrayOf(0, 500, 200, 500)
+                setSound(
+                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
             }
             notificationManager.createNotificationChannel(channel)
-            Log.d(TAG, "Step 8.3: Notification channel created")
         }
 
-        // Create intent to open the app
-        Log.d(TAG, "Step 8.4: Creating intent to open app")
-        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            // Add the route if available
-            notification["route"]?.let { route ->
-                if (route.isNotEmpty()) {
-                    Log.d(TAG, "Step 8.4.1: Adding route to intent: $route")
-                    putExtra("initial_route", route)
-                    // Get isArabic from SharedPreferences
-                    val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-                    val isArabic = prefs.getBoolean("flutter.isArabic", false)
-                    Log.d(TAG, "Step 8.4.2: Retrieved isArabic from SharedPreferences: $isArabic")
-                    
-                    // Store route and language preference
-                    prefs.edit().apply {
-                        putString("flutter.pending_notification_route", route)
-                        putBoolean("flutter.pending_notification_is_arabic", isArabic)
-                        apply()
-                    }
-                    Log.d(TAG, "Step 8.4.3: Stored route in SharedPreferences: $route")
-                }
-            }
+        // Create an Intent for when notification is tapped
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra("route", "/notifications")  // Add route for navigation
         }
 
-        // Create pending intent
-        val pendingIntent = if (intent != null) {
-            Log.d(TAG, "Step 8.4.4: Creating PendingIntent")
-            PendingIntent.getActivity(
-                context,
-                notification["id"]?.toInt() ?: 1,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // Get notification content based on language
+        val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        val isArabic = prefs.getBoolean("flutter.isArabic", false)
+        
+        val title = if (isArabic) {
+            notificationData["title_ar"] ?: notificationData["title"] ?: "إشعار جديد"
         } else {
-            Log.e(TAG, "Step Error 8.4.5: Could not create launch intent")
-            null
+            notificationData["title"] ?: notificationData["title_ar"] ?: "New Notification"
+        }
+        
+        val body = if (isArabic) {
+            notificationData["body_ar"] ?: notificationData["body"] ?: "لديك إشعار جديد"
+        } else {
+            notificationData["body"] ?: notificationData["body_ar"] ?: "You have a new notification"
         }
 
-        // 💡 Create notification builder with company branding
-        Log.d(TAG, "Step 8.5: Building notification with title: ${notification["title"]}")
-        val builder = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(R.drawable.notification_icon) // Monochrome icon for status bar
-            .setLargeIcon(android.graphics.BitmapFactory.decodeResource(context.resources, R.mipmap.launcher_icon)) // Company logo
-            .setContentTitle(notification["title"])
-            .setContentText(notification["body"])
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+        // Build the notification
+        val notification = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(R.drawable.notification_icon)  // Use our custom icon
+            .setContentTitle(title)
+            .setContentText(body)
             .setAutoCancel(true)
-            .setVibrate(longArrayOf(1000, 1000, 1000))
-            .setOnlyAlertOnce(false)
+            .setDefaults(Notification.DEFAULT_ALL)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setContentIntent(pendingIntent)
+            .setTimeoutAfter(24 * 60 * 60 * 1000) // 24 hours
+            .build()
 
-        // 💡 Handle images with proper error handling and fallbacks
-        var hasLargeIcon = true // Already set with company logo
-        var hasBigPicture = false
-
-        // Try to set custom large icon if provided
-        val largeIconUrl = notification["largeIconUrl"]?.takeIf { it.isNotBlank() }
-        if (!largeIconUrl.isNullOrBlank()) {
-            try {
-                Log.d(TAG, "Step 8.5.1: Setting custom large icon from URL: $largeIconUrl")
-                val iconBitmap = getBitmapFromUrl(largeIconUrl)
-                if (iconBitmap != null) {
-                    builder.setLargeIcon(iconBitmap)
-                    Log.d(TAG, "Step 8.5.2: Custom large icon set successfully")
-                } else {
-                    Log.e(TAG, "Step 8.5.3: Failed to load custom large icon, using company logo")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Step 8.5.4: Error setting custom large icon: ${e.message}")
-            }
-        }
-
-        // Then try to set big picture
-        val bigPictureUrl = notification["bigPictureUrl"]?.takeIf { it.isNotBlank() }
-        if (!bigPictureUrl.isNullOrBlank()) {
-            try {
-                Log.d(TAG, "Step 8.5.5: Setting big picture from URL: $bigPictureUrl")
-                val imageBitmap = getBitmapFromUrl(bigPictureUrl)
-                if (imageBitmap != null) {
-                    val bigPictureStyle = NotificationCompat.BigPictureStyle()
-                        .bigPicture(imageBitmap)
-                        .setBigContentTitle(notification["title"])
-                        .setSummaryText(notification["body"])
-                    
-                    // If we have a large icon, hide it when expanded
-                    if (hasLargeIcon) {
-                        bigPictureStyle.bigLargeIcon(null as android.graphics.Bitmap?)
-                    }
-                    
-                    builder.setStyle(bigPictureStyle)
-                    hasBigPicture = true
-                    Log.d(TAG, "Step 8.5.6: Big picture set successfully")
-                } else {
-                    Log.e(TAG, "Step 8.5.7: Failed to load big picture")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Step 8.5.8: Error setting big picture: ${e.message}")
-            }
-        } else {
-            Log.d(TAG, "Step 8.5.5.1: No valid big picture URL provided")
-        }
-
-        // If no big picture was set, use BigTextStyle as fallback
-        if (!hasBigPicture) {
-            builder.setStyle(NotificationCompat.BigTextStyle()
-                .bigText(notification["body"]))
-            Log.d(TAG, "Step 8.5.9: Using BigTextStyle as fallback")
-        }
-
-        // Set the pending intent if available
-        pendingIntent?.let {
-            builder.setContentIntent(it)
-        }
-
-        // Show the notification
-        val notificationId = notification["id"]?.toInt() ?: 1
-        Log.d(TAG, "Step 8.6: Displaying notification with ID: $notificationId")
-        notificationManager.notify(notificationId, builder.build())
-        Log.d(TAG, "Step 8.7: Notification displayed successfully")
+        // Show the notification with a unique ID based on current time
+        val notificationId = System.currentTimeMillis().toInt()
+        notificationManager.notify(notificationId, notification)
+        
+        Log.d(TAG, "Step 8.4: Notification displayed - ID: $notificationId, Title: $title")
     }
 
     // 💡 Helper function to load images from URLs with improved error handling and caching
