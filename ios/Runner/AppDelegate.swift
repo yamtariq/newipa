@@ -1,5 +1,5 @@
 import UIKit
-import Flutter.Flutter
+import Flutter
 import GoogleMaps
 import AVFoundation
 import BackgroundTasks
