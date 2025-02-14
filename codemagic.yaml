@@ -101,7 +101,7 @@ workflows:
                   config.build_settings['DEFINES_MODULE'] = 'NO'
                 end
                 
-                # Remove bridging header settings for Runner target ��
+                # Remove bridging header settings for Runner target 
                 if target.name == 'Runner'
                   config.build_settings['SWIFT_OBJC_BRIDGING_HEADER'] = ''
                   config.build_settings['SWIFT_OBJC_INTERFACE_HEADER_NAME'] = ''
@@ -123,6 +123,11 @@ workflows:
           # Build using Xcode without module flag overrides 💡
           xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Debug clean build
           cd ..
+      - name: Sanitize Xcode Project 💡
+        script: |
+          echo "Removing bridging header settings from Runner.xcodeproj"
+          sed -i '' 's/SWIFT_OBJC_BRIDGING_HEADER = [^;]*;/SWIFT_OBJC_BRIDGING_HEADER = "";/g' ios/Runner.xcodeproj/project.pbxproj;
+          sed -i '' 's/SWIFT_OBJC_INTERFACE_HEADER_NAME = [^;]*;/SWIFT_OBJC_INTERFACE_HEADER_NAME = "";/g' ios/Runner.xcodeproj/project.pbxproj;
       - name: Build iOS 💡
         script: | 
           flutter build ios --debug --no-codesign --verbose
