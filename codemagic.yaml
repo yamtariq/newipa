@@ -6,7 +6,7 @@ workflows:
     environment:
       flutter: stable
       xcode: latest
-      cocoapods: 1.13.0
+      cocoapods: 1.12.1
       vars:
         BUNDLE_ID: "com.nayifat.app2025"
         XCODE_WORKSPACE: "Runner.xcworkspace"
@@ -24,91 +24,35 @@ workflows:
           pod --version
       - name: Clean and prepare 💡
         script: |
-          # Ensure we're in the project root
           echo "Current directory: $PWD"
-          # Clean previous builds
           rm -rf build
           rm -rf ios/Pods
           rm -rf ios/Podfile.lock
           rm -rf ios/.symlinks
           rm -rf ios/Flutter/Flutter.framework
           rm -rf ios/Flutter/Flutter.podspec
-          # Clean Flutter
           flutter clean
           flutter pub get
       - name: Setup iOS project 💡
         script: |
-          # Ensure iOS platform files exist
           flutter create . --platforms=ios
           cd ios
-          # Remove old Podfile to prevent conflicts
           rm -f Podfile
           rm -f Podfile.lock
-          # Update Flutter dependencies
-          flutter pub get
+          pod cache clean --all
           cd ..
+          flutter pub get
       - name: Install CocoaPods dependencies 💡
         script: |
           cd ios
-          # Create and configure Podfile
-          cat > Podfile << 'EOL'
-          platform :ios, '12.0'
-
-          # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
-          ENV['COCOAPODS_DISABLE_STATS'] = 'true'
-
-          project 'Runner', {
-            'Debug' => :debug,
-            'Profile' => :release,
-            'Release' => :release,
-          }
-
-          def flutter_root
-            generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
-            unless File.exist?(generated_xcode_build_settings_path)
-              raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
-            end
-
-            File.foreach(generated_xcode_build_settings_path) do |line|
-              matches = line.match(/FLUTTER_ROOT\=(.*)/)
-              return matches[1].strip if matches
-            end
-            raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Generated.xcconfig, then run flutter pub get"
-          end
-
-          require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
-
-          flutter_ios_podfile_setup
-
-          target 'Runner' do
-            use_frameworks!
-            use_modular_headers!
-
-            flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-          end
-
-          post_install do |installer|
-            installer.pods_project.targets.each do |target|
-              flutter_additional_ios_build_settings(target)
-              target.build_configurations.each do |config|
-                config.build_settings['ENABLE_BITCODE'] = 'NO'
-                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
-              end
-            end
-          end
-          EOL
-          # Update CocoaPods repos
           pod repo update
-          # Install pods with detailed logging
+          rm -rf Pods
+          rm -f Podfile.lock
+          flutter pub get
           pod install --verbose
-          # Verify installation
-          ls -la Pods/
           cd ..
       - name: Build iOS 💡
         script: | 
-          # Ensure we're in the project root
-          pwd
-          # Build with detailed output
           flutter build ios --debug --no-codesign --verbose
     artifacts:
       - build/ios/iphoneos/Runner.app
