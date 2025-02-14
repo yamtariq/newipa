@@ -281,6 +281,96 @@ namespace NayifatAPI.Controllers
                 return Error("Internal server error", 500);
             }
         }
+
+        [HttpPost("insert")]
+        public async Task<IActionResult> InsertCardApplication([FromBody] InsertCardApplicationRequest request)
+        {
+            if (!ValidateApiKey())
+            {
+                return Error("Invalid API key", 401);
+            }
+
+            try
+            {
+                _logger.LogInformation("=== INSERTING CARD APPLICATION - START ===");
+                _logger.LogInformation($"Request Data: NationalId={request.NationalId}, ApplicationNo={request.ApplicationNo}");
+
+                // Validate national ID
+                if (request.NationalId.Length != 10 || (!request.NationalId.StartsWith("1") && !request.NationalId.StartsWith("2")))
+                {
+                    return Error("Invalid national ID format. Must be 10 digits and start with 1 or 2.", 400);
+                }
+
+                // Start transaction
+                await using var transaction = await _context.Database.BeginTransactionAsync();
+
+                try
+                {
+                    // Check if application already exists
+                    var existingApplication = await _context.CardApplications
+                        .FirstOrDefaultAsync(c => 
+                            c.NationalId == request.NationalId && 
+                            c.ApplicationNo == request.ApplicationNo);
+
+                    if (existingApplication != null)
+                    {
+                        return Error("Card application already exists with this application number.", 409);
+                    }
+
+                    var saudiTime = TimeZoneInfo.ConvertTime(DateTime.UtcNow, SaudiTimeZone);
+
+                    // Create new card application
+                    var application = new CardApplication
+                    {
+                        NationalId = request.NationalId,
+                        ApplicationNo = request.ApplicationNo,
+                        CardType = request.CardType,
+                        CardLimit = request.CardLimit,
+                        Status = request.Status,
+                        StatusDate = saudiTime,
+                        CustomerDecision = request.CustomerDecision,
+                        Remarks = request.Remarks,
+                        NoteUser = request.NoteUser ?? "SYSTEM",
+                        Note = request.Note ?? "Application created",
+                        NameOnCard = request.NameOnCard
+                    };
+
+                    _context.CardApplications.Add(application);
+                    await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
+
+                    _logger.LogInformation("Card application inserted successfully");
+                    _logger.LogInformation("=== INSERTING CARD APPLICATION - END ===");
+
+                    return Success(new
+                    {
+                        message = "Card application created successfully",
+                        details = new
+                        {
+                            card_id = application.Id,
+                            national_id = application.NationalId,
+                            application_no = application.ApplicationNo,
+                            card_type = application.CardType,
+                            card_limit = application.CardLimit,
+                            status = application.Status,
+                            customer_decision = application.CustomerDecision,
+                            name_on_card = application.NameOnCard,
+                            created_at = application.StatusDate
+                        }
+                    });
+                }
+                catch (Exception)
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error inserting card application for National ID: {NationalId}", request.NationalId);
+                return Error("Internal server error", 500);
+            }
+        }
     }
 
     public class InitialCardApplicationRequest
@@ -298,6 +388,38 @@ namespace NayifatAPI.Controllers
         public required string CardType { get; set; }
         public required decimal CardLimit { get; set; }
         public string? Status { get; set; }
+        public string? Remarks { get; set; }
+        public string? NoteUser { get; set; }
+        public string? Note { get; set; }
+    }
+
+    public class InsertCardApplicationRequest
+    {
+        [Required]
+        public required string NationalId { get; set; }
+
+        [Required]
+        public required int ApplicationNo { get; set; }
+
+        [Required]
+        [StringLength(50)]
+        public required string CardType { get; set; }
+
+        [Required]
+        public required decimal CardLimit { get; set; }
+
+        [Required]
+        [StringLength(50)]
+        public required string Status { get; set; }
+
+        [Required]
+        [StringLength(50)]
+        public required string CustomerDecision { get; set; }
+
+        [Required]
+        [StringLength(100)]
+        public required string NameOnCard { get; set; }
+
         public string? Remarks { get; set; }
         public string? NoteUser { get; set; }
         public string? Note { get; set; }

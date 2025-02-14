@@ -248,6 +248,28 @@ class CardService {
       }
 
       if (!responseData['success']) {
+        // Get card type for rejected application
+        final cardTypeData = await _getCardTypeForAmount(requestedAmount.toDouble());
+        final selectedCardType = cardTypeData['type'] ?? 'REWARDS';
+        final result = responseData['result'];
+
+        // 💡 If createCustomer is rejected, insert a rejected application
+        final cardData = {
+          'national_id': storedUserData['national_id'],
+          'application_no': DateTime.now().millisecondsSinceEpoch,
+          'customerDecision': 'PENDING',
+          'card_type': selectedCardType,
+          'card_limit': 0,
+          'status': 'rejected',
+          'status_date': DateTime.now().toIso8601String(),
+          'remarks': 'Application rejected by bank',
+          'noteUser': 'SYSTEM',
+          'note': responseData['errors']?.join(', ') ?? responseData['message'] ?? 'Unknown error occurred',
+          'NameOnCard': storedUserData['nameOnCard'] ?? '',
+        };
+
+        await insertCardApplication(cardData);
+
         return {
           'status': 'error',
           'message': responseData['errors']?.join(', ') ?? responseData['message'] ?? 'Unknown error occurred',
@@ -301,7 +323,7 @@ class CardService {
       print(const JsonEncoder.withIndent('  ').convert(cardLimits));
 
       // 💡 4. Check which limit band the eligible amount falls into
-      String selectedCardType = 'REWARDS'; // Default type
+      var selectedCardType = 'REWARDS'; // Default type
       for (final limit in cardLimits) {
         if (eligibleAmount >= limit['minLimit'] && eligibleAmount <= limit['maxLimit']) {
           selectedCardType = limit['cardType'];
@@ -350,52 +372,82 @@ class CardService {
     }
   }
 
-  Future<Map<String, dynamic>> updateCardApplication(Map<String, dynamic> cardData) async {
+  Future<Map<String, dynamic>> updateCustomerCardRequest(Map<String, dynamic> cardData) async {
     try {
-      print('\n=== UPDATE CARD APPLICATION - START ===');
+      print('\n=== UPDATE CUSTOMER CARD REQUEST - START ===');
       print('1. Input Card Data:');
       print(const JsonEncoder.withIndent('  ').convert(cardData));
 
-      print('\n2. API Request Details:');
-      print('Endpoint: ${Constants.apiBaseUrl}${Constants.endpointUpdateCardApplication}');
-      print('Headers: ${Constants.defaultHeaders}');
-      print('Request Body:');
-      print(const JsonEncoder.withIndent('  ').convert(cardData));
+      // Validate required fields
+      if (cardData['national_id'] == null || cardData['national_id'].toString().isEmpty) {
+        throw Exception('National ID is required');
+      }
 
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointUpdateCardApplication}'),
-        headers: Constants.defaultHeaders,
-        body: json.encode(cardData),
+      if (cardData['application_number'] == null || cardData['application_number'].toString().isEmpty) {
+        throw Exception('Application number is required');
+      }
+
+      // First call UpdateCustomer endpoint
+      final updateCustomerResponse = await http.post(
+        Uri.parse(Constants.endpointUpdateCustomer),
+        headers: {
+          ...Constants.bankApiHeaders,  // Bank headers (Authorization, X-APP-ID, etc.)
+          'api-key': Constants.apiKey,  // Proxy API key
+        },
+        body: json.encode({
+          'nationalId': cardData['national_id'],  // Changed from nationnalID to nationalId
+          'applicationId': cardData['application_number'],  // Changed from applicationID to applicationId
+          'acceptFlag': cardData['customerDecision'] == 'ACCEPTED' ? 1 : 0,  // Set based on decision
+          'nameOnCardCode': cardData['nameOnCard'],
+        }),
       );
 
-      print('\n3. API Response:');
-      print('Status Code: ${response.statusCode}');
-      print('Headers:');
-      response.headers.forEach((key, value) {
-        print('$key: $value');
-      });
-      print('Response Body: ${response.body}');
+      print('\n2. UpdateCustomer Response:');
+      print('Status Code: ${updateCustomerResponse.statusCode}');
+      print('Response Body: ${updateCustomerResponse.body}');
 
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        print('\n4. Parsed Response:');
-        print(const JsonEncoder.withIndent('  ').convert(responseData));
-        print('\n=== UPDATE CARD APPLICATION - END (SUCCESS) ===\n');
-        return responseData;
-      } else {
-        print('\nERROR: Non-200 status code received');
-        print('=== UPDATE CARD APPLICATION - END (ERROR) ===\n');
-        throw Exception('Failed to update card application');
+      final updateCustomerData = json.decode(updateCustomerResponse.body);
+      if (!updateCustomerData['success']) {
+        throw Exception('Failed to update customer: ${updateCustomerData['errors']?.join(', ') ?? updateCustomerData['result']?['errMsg'] ?? 'Unknown error'}');
       }
+
+      // 💡 After successful updateCustomer, insert the final application status
+      final insertResponse = await insertCardApplication({
+        'national_id': cardData['national_id'],
+        'application_no': cardData['application_number'],
+        'customerDecision': cardData['customerDecision'],
+        'card_type': cardData['card_type'],
+        'card_limit': cardData['card_limit'],
+        'status': cardData['customerDecision'] == 'ACCEPTED' ? 'approved' : 'declined',
+        'status_date': DateTime.now().toIso8601String(),
+        'remarks': cardData['customerDecision'] == 'ACCEPTED' ? 'Card offer accepted by customer' : 'Card offer declined by customer',
+        'noteUser': cardData['noteUser'] ?? 'CUSTOMER',
+        'note': cardData['note'] ?? 'Application ${cardData['customerDecision'].toLowerCase()} via mobile app',
+        'NameOnCard': cardData['nameOnCard'],
+      });
+
+      print('\n3. Insert Card Application Response:');
+      print('Status Code: ${insertResponse['status']}');
+      print('Response Body: ${insertResponse['message']}');
+
+      if (insertResponse['status'] != 'success') {
+        throw Exception('Failed to save card application: ${insertResponse['message']}');
+      }
+
+      print('\n=== UPDATE CUSTOMER CARD REQUEST - END (SUCCESS) ===\n');
+      return {
+        'status': 'success',
+        'message': 'Card application processed successfully',
+      };
     } catch (e) {
-      print('\nERROR in updateCardApplication:');
+      print('\nERROR in updateCustomerCardRequest:');
       print('Error Type: ${e.runtimeType}');
       print('Error Message: $e');
       print('Stack Trace: ${StackTrace.current}');
-      print('\n=== UPDATE CARD APPLICATION - END (WITH EXCEPTION) ===\n');
+      print('\n=== UPDATE CUSTOMER CARD REQUEST - END (WITH EXCEPTION) ===\n');
       return {
         'status': 'error',
-        'message': 'Failed to update card application: $e',
+        'message': 'Failed to update customer card request: $e',
       };
     }
   }
@@ -516,6 +568,95 @@ class CardService {
       print('Stack Trace: ${StackTrace.current}');
       print('\n=== GET CURRENT APPLICATION STATUS - END (WITH EXCEPTION) ===\n');
       return isArabic ? 'حدث خطأ' : 'Error occurred';
+    }
+  }
+
+  Future<Map<String, dynamic>> insertCardApplication(Map<String, dynamic> cardData) async {
+    try {
+      print('\n=== INSERT CARD APPLICATION - START ===');
+      print('1. Input Card Data:');
+      print(const JsonEncoder.withIndent('  ').convert(cardData));
+
+      // Validate required fields
+      final requiredFields = [
+        'national_id',
+        'application_no',
+        'customerDecision',
+        'card_type',
+        'card_limit',
+        'status',
+        'NameOnCard'
+      ];
+
+      for (final field in requiredFields) {
+        if (cardData[field] == null || cardData[field].toString().isEmpty) {
+          throw Exception('Required field missing: $field');
+        }
+      }
+
+      // Validate National ID format (10 digits starting with 1 or 2)
+      final nationalId = cardData['national_id'].toString();
+      if (!RegExp(r'^[12]\d{9}$').hasMatch(nationalId)) {
+        throw Exception('Invalid National ID format');
+      }
+
+      print('\n2. API Request Details:');
+      print('Endpoint: ${Constants.apiBaseUrl}${Constants.endpointInsertCardApplication}');
+      print('Headers: ${Constants.defaultHeaders}');
+
+      // Format request body according to database schema
+      final requestBody = {
+        'national_id': nationalId,
+        'application_no': cardData['application_no'],
+        'customerDecision': cardData['customerDecision'],
+        'card_type': cardData['card_type'],
+        'card_limit': cardData['card_limit'],
+        'status': cardData['status'],
+        'status_date': cardData['status_date'] ?? DateTime.now().toIso8601String(),
+        'remarks': cardData['remarks'] ?? 'New card application',
+        'noteUser': cardData['noteUser'] ?? 'CUSTOMER',
+        'note': cardData['note'] ?? 'Application submitted via mobile app',
+        'NameOnCard': cardData['NameOnCard'],
+      };
+
+      print('\n3. Request Body:');
+      print(const JsonEncoder.withIndent('  ').convert(requestBody));
+
+      final response = await http.post(
+        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointInsertCardApplication}'),
+        headers: Constants.defaultHeaders,
+        body: json.encode(requestBody),
+      );
+
+      print('\n4. API Response:');
+      print('Status Code: ${response.statusCode}');
+      print('Headers:');
+      response.headers.forEach((key, value) {
+        print('$key: $value');
+      });
+      print('Response Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        print('\n5. Parsed Response:');
+        print(const JsonEncoder.withIndent('  ').convert(responseData));
+        print('\n=== INSERT CARD APPLICATION - END (SUCCESS) ===\n');
+        return responseData;
+      } else {
+        print('\nERROR: Non-200 status code received');
+        print('=== INSERT CARD APPLICATION - END (ERROR) ===\n');
+        throw Exception('Failed to insert card application');
+      }
+    } catch (e) {
+      print('\nERROR in insertCardApplication:');
+      print('Error Type: ${e.runtimeType}');
+      print('Error Message: $e');
+      print('Stack Trace: ${StackTrace.current}');
+      print('\n=== INSERT CARD APPLICATION - END (WITH EXCEPTION) ===\n');
+      return {
+        'status': 'error',
+        'message': 'Failed to insert card application: $e',
+      };
     }
   }
 } 

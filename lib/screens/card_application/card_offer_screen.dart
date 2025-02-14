@@ -10,6 +10,7 @@ import '../../screens/cards_page_ar.dart';
 import '../../providers/theme_provider.dart';
 import 'package:provider/provider.dart';
 import 'dart:math' as math;
+import 'dart:convert';
 
 class CardOfferScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -113,27 +114,35 @@ class _CardOfferScreenState extends State<CardOfferScreen> {
 
       final cardService = CardService();
       
+      // 💡 Log the card acceptance flow start
+      print('\n=== CARD OFFER ACCEPTANCE FLOW - START ===');
+      
+      // 💡 Call updateCustomer endpoint and insert application
       final cardData = {
         'national_id': widget.userData['national_id'],
-        'card_limit': _creditLimit.toString(),
-        'status': 'approved',
         'application_number': _applicationNumber,
         'customerDecision': 'ACCEPTED',
-        'remarks': 'Card offer accepted by customer',
+        'card_type': _cardType,
+        'card_limit': _creditLimit,
+        'nameOnCard': widget.userData['nameOnCard'] ?? '',
         'noteUser': widget.userData['username'] ?? 'Customer',
         'note': 'Customer accepted the card offer through mobile app with limit $_creditLimit SAR',
-        'card_type': _cardType,
       };
 
-      final response = await cardService.updateCardApplication(cardData);
+      final response = await cardService.updateCustomerCardRequest(cardData);
 
       setState(() => _isLoading = false);
 
       if (!mounted) return;
 
       if (response['status'] != 'success') {
-        throw Exception(response['message'] ?? 'Failed to update card application');
+        print('\nERROR: Card acceptance request failed');
+        print('Error Details: ${response['message']}');
+        print('=== CARD OFFER ACCEPTANCE FLOW - END (WITH ERROR) ===\n');
+        throw Exception(response['message'] ?? 'Failed to process card acceptance');
       }
+
+      print('\n=== CARD OFFER ACCEPTANCE FLOW - END (SUCCESS) ===\n');
 
       // Show congratulations dialog
       await showDialog(
@@ -238,26 +247,28 @@ class _CardOfferScreenState extends State<CardOfferScreen> {
 
       final cardService = CardService();
       
+      // 💡 Call updateCustomer endpoint and insert application
       final cardData = {
         'national_id': widget.userData['national_id'],
-        'card_limit': '0',
-        'status': 'declined',
         'application_number': _applicationNumber,
         'customerDecision': 'DECLINED',
-        'remarks': 'Card offer declined by customer',
+        'card_type': _cardType,
+        'card_limit': 0,
+        'nameOnCard': widget.userData['nameOnCard'] ?? '',
         'noteUser': widget.userData['username'] ?? 'Customer',
         'note': 'Customer declined the card offer through mobile app',
-        'card_type': _cardType,
       };
 
-      final response = await cardService.updateCardApplication(cardData);
+      final response = await cardService.updateCustomerCardRequest(cardData);
 
       setState(() => _isLoading = false);
 
       if (!mounted) return;
 
       if (response['status'] != 'success') {
-        throw Exception(response['message'] ?? 'Failed to update card application');
+        print('\nERROR: Card decline request failed');
+        print('Error Details: ${response['message']}');
+        throw Exception(response['message'] ?? 'Failed to process card decline');
       }
 
       // Show success message and navigate back

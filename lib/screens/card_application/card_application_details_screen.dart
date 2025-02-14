@@ -161,6 +161,17 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
           _userData['food_expense'] = (salary * 0.08).round().toString();
           _userData['transportation_expense'] = (salary * 0.05).round().toString();
           _userData['other_liabilities'] ??= '';
+
+          // 💡 Prefill nameOnCard with English first and family names in capital letters
+          if (_userData['nameOnCard'] == null || _userData['nameOnCard'].toString().isEmpty) {
+            String nameOnCard = '';
+            // Get the English name from userData first
+            if (_userData['name']?.toString().trim().isNotEmpty == true) {
+              nameOnCard = _userData['name'].toString().trim().toUpperCase();
+            }
+            _userData['nameOnCard'] = nameOnCard;
+          }
+
           _isLoading = false;
           print('\n17. Final _userData after setState:');
           print('- Name: ${_userData['name']}');
@@ -169,6 +180,7 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
           print('- Email: ${_userData['email']}');
           print('- Salary: ${_userData['salary']}');
           print('- Dependents: ${_userData['dependents']}');
+          print('- Name on Card: ${_userData['nameOnCard']}');
         });
       } else {
         print('\nERROR: No user data found in any storage location');
@@ -588,6 +600,20 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                         } else {
                           validationError = null;
                         }
+                      } else if (field == 'nameOnCard') {
+                        if (value.isEmpty) {
+                          validationError = isArabic ? 'الاسم على البطاقة مطلوب' : 'Name on card is required';
+                        } else if (!RegExp(r'^[A-Z\s]+$').hasMatch(value)) {
+                          validationError = isArabic 
+                            ? 'يجب أن يحتوي الاسم على أحرف إنجليزية كبيرة فقط'
+                            : 'Name must contain only capital English letters';
+                        } else if (value.length > 26) {
+                          validationError = isArabic
+                            ? 'يجب ألا يتجاوز الاسم 26 حرفاً'
+                            : 'Name cannot exceed 26 characters';
+                        } else {
+                          validationError = null;
+                        }
                       } else if (field == 'food_expense' || field == 'transportation_expense') {
                         // Get the minimum allowed value (current calculated value)
                         double salary = double.parse(_userData['salary']?.toString() ?? '0');
@@ -829,9 +855,121 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
     final hintColor = Color(themeProvider.isDarkMode 
         ? Constants.darkHintTextColor 
         : Constants.lightHintTextColor);
+    final borderColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkFormBorderColor 
+        : Constants.lightFormBorderColor);
+    final surfaceColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
 
     String arabicLabel = _getArabicLabel(label);
+
+    // 💡 Special handling for name on card field with improved error styling
+    if (fieldName == 'nameOnCard') {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${isArabic ? arabicLabel : label} ${isRequired ? '*' : ''}',
+              style: TextStyle(
+                fontSize: 14,
+                color: hintColor,
+              ),
+            ),
+            const SizedBox(height: 4),
+            TextFormField(
+              initialValue: value,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: textColor,
+              ),
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                hintText: isArabic ? 'أدخل الاسم باللغة الإنجليزية' : 'Enter name in English',
+                hintStyle: TextStyle(color: hintColor),
+                filled: true,
+                fillColor: surfaceColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: borderColor),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: borderColor),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: primaryColor),
+                ),
+              ),
+              onChanged: (newValue) {
+                String? errorMessage;
+                if (newValue.isEmpty) {
+                  errorMessage = isArabic 
+                    ? 'الاسم على البطاقة مطلوب'
+                    : 'Name on card is required';
+                } else if (!RegExp(r'^[A-Z\s]+$').hasMatch(newValue)) {
+                  errorMessage = isArabic 
+                    ? 'يجب أن يحتوي الاسم على أحرف إنجليزية كبيرة فقط'
+                    : 'Name must contain only capital English letters';
+                } else if (newValue.length > 26) {
+                  errorMessage = isArabic
+                    ? 'يجب ألا يتجاوز الاسم 26 حرفاً'
+                    : 'Name cannot exceed 26 characters';
+                }
+
+                if (errorMessage != null) {
+                  // Show error in a beautiful container
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          children: [
+                            Icon(Icons.error_outline, color: Colors.white),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                errorMessage,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      backgroundColor: Colors.red.shade700,
+                      duration: const Duration(seconds: 3),
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      margin: EdgeInsets.only(
+                        bottom: MediaQuery.of(context).size.height - 150,
+                        left: 16,
+                        right: 16,
+                      ),
+                    ),
+                  );
+                }
+                setState(() {
+                  _userData['nameOnCard'] = newValue;
+                });
+              },
+            ),
+            Divider(color: hintColor.withOpacity(0.5)),
+          ],
+        ),
+      );
+    }
     
+    // Regular fields
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: Column(
@@ -891,6 +1029,8 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
         return 'إلتزامات أخرى';
       case 'Number of Dependents':
         return 'عدد المعالين';
+      case 'Name on Card':
+        return 'الاسم على البطاقة';
       default:
         return englishLabel;
     }
@@ -908,6 +1048,8 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
         return 'إلتزامات أخرى';
       case 'email':
         return 'البريد الإلكتروني';
+      case 'nameOnCard':
+        return 'الاسم على البطاقة';
       default:
         return field;
     }
@@ -1033,6 +1175,28 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
 
   Future<void> _handleNextButtonClick() async {
     try {
+      // 💡 Validate name on card first
+      if (_userData['nameOnCard']?.toString().trim().isEmpty ?? true) {
+        _showError(isArabic 
+          ? 'الاسم على البطاقة مطلوب'
+          : 'Name on card is required');
+        return;
+      }
+
+      if (!RegExp(r'^[A-Z\s]+$').hasMatch(_userData['nameOnCard'])) {
+        _showError(isArabic 
+          ? 'يجب أن يحتوي الاسم على أحرف إنجليزية كبيرة فقط'
+          : 'Name must contain only capital English letters');
+        return;
+      }
+
+      if (_userData['nameOnCard'].length > 26) {
+        _showError(isArabic
+          ? 'يجب ألا يتجاوز الاسم 26 حرفاً'
+          : 'Name cannot exceed 26 characters');
+        return;
+      }
+
       setState(() => _isLoading = true);
 
       print('\n=== CARD APPLICATION REQUEST START ===');
@@ -1051,6 +1215,7 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
       print('- Transportation Expense: ${_userData['transportation_expense']}');
       print('- Other Liabilities: ${_userData['other_liabilities']}');
       print('- Dependents: ${_userData['dependents']}');
+      print('- Name on Card: ${_userData['nameOnCard']}');
       
       print('\nUploaded Documents:');
       _uploadedFiles.forEach((key, value) {
@@ -1093,9 +1258,11 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
           builder: (context) => CardOfferScreen(
             userData: {
               ...response, // Include all response data
+              'national_id': _userData['national_id'],  // Add national_id
               'application_number': response['application_number'],
               'card_type': response['card_type'],
               'card_type_ar': response['card_type_ar'],
+              'nameOnCard': _userData['nameOnCard'], // Pass name on card
             },
             isArabic: isArabic,
             maxCreditLimit: response['credit_limit']?.toInt() ?? 0,
@@ -1237,6 +1404,13 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                                     'Salary', 
                                     double.parse(_userData['salary']?.toString() ?? '0').round().toString(), 
                                     editable: true
+                                  ),
+                                  _buildInfoField(
+                                    'Name on Card',
+                                    _userData['nameOnCard']?.toString() ?? '',
+                                    editable: true,
+                                    fieldName: 'nameOnCard',
+                                    isRequired: true
                                   ),
                                 ],
                               ),

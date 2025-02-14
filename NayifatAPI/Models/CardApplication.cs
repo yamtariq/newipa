@@ -46,6 +46,16 @@ namespace NayifatAPI.Models
         [Column("note")]
         public string Note { get; set; } = string.Empty;
 
+        [Required]
+        [Column("customerDecision")]
+        [StringLength(50)]
+        public string CustomerDecision { get; set; } = "PENDING";
+
+        [Required]
+        [Column("NameOnCard")]
+        [StringLength(100)]
+        public string NameOnCard { get; set; } = string.Empty;
+
         [ForeignKey(nameof(NationalId))]
         public virtual Customer Customer { get; set; } = null!;
     }

@@ -234,7 +234,15 @@ class Constants {
   static String endpointCreateCustomer = 
       '$apiBaseUrl/proxy/forward?url=https://icreditdept.com/api/Bank/test_local_CreateCustomer.php';
 
+ //remove this endpoint
   static String endpointUpdateAmount = 
+      '$apiBaseUrl/proxy/forward?url=https://icreditdept.com/api/Bank/test_local_UpdateCustomer.php';
+
+  // 💡 Bank Customer Update Endpoint
+//   static String endpointUpdateCustomer = 
+//       '$apiBaseUrl/proxy/forward?url=https://172.22.226.203:9443/api/Bank/UpdateCustomer';
+
+static String endpointUpdateCustomer = 
       '$apiBaseUrl/proxy/forward?url=https://icreditdept.com/api/Bank/test_local_UpdateCustomer.php';
 
   // Old: static const String endpointUpdateLoanApplication = '/update_loan_application.php';
@@ -247,8 +255,12 @@ class Constants {
   // Used in: CardService (card_service.dart) - getCardDecision()
 
   // Old: static const String endpointUpdateCardApplication = '/update_cards_application.php';
-  static const String endpointUpdateCardApplication = '/card/update';
+  static const String endpointUpdateCardApplication = '/card-application/update';
   // Used in: CardService (card_service.dart) - updateCardApplication()
+
+  // 💡 Card Application Insert Endpoint
+  static const String endpointInsertCardApplication = '/card-application/insert';
+  // Used in: CardService (card_service.dart) - insertCardApplication()
 
   // Notification Management
   // Old: static const String endpointGetNotifications = '/get_notifications.php';
