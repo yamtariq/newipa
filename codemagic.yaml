@@ -123,6 +123,7 @@ workflows:
                 config.build_settings['ENABLE_BITCODE'] = 'NO'
                 config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
                 config.build_settings['SWIFT_VERSION'] = '5.0'
+                config.build_settings['DEFINES_MODULE'] = 'YES'
                 
                 # Apply module settings only to PhoneNumberKit 💡
                 if target.name == 'PhoneNumberKit'
@@ -130,10 +131,14 @@ workflows:
                   config.build_settings['DEFINES_MODULE'] = 'NO'
                 end
                 
-                # Remove bridging header settings for Runner target 
+                # Configure Runner target settings
                 if target.name == 'Runner'
                   config.build_settings['SWIFT_OBJC_BRIDGING_HEADER'] = ''
                   config.build_settings['SWIFT_OBJC_INTERFACE_HEADER_NAME'] = ''
+                  config.build_settings['SWIFT_INSTALL_OBJC_HEADER'] = 'NO'
+                  config.build_settings['SWIFT_EMIT_MODULE_INTERFACE'] = 'NO'
+                  config.build_settings['DEFINES_MODULE'] = 'NO'
+                  config.build_settings['SWIFT_PRECOMPILE_BRIDGING_HEADER'] = 'NO'
                 end
               end
             end
@@ -152,7 +157,8 @@ workflows:
           rm -rf Flutter/GeneratedPluginRegistrant.*
           flutter pub get
           pod install --verbose --repo-update
-          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Debug clean build SWIFT_OBJC_BRIDGING_HEADER="" SWIFT_OBJC_INTERFACE_HEADER_NAME=""
+          # Remove module interface flags from xcodebuild command
+          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Debug clean build
           cd ..
       - name: Build iOS 💡
         script: | 
