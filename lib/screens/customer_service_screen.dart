@@ -17,6 +17,8 @@ import 'main_page.dart';
 import 'map_with_branches.dart';
 import '../utils/constants.dart';
 import '../services/theme_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'dart:convert';
 
 class CustomerServiceScreen extends StatefulWidget {
   final bool isArabic;
@@ -749,34 +751,226 @@ class _CustomerFormState extends State<CustomerForm> {
   }
 
   Future<void> _submitForm() async {
-    if (!_formKey.currentState!.validate()) return;
+    print('\n=== CUSTOMER CARE FORM SUBMISSION START ===');
+    
+    if (!_formKey.currentState!.validate()) {
+      print('Form validation failed');
+      return;
+    }
 
     setState(() => _isSubmitting = true);
+    print('Setting submission state to true');
 
     try {
+      print('\n1. GETTING USER DATA');
+      // Get user data from secure storage
+      final storage = const FlutterSecureStorage();
+      final userDataStr = await storage.read(key: 'user_data');
+      print('Raw user data from storage: $userDataStr');
+      
+      String? nationalId;
+      String? phone;
+      String? customerName;
+
+      if (userDataStr == null || !json.decode(userDataStr)['isSessionActive']) {
+        print('No active session found, showing guest user form');
+        final guestData = await _showGuestUserForm();
+        if (guestData == null) {
+          print('Guest form cancelled');
+          setState(() => _isSubmitting = false);
+          return;
+        }
+        nationalId = guestData['nationalId'];
+        phone = guestData['phone'];
+        customerName = guestData['customerName'];
+      } else {
+        final userData = json.decode(userDataStr);
+        print('Parsed user data: $userData');
+        
+        print('\n2. EXTRACTING USER DETAILS');
+        nationalId = userData['national_id'] ?? await storage.read(key: 'national_id');
+        phone = userData['phone'];
+        customerName = userData['name'] ?? '';
+      }
+
+      print('Extracted user details:');
+      print('- National ID: $nationalId');
+      print('- Phone: $phone');
+      print('- Customer Name: $customerName');
+
+      if (nationalId == null || phone == null || customerName == null || customerName.isEmpty) {
+        print('❌ Missing required user information:');
+        print('- National ID present: ${nationalId != null}');
+        print('- Phone present: ${phone != null}');
+        print('- Customer Name present: ${customerName?.isNotEmpty}');
+        throw Exception('Required user information is missing');
+      }
+
+      print('\n3. PREPARING REQUEST');
+      print('Form Data:');
+      print('- Form Type: $formType');
+      print('- Request Type: ${formType == 'request' ? requestType : 'N/A'}');
+      print('- Complaint Text: ${bodyController.text}');
+
       final request = CustomerCareRequest(
-        nationalId: 'TODO: Get from user session', // You'll need to get this from your auth service
-        phone: 'TODO: Get from user session',      // You'll need to get this from your auth service
-        customerName: 'TODO: Get from user session', // You'll need to get this from your auth service
+        nationalId: nationalId,
+        phone: phone,
+        customerName: customerName,
         subject: formType,
-        subSubject: formType == 'request' ? requestType : null,
+        subSubject: formType == 'request' ? requestType : formType,
         complaint: bodyController.text,
       );
 
+      print('\n4. SUBMITTING REQUEST');
       final response = await _apiService.submitCustomerCare(request);
 
+      print('\n5. PROCESSING RESPONSE');
+      print('Response success: ${response.success}');
+      print('Response message: ${response.message}');
+      print('Complaint number: ${response.complaintNumber}');
+
       if (response.success) {
+        print('✅ Request submitted successfully');
         _showSuccessDialog(context, response.complaintNumber!);
       } else {
+        print('❌ Request submission failed');
         _showErrorDialog(response.message);
       }
     } catch (e) {
+      print('\n❌ ERROR IN FORM SUBMISSION');
+      print('Error type: ${e.runtimeType}');
+      print('Error message: $e');
+      print('Stack trace: ${StackTrace.current}');
+      
       _showErrorDialog(widget.isArabic 
           ? 'حدث خطأ. يرجى المحاولة مرة أخرى.'
           : 'An error occurred. Please try again.');
     } finally {
       setState(() => _isSubmitting = false);
+      print('\n=== CUSTOMER CARE FORM SUBMISSION END ===\n');
     }
+  }
+
+  Future<Map<String, String>?> _showGuestUserForm() async {
+    final formKey = GlobalKey<FormState>();
+    final nationalIdController = TextEditingController();
+    final phoneController = TextEditingController();
+    final nameController = TextEditingController();
+    
+    return showDialog<Map<String, String>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(
+            widget.isArabic ? 'الرجاء تزويدنا بمعلوماتك' : 'Please provide your details',
+            textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
+          ),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: widget.isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                children: [
+                  TextFormField(
+                    controller: nationalIdController,
+                    decoration: InputDecoration(
+                      labelText: widget.isArabic ? 'رقم الهوية' : 'National/Iqama ID',
+                      alignLabelWithHint: true,
+                      floatingLabelAlignment: widget.isArabic ? FloatingLabelAlignment.start : FloatingLabelAlignment.start,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
+                    textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return widget.isArabic ? ' رقم الهوية مطلوب' : 'ID is required';
+                      }
+                      if (!RegExp(r'^[12]\d{9}$').hasMatch(value)) {
+                        return widget.isArabic 
+                            ? 'يجب أن يبدأ رقم الهوية بـ 1 أو 2 ويتكون من 10 أرقام'
+                            : 'ID should start with 1 or 2 and be 10 digits';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: phoneController,
+                    decoration: InputDecoration(
+                      labelText: widget.isArabic ? 'رقم الجوال' : 'Phone Number',
+                      hintText: widget.isArabic ? '9665xxxxxxxx' : '9665xxxxxxxx',
+                      
+                      alignLabelWithHint: true,
+                      floatingLabelAlignment: widget.isArabic ? FloatingLabelAlignment.start : FloatingLabelAlignment.start,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
+                    textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
+                    keyboardType: TextInputType.phone,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return widget.isArabic ? ' رقم الجوال مطلوب' : 'Phone number is required';
+                      }
+                      if (!RegExp(r'^9665\d{8}$').hasMatch(value)) {
+                        return widget.isArabic 
+                            ? 'يجب أن يبدأ رقم الجوال بـ 9665 ويتكون من 12 رقم'
+                            : 'Phone should start with 9665 and be 12 digits';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: nameController,
+                    decoration: InputDecoration(
+                      labelText: widget.isArabic ? 'الاسم الكامل' : 'Full Name',
+                      hintText: widget.isArabic ? 'الاسم الكامل' : 'Full Name',
+                      alignLabelWithHint: true,
+                      floatingLabelAlignment: widget.isArabic ? FloatingLabelAlignment.start : FloatingLabelAlignment.start,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
+                    textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return widget.isArabic ? 'مطلوب الاسم الكامل' : 'Full name is required';
+                      }
+                      if (value.length < 3) {
+                        return widget.isArabic 
+                            ? 'يجب أن يتكون الاسم من 3 أحرف على الأقل'
+                            : 'Name should be at least 3 characters';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(widget.isArabic ? 'إلغاء' : 'Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  Navigator.of(context).pop({
+                    'nationalId': nationalIdController.text,
+                    'phone': phoneController.text,
+                    'customerName': nameController.text,
+                  });
+                }
+              },
+              child: Text(widget.isArabic ? 'تأكيد' : 'Confirm'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override

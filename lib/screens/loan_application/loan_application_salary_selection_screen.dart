@@ -87,7 +87,7 @@ class _LoanApplicationSalarySelectionScreenState extends State<LoanApplicationSa
             onPressed: () => Navigator.of(context).pop(),
           ),
           title: Text(
-            isArabic ? 'اختيار الراتب' : 'Select Salary',
+            isArabic ? 'اختر الراتب الاساسي'  : 'Select Basic Salary',
             style: TextStyle(
               color: primaryColor,
               fontSize: 20,

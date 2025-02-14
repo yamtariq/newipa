@@ -10,6 +10,8 @@ import '../../screens/loans_page.dart';
 import '../../screens/loans_page_ar.dart';
 import '../../providers/theme_provider.dart';
 import 'package:provider/provider.dart';
+import 'dart:convert';
+import 'dart:io';
 
 class LoanOfferScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -48,6 +50,35 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
   double _originalInterest = 0;
   int _originalTenure = 60;
 
+  // 💡 Add APR variable
+  double _apr = 0;
+  
+  // 💡 Add APR calculation method
+  double _calculateAPR(double principal, double emi, int tenureMonths) {
+    // Convert monthly payment and loan amount to yearly figures
+    double yearlyPayment = emi * 12;
+    
+    // Use Newton-Raphson method to find APR
+    double guess = _flatRate * 100; // Start with flat rate as initial guess
+    double tolerance = 0.0001;
+    int maxIterations = 100;
+    
+    for (int i = 0; i < maxIterations; i++) {
+      double f = principal * (guess / 100) - yearlyPayment * (1 - pow(1 + guess / 100, -tenureMonths / 12));
+      double fPrime = principal - yearlyPayment * (-tenureMonths / 12) * pow(1 + guess / 100, -tenureMonths / 12 - 1);
+      
+      double newGuess = guess - f / fPrime;
+      
+      if ((newGuess - guess).abs() < tolerance) {
+        return newGuess;
+      }
+      
+      guess = newGuess;
+    }
+    
+    return guess;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -80,11 +111,14 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
         _originalTenure = tenure;
         
         // Set flat rate
-        _flatRate = 0.05; // 5% flat rate
+        _flatRate = 0.0795; // 5% flat rate
         
         // Calculate total repayment and interest
         _totalRepayment = financeAmount * (1 + (_flatRate * tenure / 12));
         _interest = _totalRepayment - financeAmount;
+        
+        // 💡 Calculate APR
+        _apr = _calculateAPR(financeAmount, emi, tenure);
         
         _originalTotalRepayment = _totalRepayment;
         _originalInterest = _interest;
@@ -96,6 +130,48 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
         print('Total Repayment: $_totalRepayment');
         print('Interest: $_interest');
         print('Flat Rate: $_flatRate');
+        print('APR: $_apr%');
+      });
+    } else if (widget.userData['finance_amount'] != null) {
+      setState(() {
+        _isLoading = false;
+        _error = null;
+        
+        // Set finance amount from direct format
+        _maxFinanceAmount = double.tryParse(widget.userData['finance_amount'].toString()) ?? 0;
+        financeAmount = _maxFinanceAmount;
+        _originalFinanceAmount = _maxFinanceAmount;
+        
+        // Set EMI from direct format
+        _maxEMI = double.tryParse(widget.userData['emi'].toString()) ?? 0;
+        emi = _maxEMI;
+        _originalEMI = _maxEMI;
+        
+        // Set tenure
+        tenure = 60; // Default tenure
+        _originalTenure = tenure;
+        
+        // Set flat rate
+        _flatRate = 0.05; // 5% flat rate
+        
+        // Calculate total repayment and interest
+        _totalRepayment = financeAmount * (1 + (_flatRate * tenure / 12));
+        _interest = _totalRepayment - financeAmount;
+        
+        // 💡 Calculate APR
+        _apr = _calculateAPR(financeAmount, emi, tenure);
+        
+        _originalTotalRepayment = _totalRepayment;
+        _originalInterest = _interest;
+        
+        print('\nInitialized values:');
+        print('Finance Amount: $financeAmount');
+        print('EMI: $emi');
+        print('Tenure: $tenure');
+        print('Total Repayment: $_totalRepayment');
+        print('Interest: $_interest');
+        print('Flat Rate: $_flatRate');
+        print('APR: $_apr%');
       });
     } else {
       setState(() {
@@ -183,6 +259,9 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
         }
       }
 
+      // 💡 Update APR
+      _apr = _calculateAPR(financeAmount, emi, tenure);
+
       print('DEBUG - Finance Update:');
       print('Requested Amount: $value');
       print('Final Amount: $financeAmount');
@@ -190,6 +269,7 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
       print('Total Repayment: $_totalRepayment');
       print('Interest: $_interest');
       print('Using Flat Rate: $_flatRate');
+      print('APR: $_apr%');
     });
   }
 
@@ -204,30 +284,28 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
         _totalRepayment = _originalTotalRepayment;
         _interest = _originalInterest;
         print('DEBUG - Restored original values for tenure $_originalTenure');
-        return;
-      }
-      
-      // Otherwise recalculate with flat rate
-      final tenureYears = tenure / 12;
-      
-      // Calculate new values
-      _interest = financeAmount * _flatRate * tenureYears;
-      _totalRepayment = financeAmount + _interest;
-      emi = _totalRepayment / tenure;
-      
-      // If new EMI exceeds max, adjust everything down
-      if (emi > _maxEMI) {
-        emi = _maxEMI;
-        _totalRepayment = emi * tenure;
-        // Solve for new principal: P = EMI * months / (1 + R * T)
-        financeAmount = (emi * tenure) / (1 + (_flatRate * tenureYears));
-        // Round down to nearest thousand
-        financeAmount = (financeAmount ~/ 1000) * 1000.0;
-        // Recalculate final values with rounded principal
+      } else {
+        // Otherwise recalculate with flat rate
+        final tenureYears = tenure / 12;
+        
+        // Calculate new values
         _interest = financeAmount * _flatRate * tenureYears;
         _totalRepayment = financeAmount + _interest;
         emi = _totalRepayment / tenure;
+        
+        // If new EMI exceeds max, adjust everything down
+        if (emi > _maxEMI) {
+          emi = _maxEMI;
+          _totalRepayment = emi * tenure;
+          financeAmount = (emi * tenure) / (1 + (_flatRate * tenureYears));
+          financeAmount = (financeAmount ~/ 1000) * 1000.0;
+          _interest = financeAmount * _flatRate * tenureYears;
+          _totalRepayment = financeAmount + _interest;
+        }
       }
+
+      // 💡 Update APR
+      _apr = _calculateAPR(financeAmount, emi, tenure);
 
       print('DEBUG - Tenure Update:');
       print('New Tenure: $value months');
@@ -236,6 +314,7 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
       print('Total Repayment: $_totalRepayment');
       print('Interest: $_interest');
       print('Using Flat Rate: $_flatRate');
+      print('APR: $_apr%');
     });
   }
 
@@ -243,7 +322,50 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
     try {
       setState(() => _isLoading = true);
 
-      // Update loan application in database first
+      // 💡 First call the UpdateAmount API
+      final updateAmountData = {
+        'AgreementId': widget.userData['application_number']?.toString() ?? '',
+        'Amount': financeAmount,
+        'Tenure': tenure,
+        'FinEmi': emi,
+        'RateEliGible': _flatRate * 100
+      };
+
+      print('DEBUG - Calling UpdateAmount API:');
+      print('URL: ${Constants.endpointUpdateAmount}');
+      print('Data: $updateAmountData');
+
+      final client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+
+      final request = await client.postUrl(Uri.parse(Constants.endpointUpdateAmount));
+      
+      // Add headers
+      Constants.defaultHeaders.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+
+      // Add body
+      request.write(jsonEncode(updateAmountData));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      print('DEBUG - UpdateAmount API Response:');
+      print('Status Code: ${response.statusCode}');
+      print('Response Body: $responseBody');
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to update amount: ${response.statusCode}');
+      }
+
+      // Parse response to check for success
+      final updateAmountResponse = jsonDecode(responseBody);
+      if (updateAmountResponse['status'] == 'error') {
+        throw Exception(updateAmountResponse['message'] ?? 'Failed to update amount');
+      }
+
+      // If UpdateAmount API call is successful, proceed with updating loan application
       final loanService = LoanService();
       
       // Round all numeric values to 2 decimal places and keep UI display values
@@ -269,14 +391,14 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
       print('Loan Purpose: ${widget.userData['loan_purpose']}');  // Debug print
       print(loanData);
 
-      final response = await loanService.updateLoanApplication(loanData);
+      final response2 = await loanService.updateLoanApplication(loanData);
 
       setState(() => _isLoading = false);
 
       if (!mounted) return;
 
-      if (response['status'] != 'success') {
-        throw Exception(response['message'] ?? 'Failed to update loan application');
+      if (response2['status'] != 'success') {
+        throw Exception(response2['message'] ?? 'Failed to update loan application');
       }
 
       // Get application number from the loan decision response
@@ -729,6 +851,9 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 💡 Get the current theme mode
+    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
+    
     // Validate finance amounts before building UI
     final bool canShowFinanceDetails = _maxFinanceAmount >= 10000;
     
@@ -742,7 +867,7 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
     final int? safeFinanceDivisions = computedDivisions > 0 ? computedDivisions : null;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: isDarkMode ? Color(Constants.darkBackgroundColor) : Colors.white,
       body: Stack(
         children: [
           // Gradient Background
@@ -752,8 +877,8 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  const Color(0xFF1B3E6C).withOpacity(0.1),
-                  Colors.white,
+                  Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor).withOpacity(0.1),
+                  Color(isDarkMode ? Constants.darkBackgroundColor : Constants.lightBackgroundColor),
                 ],
               ),
             ),
@@ -778,7 +903,7 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
                             },
                             icon: Icon(
                               isArabic ? Icons.arrow_forward_ios : Icons.arrow_back_ios,
-                              color: Color(Constants.primaryColorValue),
+                              color: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
                             ),
                           ),
                         ],
@@ -786,10 +911,10 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
                       // Title
                       Text(
                         isArabic ? 'عرض التمويل' : 'Loan Offer',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
-                          color: Color(Constants.primaryColorValue),
+                          color: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
                         ),
                       ),
                     ],
@@ -806,20 +931,26 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
                           children: [
                             Icon(
                               Icons.error_outline,
-                              color: Colors.red,
+                              color: Color(isDarkMode ? Constants.darkErrorColor : Constants.lightErrorColor),
                               size: 48,
                             ),
                             const SizedBox(height: 16),
                             Text(
                               _error!,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(fontSize: 16),
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: isDarkMode ? Colors.white : Colors.black,
+                              ),
                             ),
                             const SizedBox(height: 24),
                             ElevatedButton(
                               onPressed: () {
                                 Navigator.pop(context);
                               },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
+                              ),
                               child: Text(isArabic ? 'رجوع' : 'Go Back'),
                             ),
                           ],
@@ -846,13 +977,19 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
                                 ? 'عذراً، لا يمكن تقديم عرض تمويل في الوقت الحالي'
                                 : 'Sorry, we cannot provide a finance offer at this time',
                               textAlign: TextAlign.center,
-                              style: const TextStyle(fontSize: 16),
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: isDarkMode ? Colors.white : Colors.black,
+                              ),
                             ),
                             const SizedBox(height: 24),
                             ElevatedButton(
                               onPressed: () {
                                 Navigator.pop(context);
                               },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
+                              ),
                               child: Text(isArabic ? 'رجوع' : 'Go Back'),
                             ),
                           ],
@@ -876,11 +1013,11 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
+                                    color: Color(isDarkMode ? Constants.darkSurfaceColor : Constants.lightSurfaceColor),
                                     borderRadius: BorderRadius.circular(12),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withOpacity(0.05),
+                                        color: Color(isDarkMode ? Constants.darkPrimaryShadowColor : Constants.lightPrimaryShadowColor),
                                         blurRadius: 10,
                                         offset: const Offset(0, 3),
                                       ),
@@ -892,10 +1029,10 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
                                       Text(
                                         isArabic ? 'تفاصيل التمويل' : 'Finance Details',
                                         textAlign: isArabic ? TextAlign.right : TextAlign.left,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold,
-                                          color: Color(Constants.primaryColorValue),
+                                          color: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
                                         ),
                                       ),
                                       const SizedBox(height: 16),
@@ -1132,6 +1269,50 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
                                           ],
                                         ),
                                       ),
+                                      const SizedBox(height: 16),
+                                      
+                                      // 💡 APR Section
+                                      Text(
+                                        isArabic ? 'معدل النسبة السنوي' : 'Annual Percentage Rate (APR)',
+                                        textAlign: isArabic ? TextAlign.right : TextAlign.left,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Container(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: Color(isDarkMode ? Constants.darkFormBackgroundColor : Constants.lightFormBackgroundColor),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment: isArabic ? MainAxisAlignment.end : MainAxisAlignment.start,
+                                          children: <Widget>[
+                                            Text(
+                                              '${_apr.toStringAsFixed(2)}%',
+                                              textAlign: isArabic ? TextAlign.right : TextAlign.left,
+                                              style: TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        isArabic 
+                                          ? 'معدل النسبة السنوي يشمل جميع الرسوم والتكاليف'
+                                          : 'APR includes all fees and charges',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -1204,16 +1385,16 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
           // Loading Overlay
           if (_isLoading)
             Container(
-              color: Colors.black.withOpacity(0.3),
+              color: (isDarkMode ? Colors.black : Colors.white).withOpacity(0.3),
               child: Center(
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Color(isDarkMode ? Constants.darkSurfaceColor : Constants.lightSurfaceColor),
                     borderRadius: BorderRadius.circular(8),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Color(isDarkMode ? Constants.darkPrimaryShadowColor : Constants.lightPrimaryShadowColor),
                         blurRadius: 10,
                         offset: const Offset(0, 3),
                       ),
@@ -1222,11 +1403,18 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const CircularProgressIndicator(),
+                      CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
+                        ),
+                      ),
                       const SizedBox(height: 16),
                       Text(
                         isArabic ? 'جاري المعالجة...' : 'Processing...',
-                        style: const TextStyle(fontSize: 16),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
                       ),
                     ],
                   ),

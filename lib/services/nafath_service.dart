@@ -7,6 +7,19 @@ class NafathService {
 
   Future<Map<String, dynamic>> createRequest(String nationalId) async {
     try {
+      // 💡 Check for bypass flag
+      if (Constants.bypassNafathForTesting) {
+        print('\n=== NAFATH BYPASS ENABLED ===');
+        print('Returning mock successful response');
+        return {
+          'success': true,
+          'result': {
+            'random': '123456',
+            'transId': 'TEST-${DateTime.now().millisecondsSinceEpoch}',
+          }
+        };
+      }
+
       print('\n=== NAFATH CREATE REQUEST ===');
       print('National ID: $nationalId');
       print('URL: $baseUrl/CreateRequest');
@@ -42,6 +55,21 @@ class NafathService {
     String random,
   ) async {
     try {
+      // 💡 Check for bypass flag
+      if (Constants.bypassNafathForTesting) {
+        print('\n=== NAFATH BYPASS ENABLED ===');
+        print('Returning mock successful status');
+        return {
+          'success': true,
+          'result': {
+            'status': 'COMPLETED',
+            'transId': transId,
+            'random': random,
+            'nationalId': nationalId,
+          }
+        };
+      }
+
       print('\n=== NAFATH STATUS CHECK ===');
       print('National ID: $nationalId');
       print('Transaction ID: $transId');

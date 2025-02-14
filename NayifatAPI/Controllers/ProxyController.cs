@@ -12,6 +12,10 @@ using NayifatAPI.Data;
 using NayifatAPI.Models;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
+using System.Collections.Generic;
+using System.Net;
+using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace NayifatAPI.Controllers
 {
@@ -32,24 +36,36 @@ namespace NayifatAPI.Controllers
         {
             _httpClientFactory = httpClientFactory;
             _logger = logger;
-            // 💡 Create a more permissive HttpClient that completely ignores SSL
+            
+            // 💡 Enhanced SSL ignorance for all requests
             var handler = new HttpClientHandler
             {
-                ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => true,
+                // Ignore ALL certificate validation
+                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
                 ClientCertificateOptions = ClientCertificateOption.Manual,
-                SslProtocols = System.Security.Authentication.SslProtocols.Tls12 | System.Security.Authentication.SslProtocols.Tls13,
+                // Support only secure TLS versions
+                SslProtocols = System.Security.Authentication.SslProtocols.Tls12 | 
+                             System.Security.Authentication.SslProtocols.Tls13,
                 CheckCertificateRevocationList = false,
                 UseProxy = false
             };
 
-            // Add allowed hosts
-            var allowedHosts = new[] {
-                "172.22.226.190",
-                "172.22.226.203"  // Adding the new internal IP
-            };
-
             _sslIgnorantClient = new HttpClient(handler);
             _sslIgnorantClient.Timeout = TimeSpan.FromSeconds(30);
+            
+            // 💡 Disable SSL certificate validation globally for this controller
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
+            ServicePointManager.ServerCertificateValidationCallback = (sender, cert, chain, sslPolicyErrors) => true;
+        }
+
+        // 💡 Model for structured forward request
+        public class ForwardRequestModel
+        {
+            [Required]
+            public string TargetUrl { get; set; }
+            public string Method { get; set; } = "POST";  // Default to POST if not specified
+            public Dictionary<string, string> InternalHeaders { get; set; } = new();
+            public object Body { get; set; }
         }
 
         [HttpPost("forward")]
@@ -57,7 +73,7 @@ namespace NayifatAPI.Controllers
         [ResponseCache(Duration = 300)] // Cache for 5 minutes, adjust as needed
         public async Task<IActionResult> ForwardRequest()
         {
-            string targetUrl = string.Empty; // Declare at method level
+            string targetUrl = string.Empty;
             try
             {
                 // 💡 Detailed logging added: Starting ForwardRequest
@@ -71,25 +87,7 @@ namespace NayifatAPI.Controllers
                     return BadRequest(new { success = false, message = "Invalid API key" });
                 }
 
-                // 2. Get target URL from ?url= query string
-                targetUrl = Request.Query["url"].ToString().Trim(); // Assign to the outer scope variable
-                _logger.LogInformation("T_PROXY_Extracted Query Parameter 'url': {TargetUrl}", targetUrl);
-                if (string.IsNullOrEmpty(targetUrl))
-                    return BadRequest(new { success = false, message = "URL parameter is required" });
-
-                // Validate allowed hosts first
-                var allowedHosts = new[] {
-                    "172.22.226.190",
-                    "172.22.226.203"  // Adding the new internal IP
-                };
-                
-                if (!allowedHosts.Any(host => targetUrl.Contains(host)))
-                {
-                    _logger.LogWarning("T_PROXY_Unauthorized target URL attempted: {TargetUrl}", targetUrl);
-                    return BadRequest(new { success = false, message = "Unauthorized target URL" });
-                }
-
-                // 3. Read raw JSON body from the incoming request
+                // 2. Read raw request body
                 string rawBody;
                 using (var reader = new StreamReader(Request.Body, Encoding.UTF8, leaveOpen: true))
                 {
@@ -97,25 +95,77 @@ namespace NayifatAPI.Controllers
                 }
                 _logger.LogInformation("T_PROXY_Received Request Body: {RawBody}", rawBody);
 
-                // 4. Create a new HttpRequestMessage
-                var forwardRequest = new HttpRequestMessage(HttpMethod.Post, targetUrl)
+                // Try to parse as ForwardRequestModel first
+                ForwardRequestModel structuredRequest = null;
+                try
                 {
-                    Content = new StringContent(rawBody, Encoding.UTF8, "application/json")
-                };
-                _logger.LogInformation("T_PROXY_Preparing forward HttpRequestMessage. Target URL: {TargetUrl}", targetUrl);
-                _logger.LogInformation("T_PROXY_Initial Request Body set for forwarding: {ForwardBody}", rawBody);
-
-                // 5. Copy headers except Host
-                foreach (var header in Request.Headers)
-                {
-                    if (!header.Key.Equals("Host", StringComparison.OrdinalIgnoreCase))
+                    _logger.LogInformation("💡 T_PROXY_NEW_FORMAT: Attempting to parse structured request format");
+                    var options = new System.Text.Json.JsonSerializerOptions
                     {
-                        forwardRequest.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
-                        _logger.LogInformation("T_PROXY_Copying header: {HeaderKey} = {HeaderValues}", header.Key, string.Join(", ", header.Value.ToArray()));
+                        PropertyNameCaseInsensitive = true // This makes it accept any case
+                    };
+                    structuredRequest = System.Text.Json.JsonSerializer.Deserialize<ForwardRequestModel>(rawBody, options);
+                    if (structuredRequest?.TargetUrl != null)
+                    {
+                        _logger.LogInformation("💡 T_PROXY_NEW_FORMAT: Successfully parsed structured format with targetUrl: {TargetUrl}", structuredRequest.TargetUrl);
+                        targetUrl = structuredRequest.TargetUrl;
+                        rawBody = System.Text.Json.JsonSerializer.Serialize(structuredRequest.Body);
                     }
                     else
                     {
-                        _logger.LogInformation("T_PROXY_Skipping 'Host' header");
+                        _logger.LogInformation("💡 T_PROXY_NEW_FORMAT: Structured request parsed but targetUrl was null");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogInformation("💡 T_PROXY_NEW_FORMAT: Request not in structured format, falling back to legacy. Error: {Error}", ex.Message);
+                }
+
+                // If structured format failed, try legacy format
+                if (string.IsNullOrEmpty(targetUrl))
+                {
+                    _logger.LogInformation("💡 T_PROXY_NEW_FORMAT: Falling back to legacy URL parameter format");
+                    targetUrl = Request.Query["url"].ToString().Trim();
+                }
+
+                if (string.IsNullOrEmpty(targetUrl))
+                {
+                    _logger.LogWarning("T_PROXY_Missing URL parameter. StructuredRequest: {HasStructured}, QueryString: {HasQuery}", 
+                        structuredRequest != null, 
+                        Request.Query.ContainsKey("url"));
+                    return BadRequest(new { success = false, message = "URL parameter is required" });
+                }
+
+                _logger.LogInformation("T_PROXY_Target URL: {TargetUrl}, Body Length: {BodyLength}", targetUrl, rawBody?.Length ?? 0);
+
+                // 💡 Log target URL for security tracking but allow all hosts
+                _logger.LogInformation("T_PROXY_Forwarding request to URL: {TargetUrl}", targetUrl);
+
+                // Create forward request with appropriate method
+                var method = structuredRequest?.Method?.ToUpper() ?? "POST";
+                var forwardRequest = new HttpRequestMessage(new HttpMethod(method), targetUrl)
+                {
+                    Content = new StringContent(rawBody, Encoding.UTF8, "application/json")
+                };
+
+                // Add headers
+                if (structuredRequest?.InternalHeaders != null)
+                {
+                    // Add structured internal headers
+                    foreach (var header in structuredRequest.InternalHeaders)
+                    {
+                        forwardRequest.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                    }
+                }
+                else
+                {
+                    // Legacy: copy all headers except Host
+                    foreach (var header in Request.Headers)
+                    {
+                        if (!header.Key.Equals("Host", StringComparison.OrdinalIgnoreCase))
+                        {
+                            forwardRequest.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
+                        }
                     }
                 }
 

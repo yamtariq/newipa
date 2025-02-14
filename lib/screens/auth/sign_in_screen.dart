@@ -1094,7 +1094,13 @@ class _SignInScreenState extends State<SignInScreen> {
             print('✅ Session data stored');
             
             // Store user data
-            final userDataJson = json.encode(userData);
+            final userDataJson = json.encode({
+              ...userData,
+              'id_expiry_date': userData['id_expiry_date'] ?? 
+                               userData['IdExpiryDate'] ?? 
+                               userData['idExpiryDate'] ?? 
+                               userData['id_expiry_date_hijri'],
+            });
             await prefs.setString('user_data', userDataJson);
             await secureStorage.write(
               key: 'user_data',

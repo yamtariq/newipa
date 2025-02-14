@@ -32,24 +32,98 @@ class CardService {
     }
   }
 
+  // 💡 Add method to fetch card types and limits
+  Future<Map<String, dynamic>> _getCardTypeForAmount(double amount) async {
+    try {
+      print('\n=== GET CARD TYPE FOR AMOUNT - START ===');
+      print('Requested Amount: $amount');
+      
+      final response = await http.get(
+        Uri.parse('${Constants.apiBaseUrl}/constants'),
+        headers: Constants.defaultHeaders,
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to fetch card types');
+      }
+
+      final responseData = json.decode(response.body);
+      if (!responseData['success']) {
+        throw Exception('Failed to get card types from response');
+      }
+
+      final constants = responseData['data'] as List;
+      
+      // Filter for card types and their limits
+      final cardTypes = constants.where((c) => 
+        c['name'] == 'CardType' || c['name'].toString().endsWith('_Limit')
+      ).toList();
+
+      print('\nAvailable Card Types and Limits:');
+      print(const JsonEncoder.withIndent('  ').convert(cardTypes));
+
+      // Find matching card type based on amount
+      String? selectedType;
+      String? selectedTypeAr;
+      
+      for (final constant in cardTypes) {
+        if (constant['name'].toString().endsWith('_Limit')) {
+          final cardType = constant['name'].toString().replaceAll('_Limit', '');
+          final limitRange = constant['value'].toString().split(' - ');
+          
+          if (limitRange.length == 2) {
+            final minLimit = double.tryParse(limitRange[0]) ?? 0;
+            final maxLimit = double.tryParse(limitRange[1]) ?? double.infinity;
+            
+            if (amount >= minLimit && amount <= maxLimit) {
+              // Find corresponding card type name
+              final typeData = cardTypes.firstWhere(
+                (c) => c['name'] == 'CardType' && c['value'] == cardType,
+                orElse: () => {'value': cardType, 'valueAr': cardType},
+              );
+              
+              selectedType = typeData['value'];
+              selectedTypeAr = typeData['valueAr'];
+              break;
+            }
+          }
+        }
+      }
+
+      print('\nSelected Card Type:');
+      print('Type: $selectedType');
+      print('Type (Arabic): $selectedTypeAr');
+      print('=== GET CARD TYPE FOR AMOUNT - END ===\n');
+
+      if (selectedType == null) {
+        throw Exception('No matching card type found for amount: $amount');
+      }
+
+      return {
+        'type': selectedType,
+        'typeAr': selectedTypeAr,
+      };
+    } catch (e) {
+      print('Error determining card type: $e');
+      throw Exception('Failed to determine card type: $e');
+    }
+  }
+
   Future<Map<String, dynamic>> createCustomerCardRequest(Map<String, dynamic> userData, bool isArabic) async {
     try {
       print('\n=== CREATE CUSTOMER CARD REQUEST - START ===');
       print('1. Input User Data:');
       print(const JsonEncoder.withIndent('  ').convert(userData));
       
-      // 💡 First get all required data from storage
+      // 💡 Get stored data from SharedPreferences only
       final prefs = await SharedPreferences.getInstance();
-      final registrationDataStr = prefs.getString('registration_data');
-      final storedUserDataStr = await _secureStorage.read(key: 'user_data');
+      final storedUserDataStr = prefs.getString('user_data');
       
-      if (registrationDataStr == null || storedUserDataStr == null) {
-        throw Exception('Required user data not found in storage');
+      if (storedUserDataStr == null) {
+        throw Exception('User data not found in storage');
       }
 
-      final registrationData = jsonDecode(registrationDataStr);
       final storedUserData = jsonDecode(storedUserDataStr);
-      final userRegistrationData = registrationData['userData'];
 
       // 💡 Format phone number
       String formattedPhone = storedUserData['phone']?.toString() ?? '';
@@ -67,21 +141,32 @@ class CardService {
         return inputDate;
       }
 
-      // 💡 Prepare request data with mandatory fields only
+      // 💡 Get card type based on amount (for display only)
+      final requestedAmount = (double.tryParse(userData['salary'].toString()) ?? 10000).round();
+      final cardTypeData = await _getCardTypeForAmount(requestedAmount.toDouble());
+      
+      // 💡 Log card type information for user
+      print('\n=== CARD TYPE INFORMATION ===');
+      print('Based on the requested amount of SAR $requestedAmount:');
+      print('Eligible Card Type: ${cardTypeData['type']}');
+      print('نوع البطاقة المؤهل: ${cardTypeData['typeAr']}');
+      print('===============================\n');
+
+      // 💡 Prepare request data with existing data structure
       final requestData = {
         "nationnalID": storedUserData['national_id'],
-        "dob": formatHijriDate(userRegistrationData['dateOfBirth']),
-        "doe": formatHijriDate(userRegistrationData['idExpiryDate']),
+        "dob": formatHijriDate(storedUserData['date_of_birth']),
+        "doe": formatHijriDate(storedUserData['id_expiry_date']),
         "finPurpose": "BUF",
         "language": isArabic ? 1 : 0,
         "productType": 1,
         "mobileNo": formattedPhone,
         "emailId": storedUserData['email']?.toString().toLowerCase() ?? '',
-        "finAmount": (double.tryParse(userData['salary'].toString()) ?? 10000).round(),
+        "finAmount": requestedAmount,
         "tenure": 60,
         "propertyStatus": 1,
         "effRate": 1,
-        "ibanNo": userData['iban'] ?? "SA9750000000000555551111",
+        "ibanNo": storedUserData['iban'] ?? "SA9750000000000555551111",
         "param1": "TEST001",           // string max 20
         "param2": "TEST002",           // string max 20
         "param3": "TEST003",           // string max 20
@@ -98,7 +183,14 @@ class CardService {
         "param14": false               // boolean
       };
 
-      print('\n2. Prepared Request Data:');
+      // Add debug logging for date fields
+      print('\n2. Date Fields Debug:');
+      print('Date of Birth: ${storedUserData['date_of_birth']}');
+      print('Formatted DOB: ${formatHijriDate(storedUserData['date_of_birth'])}');
+      print('ID Expiry Date: ${storedUserData['id_expiry_date']}');
+      print('Formatted DOE: ${formatHijriDate(storedUserData['id_expiry_date'])}');
+
+      print('\n3. Prepared Request Data:');
       print(const JsonEncoder.withIndent('  ').convert(requestData));
 
       // Create a custom HttpClient that accepts self-signed certificates
@@ -107,9 +199,13 @@ class CardService {
 
       final request = await client.postUrl(Uri.parse(Constants.endpointCreateCustomer));
       
-      // Add headers
-      final headers = Constants.bankApiHeaders;
-      print('\n3. Request Headers:');
+      // 💡 Combine both proxy and bank headers
+      final headers = {
+        ...Constants.bankApiHeaders,  // Bank headers (Authorization, X-APP-ID, etc.)
+        'api-key': Constants.apiKey,  // Proxy API key
+      };
+      
+      print('\n4. Request Headers:');
       print('Headers: ${headers.map((key, value) => MapEntry(key, key.toLowerCase() == 'authorization' ? '[REDACTED]' : value))}');
 
       headers.forEach((key, value) {
@@ -122,31 +218,115 @@ class CardService {
       final response = await request.close();
       final responseBody = await response.transform(utf8.decoder).join();
 
-      print('\n4. API Response:');
+      print('\n5. API Response:');
       print('Status Code: ${response.statusCode}');
-      print('Response Body: $responseBody');
+      print('Response Body: "$responseBody"');  // Added quotes to see if empty
+      print('Response Body Length: ${responseBody.length}');
+      print('Response Headers:');
+      response.headers.forEach((name, values) {
+        print('$name: $values');
+      });
+
+      // 💡 Handle empty response
+      if (responseBody.isEmpty) {
+        print('\nEmpty response body received');
+        throw Exception('Empty response received from server');
+      }
 
       if (response.statusCode != 200) {
         throw Exception('Failed to create customer: ${response.statusCode}');
       }
 
-      final responseData = jsonDecode(responseBody);
+      // 💡 Add try-catch for JSON parsing
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(responseBody);
+      } catch (e) {
+        print('\nError parsing JSON response: $e');
+        print('Raw response body: "$responseBody"');
+        throw Exception('Invalid response format from server');
+      }
 
       if (!responseData['success']) {
         return {
           'status': 'error',
-          'message': responseData['errors']?.join(', ') ?? 'Unknown error occurred',
+          'message': responseData['errors']?.join(', ') ?? responseData['message'] ?? 'Unknown error occurred',
         };
       }
 
       final result = responseData['result'];
+      print('\nDEBUG - Credit Limit Parsing:');
+      print('Raw eligibleAmount: ${result['eligibleAmount']}');
+      print('Type of eligibleAmount: ${result['eligibleAmount']?.runtimeType}');
+      
+      // 💡 1. Get and save the eligible amount from createCustomer response
+      final eligibleAmount = double.tryParse(result['eligibleAmount'] ?? '0') ?? 0;
+      print('Parsed Eligible Amount: $eligibleAmount');
+
+      // 💡 2. Get all card type limits from constants
+      final constantsResponse = await http.get(
+        Uri.parse('${Constants.apiBaseUrl}/constants'),
+        headers: Constants.defaultHeaders,
+      );
+
+      if (constantsResponse.statusCode != 200) {
+        throw Exception('Failed to fetch constants');
+      }
+
+      final constantsData = json.decode(constantsResponse.body);
+      if (!constantsData['success']) {
+        throw Exception('Failed to get constants from response');
+      }
+
+      // 💡 3. Save all limits with their card types
+      final constants = constantsData['data'] as List;
+      final cardLimits = <Map<String, dynamic>>[];
+      
+      for (final constant in constants) {
+        if (constant['name'].toString().endsWith('_Limit')) {
+          final cardType = constant['name'].toString().replaceAll('_Limit', '');
+          final limitRange = constant['value'].toString().split(' - ');
+          
+          if (limitRange.length == 2) {
+            cardLimits.add({
+              'cardType': cardType,
+              'minLimit': double.tryParse(limitRange[0]) ?? 0,
+              'maxLimit': double.tryParse(limitRange[1]) ?? double.infinity,
+            });
+          }
+        }
+      }
+
+      print('\nCard Limits:');
+      print(const JsonEncoder.withIndent('  ').convert(cardLimits));
+
+      // 💡 4. Check which limit band the eligible amount falls into
+      String selectedCardType = 'REWARDS'; // Default type
+      for (final limit in cardLimits) {
+        if (eligibleAmount >= limit['minLimit'] && eligibleAmount <= limit['maxLimit']) {
+          selectedCardType = limit['cardType'];
+          print('\nSelected Card Type: $selectedCardType');
+          print('Eligible Amount: $eligibleAmount falls in range:');
+          print('Min: ${limit['minLimit']}, Max: ${limit['maxLimit']}');
+          break;
+        }
+      }
+
+      // Get Arabic name for selected card type
+      final selectedTypeData = constants.firstWhere(
+        (c) => c['name'] == 'CardType' && c['value'] == selectedCardType,
+        orElse: () => {'valueAr': 'المكافآت'},
+      );
+
       final mappedResponse = {
         'status': 'success',
         'decision': result['applicationStatus'] == 'APPROVED' ? 'approved' : 'rejected',
-        'credit_limit': double.tryParse(result['eligibleAmount'] ?? '0') ?? 0,
+        'credit_limit': eligibleAmount.round(),
         'application_number': result['applicationId'],
         'request_id': result['requestId'],
         'customer_id': result['customerId'],
+        'card_type': selectedCardType,
+        'card_type_ar': selectedTypeData['valueAr'],
       };
 
       // Save response for later use

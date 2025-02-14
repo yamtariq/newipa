@@ -108,6 +108,7 @@ namespace NayifatAPI.Controllers
                             phone = customer.Phone,
                             device_id = request.DeviceId,
                             date_of_birth = customer.DateOfBirth?.ToString("yyyy-MM-dd"),
+                            id_expiry_date = customer.IdExpiryDate?.ToString("yyyy-MM-dd"),
                             iban = customer.Iban,
                             dependents = customer.Dependents ?? 0
                         }

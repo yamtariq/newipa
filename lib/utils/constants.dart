@@ -7,6 +7,9 @@ class Constants {
   // API Base URLs
   static const bool useNewApi = true; // Feature flag for easy switching
   
+  // 💡 Testing Flags
+  static const bool bypassNafathForTesting = true; // Temporary flag to bypass Nafath verification
+  
   static String get apiBaseUrl => useNewApi
       ? 'https://tmappuat.nayifat.com/api'  //'https://172.22.160.20:5264/api'
       : 'https://icreditdept.com/api';
@@ -32,9 +35,9 @@ class Constants {
   static String get proxyOtpVerifyUrl => '$apiBaseUrl/proxy/forward?url=https://172.22.226.203:6445/api/otp/GetVerifyOtp';
 
 
-  // 💡 Add Dakhli salary endpoint
+  // 💡 Update Dakhli endpoints for proxy
   static const String dakhliBaseUrl = 'https://172.22.226.190:4043/api/Dakhli/GetDakhliPubPriv';
-  static String get dakhliSalaryEndpoint => '$apiBaseUrl/proxy/forward?url=$dakhliBaseUrl';
+  static String get dakhliSalaryEndpoint => '$apiBaseUrl/Proxy/forward';
 
 // 💡 Add Dakhli salary endpoint
 //   static String get dakhliSalaryEndpoint => '$apiBaseUrl/api/Proxy/dakhli/salary';
@@ -222,8 +225,17 @@ class Constants {
   // Used in: LoanService (loan_service.dart) - getLoanDecision()
   
   // 💡 Bank API Endpoints
+//   static String endpointCreateCustomer = 
+//       '$apiBaseUrl/proxy/forward?url=https://172.22.226.203:9443/api/Bank/CreateCustomer';
+
+//   static String endpointUpdateAmount = 
+//       '$apiBaseUrl/proxy/forward?url=http://172.22.226.189:100/api/v1/Finnone/UpdateAmount';
+
   static String endpointCreateCustomer = 
-      '$apiBaseUrl/proxy/forward?url=https://172.22.226.203:9443/api/Bank/CreateCustomer';
+      '$apiBaseUrl/proxy/forward?url=https://icreditdept.com/api/Bank/test_local_CreateCustomer.php';
+
+  static String endpointUpdateAmount = 
+      '$apiBaseUrl/proxy/forward?url=https://icreditdept.com/api/Bank/test_local_UpdateCustomer.php';
 
   // Old: static const String endpointUpdateLoanApplication = '/update_loan_application.php';
   static const String endpointUpdateLoanApplication = '/loan/update';
@@ -525,7 +537,8 @@ class Constants {
   static const String bankApiUsername = 'Nayifat'; // Change in production
   static const String bankApiPassword = 'Nayifat@123'; // Change in production
   static const String bankApiAppId = '3162C93C-3C9E-4613-A4D9-53BF99BB9CB1'; // Change in production
-  static const String bankApiKey = 'A624BA39-BFDA-4F09-829C-9F6294D6DF23'; // Change in production
+//   static const String bankApiKey = 'A624BA39-BFDA-4F09-829C-9F6294D6DF23'; // Change in production
+  static const String bankApiKey = apiKey; // Change in production
   static const String bankApiOrgNo = 'Nayifat'; // Change in production
 
   // 💡 Bank API Headers
@@ -547,7 +560,7 @@ class Constants {
     return http.Client();
   }
 
-  static const String endpointSubmitCustomerCare = '/api/CustomerCare/Submit';
+  static const String endpointSubmitCustomerCare = '/CustomerCare/Submit';
 
   // Notification Configuration
   static const notificationConfig = NotificationConfig(

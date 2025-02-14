@@ -4,6 +4,7 @@ import '../models/slide.dart';
 import '../models/contact_details.dart';
 import '../utils/constants.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:io';
 
 class ApiService {
   final bool useMockData = false;
@@ -300,24 +301,90 @@ class ApiService {
   }
 
   Future<CustomerCareResponse> submitCustomerCare(CustomerCareRequest request) async {
+    print('\n=== CUSTOMER CARE API REQUEST START ===');
+    HttpClient? client;
+    
     try {
-      final response = await http.post(
-        Uri.parse('${Constants.authBaseUrl}${Constants.endpointSubmitCustomerCare}'),
-        body: json.encode(request.toJson()),
-        headers: Constants.authHeaders,
-      );
+      print('\n1. INITIALIZING HTTP CLIENT');
+      // Create a custom HttpClient that accepts self-signed certificates
+      client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) {
+          print('Accepting certificate for - Host: $host, Port: $port');
+          return true;
+        });
+
+      final uri = Uri.parse('${Constants.apiBaseUrl}${Constants.endpointSubmitCustomerCare}');
+      print('\n2. REQUEST DETAILS');
+      print('URL: $uri');
+      print('Method: POST');
+      
+      print('\n3. REQUEST HEADERS');
+      final headers = Constants.authHeaders;
+      headers.forEach((key, value) {
+        if (key.toLowerCase() == 'authorization') {
+          print('$key: [REDACTED]');
+        } else {
+          print('$key: $value');
+        }
+      });
+
+      print('\n4. REQUEST BODY');
+      final requestJson = request.toJson();
+      print(const JsonEncoder.withIndent('  ').convert(requestJson));
+
+      print('\n5. CREATING HTTP REQUEST');
+      final httpRequest = await client.postUrl(uri);
+      
+      // Add headers
+      print('Adding headers to request...');
+      headers.forEach((key, value) {
+        httpRequest.headers.set(key, value);
+      });
+      httpRequest.headers.contentType = ContentType.json;
+      print('Headers added successfully');
+
+      // Add body
+      print('\n6. WRITING REQUEST BODY');
+      httpRequest.write(json.encode(requestJson));
+      
+      print('\n7. SENDING REQUEST AND WAITING FOR RESPONSE');
+      final response = await httpRequest.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      print('\n8. RESPONSE DETAILS');
+      print('Status code: ${response.statusCode}');
+      print('Response headers:');
+      response.headers.forEach((name, values) {
+        print('$name: $values');
+      });
+      print('\nResponse body:');
+      print(responseBody);
 
       if (response.statusCode == 200) {
-        return CustomerCareResponse.fromJson(json.decode(response.body));
+        print('\n✅ Request successful');
+        final parsedResponse = CustomerCareResponse.fromJson(json.decode(responseBody));
+        print('Parsed response:');
+        print('- Success: ${parsedResponse.success}');
+        print('- Complaint Number: ${parsedResponse.complaintNumber}');
+        print('- Message: ${parsedResponse.message}');
+        return parsedResponse;
       } else {
+        print('\n❌ Request failed with status: ${response.statusCode}');
         throw Exception('Failed to submit request: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error submitting customer care: $e');
+      print('\n❌ ERROR IN API REQUEST');
+      print('Error type: ${e.runtimeType}');
+      print('Error message: $e');
+      print('Stack trace: ${StackTrace.current}');
+      
       return CustomerCareResponse(
         success: false,
         message: 'Failed to submit request. Please try again.',
       );
+    } finally {
+      client?.close();
+      print('\n=== CUSTOMER CARE API REQUEST END ===\n');
     }
   }
 

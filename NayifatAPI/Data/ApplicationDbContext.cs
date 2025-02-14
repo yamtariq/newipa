@@ -28,6 +28,7 @@ namespace NayifatAPI.Data
         public DbSet<LeadAppLoan> LeadAppLoans { get; set; }
         public DbSet<BankCustomer> BankCustomers { get; set; }
         public DbSet<CustomerDocument> CustomerDocuments { get; set; }
+        public DbSet<Constant> Constants { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -295,6 +296,33 @@ namespace NayifatAPI.Data
             modelBuilder.Entity<CitizenAddressListItem>(entity =>
             {
                 entity.HasKey(e => e.Id);
+            });
+
+            // Constants configuration
+            modelBuilder.Entity<Constant>(entity =>
+            {
+                entity.ToTable("Constants");
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.ConstantName).IsUnique();
+                
+                entity.Property(e => e.ConstantName)
+                    .HasMaxLength(255)
+                    .UseCollation("Arabic_CI_AS");
+                
+                entity.Property(e => e.ConstantValue)
+                    .HasMaxLength(255)
+                    .UseCollation("Arabic_CI_AS");
+                
+                entity.Property(e => e.ConstantValueAr)
+                    .HasMaxLength(255)
+                    .UseCollation("Arabic_CI_AS");
+                
+                entity.Property(e => e.Description)
+                    .HasMaxLength(255)
+                    .UseCollation("Arabic_CI_AS");
+                
+                entity.Property(e => e.LastUpdated)
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
             });
         }
     }

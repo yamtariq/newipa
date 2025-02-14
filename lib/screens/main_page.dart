@@ -43,7 +43,6 @@ import 'loans_page_ar.dart';
 import 'account_page.dart';
 import 'application_landing_screen.dart';
 import 'splash_screen.dart';
-import 'loan_application/loan_application_details_test_screen.dart';
 
 class MainPage extends StatefulWidget {
   final bool isArabic;
@@ -792,48 +791,6 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
           ),
           _buildAuthButtons(),
         ],
-      ),
-    );
-  }
-
-  Widget _buildTestButton() {
-    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
-    final primaryColor = Color(isDarkMode 
-        ? Constants.darkPrimaryColor 
-        : Constants.lightPrimaryColor);
-    final surfaceColor = Color(isDarkMode 
-        ? Constants.darkSurfaceColor 
-        : Constants.lightSurfaceColor);
-
-    return Positioned(
-      bottom: 100,
-      right: 16,
-      child: Container(
-        decoration: BoxDecoration(
-          color: surfaceColor,
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [
-            BoxShadow(
-              color: primaryColor.withOpacity(0.2),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: IconButton(
-          icon: Icon(Icons.bug_report, color: primaryColor),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => LoanApplicationDetailsTestScreen(
-                  isArabic: widget.isArabic,
-                ),
-              ),
-            );
-          },
-          tooltip: widget.isArabic ? 'شاشة الاختبار' : 'Test Screen',
-        ),
       ),
     );
   }
@@ -1673,8 +1630,6 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                         ),
                       ),
                     ),
-                  if (kDebugMode)
-                    _buildTestButton(),
                 ],
               ),
             ),

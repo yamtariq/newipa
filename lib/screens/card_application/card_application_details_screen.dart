@@ -183,6 +183,24 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
           );
         }
       }
+
+      // Ensure ID expiry date is available
+      if (userData != null && userData['id_expiry_date'] == null) {
+        print('ID expiry date not found in user_data, checking registration data');
+        final prefs = await SharedPreferences.getInstance();
+        final registrationDataStr = prefs.getString('registration_data');
+        if (registrationDataStr != null) {
+          final registrationData = json.decode(registrationDataStr);
+          if (registrationData['userData'] != null) {
+            userData['id_expiry_date'] = registrationData['userData']['idExpiryDate'] ??
+                                       registrationData['userData']['IdExpiryDate'] ??
+                                       registrationData['userData']['id_expiry_date'] ??
+                                       registrationData['userData']['id_expiry_date_hijri'];
+            // Update stored user data with ID expiry date
+            await _secureStorage.write(key: 'user_data', value: json.encode(userData));
+          }
+        }
+      }
     } catch (e) {
       print('\nERROR loading user data: $e');
       if (mounted) {
@@ -1073,9 +1091,14 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
         context,
         MaterialPageRoute(
           builder: (context) => CardOfferScreen(
-            userData: _userData,
+            userData: {
+              ...response, // Include all response data
+              'application_number': response['application_number'],
+              'card_type': response['card_type'],
+              'card_type_ar': response['card_type_ar'],
+            },
             isArabic: isArabic,
-            maxCreditLimit: response['credit_limit']?.toDouble() ?? 0,
+            maxCreditLimit: response['credit_limit']?.toInt() ?? 0,
             minCreditLimit: 0,
           ),
         ),

@@ -2,62 +2,71 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../utils/constants.dart';
+import 'package:http/http.dart' as http;
 
 class DakhliService {
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
-  // Fetch salary information from Dakhli API
+  // 💡 Fetch salary information from Dakhli API using proxy
   Future<Map<String, dynamic>> fetchSalaryInfo(String nationalId) async {
-    HttpClient? client;
     try {
       print('\n=== DAKHLI SALARY INFO START ===');
       print('Fetching salary info for National ID: $nationalId');
       
-      final dob = '1975-09-04';  // Using the example date format
-      final reason = 'CARD';
+      // 💡 Prepare proxy request body according to documentation
+      final proxyRequest = {
+        "targetUrl": 'https://172.22.226.190:4043/api/Dakhli/GetDakhliPubPriv?customerId=${nationalId}&dob=${await _getDOBFromStorage()}&reason=CARD',
+        "method": "GET",
+        "internalHeaders": {
+          "Internal-Auth": Constants.bankApiKey,
+          "Internal-API-Version": "2.0",
+          "Content-Type": "application/json"
+        },
+        "Body": {
+          "customerId": nationalId,
+          "dob": await _getDOBFromStorage(),
+          "reason": "CARD"
+        }
+      };
       
-      final uri = Uri.parse(Constants.dakhliSalaryEndpoint);
-      print('Target URL: $uri');
+      print('Making proxy API call...');
+      print('Endpoint: ${Constants.dakhliSalaryEndpoint}');
+      print('Request Body: ${jsonEncode(proxyRequest)}');
       
-      // Create HttpClient with SSL bypass like in AuthService
-      client = HttpClient()
-        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
-      
-      print('Making API call...');
-      final request = await client.postUrl(uri);
-      request.headers.contentType = ContentType.json;
-      request.headers.add('Accept', 'application/json');
-      request.headers.add('x-api-key', Constants.apiKey);
-      Constants.authHeaders.forEach((key, value) {
-        request.headers.add(key, value);
-      });
-      
-      // Send request body
-      final requestBody = jsonEncode({
-        'customerId': nationalId,
-        'dob': dob,
-        'reason': reason,
-      });
-      print('Request Body: $requestBody');
-      request.write(requestBody);
-      
-      final response = await request.close();
-      final responseBody = await response.transform(utf8.decoder).join();
+      final response = await http.post(
+        Uri.parse(Constants.dakhliSalaryEndpoint),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': Constants.apiKey,
+          'Accept-Charset': 'utf-8'
+        },
+        body: jsonEncode(proxyRequest)
+      );
       
       print('Response Status: ${response.statusCode}');
       print('Response Headers: ${response.headers}');
-      print('Response Body: $responseBody');
+      print('Raw Response Body: ${response.body}');
       
       if (response.statusCode == 200) {
-        if (responseBody.isEmpty) {
+        if (response.body.isEmpty) {
           throw Exception('Empty response body');
         }
-        final responseData = jsonDecode(responseBody);
+        
+        // 💡 Use dart:convert with UTF8 decoder explicitly
+        final responseData = jsonDecode(const Utf8Decoder().convert(response.bodyBytes));
+        
         if (responseData['success'] == true) {
           print('Successfully fetched salary data');
+          print('Raw employment info before transformation: ${responseData['result']['employmentStatusInfo']}');
           
           // Transform the response to our expected format
           final employmentInfo = responseData['result']['employmentStatusInfo'] as List;
+          
+          // 💡 Log each employer name as we process it
+          for (var emp in employmentInfo) {
+            print('Processing employer name: ${emp['employerName']}');
+          }
+          
           final transformedData = {
             'salaries': employmentInfo.map((emp) => {
               'amount': (double.parse(emp['basicWage'].toString()) + 
@@ -96,8 +105,6 @@ class DakhliService {
         throw Exception('Request timed out');
       }
       throw Exception('Error fetching salary data: ${e.toString()}');
-    } finally {
-      client?.close();
     }
   }
 
@@ -115,6 +122,27 @@ class DakhliService {
     } catch (e) {
       print('❌ Error reading saved salary data: $e');
       return null;
+    }
+  }
+
+  // 💡 Helper method to get DOB from storage
+  Future<String> _getDOBFromStorage() async {
+    try {
+      final userDataStr = await _secureStorage.read(key: 'user_data');
+      if (userDataStr != null) {
+        final userData = json.decode(userDataStr) as Map<String, dynamic>;
+        // Try all possible DOB keys in order of preference
+        final dob = userData['date_of_birth']?.toString() ?? 
+                   userData['dateOfBirth']?.toString() ?? 
+                   userData['dob']?.toString();
+        if (dob != null && dob.isNotEmpty) {
+          return dob;
+        }
+      }
+      throw Exception('Date of birth not found in storage');
+    } catch (e) {
+      print('Error getting DOB from storage: $e');
+      throw Exception('Failed to get date of birth: $e');
     }
   }
 }

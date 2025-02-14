@@ -22,6 +22,15 @@ import android.media.RingtoneManager
 import android.media.AudioAttributes
 import android.graphics.Color
 import com.example.nayifat_app_2025_new.R
+import androidx.work.Constraints
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkRequest
+import androidx.work.WorkManager
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.core.app.NotificationManagerCompat
+import androidx.work.BackoffPolicy
+import java.util.concurrent.TimeUnit
 
 class NotificationWorker(
     private val context: Context,
@@ -41,6 +50,34 @@ class NotificationWorker(
         private const val NOTIFICATIONS_ENDPOINT = "/notifications/list"
         private const val API_KEY = "7ca7427b418bdbd0b3b23d7debf69bf7"
         private const val TAG = "Tariq_NotificationWorker"
+        
+        // 💡 Add function to schedule periodic work
+        fun schedulePeriodicWork(context: Context) {
+            val constraints = Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build()
+
+            val workRequest = PeriodicWorkRequestBuilder<NotificationWorker>(
+                15, TimeUnit.MINUTES,  // Minimum interval is 15 minutes
+                5, TimeUnit.MINUTES    // Flex interval
+            )
+            .setConstraints(constraints)
+            .setBackoffCriteria(
+                BackoffPolicy.LINEAR,
+                WorkRequest.MIN_BACKOFF_MILLIS,
+                TimeUnit.MILLISECONDS
+            )
+            .build()
+
+            WorkManager.getInstance(context)
+                .enqueueUniquePeriodicWork(
+                    "notification_worker",
+                    ExistingPeriodicWorkPolicy.KEEP,
+                    workRequest
+                )
+            
+            Log.d(TAG, "Scheduled periodic work for notifications")
+        }
     }
 
     // 💡 Create a trust manager that trusts all certificates
@@ -62,66 +99,51 @@ class NotificationWorker(
     }
 
     override fun doWork(): Result {
-        Log.d(TAG, "Step 1: Worker Started - Time: ${System.currentTimeMillis()}")
+        Log.d(TAG, "Starting notification worker...")
         
         return try {
             // Get SharedPreferences
             val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-            Log.d(TAG, "Step 2: Checking SharedPreferences")
             
-            // List all available keys for debugging
-            Log.d(TAG, "Step 2.1: Available SharedPreferences keys:")
-            prefs.all.forEach { (key, value) ->
-                Log.d(TAG, "Step 2.2: Found Key: $key, Value: $value")
+            // Check if notifications are enabled
+            if (!areNotificationsEnabled()) {
+                Log.d(TAG, "Notifications are disabled")
+                return Result.success()
             }
-
-            // Check for national ID
+            
+            // Get national ID
             val nationalId = prefs.getString("flutter.national_id", null)
-            Log.d(TAG, "Step 3: National ID check - Found ID: $nationalId")
-
             if (nationalId == null) {
-                Log.d(TAG, "Step 3.1: No national ID found, scheduling retry")
+                Log.d(TAG, "No national ID found")
                 return Result.retry()
             }
 
-            Log.d(TAG, "Step 4: Starting API calls")
-            Log.d(TAG, "Step 4.1: Setting up API calls")
-
-            // Fetch notifications for "all" users first
-            Log.d(TAG, "Step 4.2: Fetching notifications for ID: all")
-            val isArabic = prefs.getBoolean("flutter.isArabic", false)
-            Log.d(TAG, "Step 4.2.1: App language setting - isArabic: $isArabic")
+            Log.d(TAG, "Fetching notifications for ID: $nationalId")
             
-            val allNotifications = fetchNotifications(nationalId)
-            Log.d(TAG, "Step 4.3: API Response code: ${allNotifications.first}")
-
-            // Then fetch user-specific notifications
-            Log.d(TAG, "Step 4.2: Fetching notifications for ID: $nationalId")
-            Log.d(TAG, "Step 4.2.1: App language setting - isArabic: $isArabic")
-            
-            val userNotifications = fetchNotifications(nationalId)
-            Log.d(TAG, "Step 4.3: API Response code: ${userNotifications.first}")
-
-            // Combine and process notifications
-            val notifications = processNotifications(allNotifications.second, userNotifications.second)
-            Log.d(TAG, "Step 7: API calls complete - Found ${notifications.size} notifications")
-
+            // Fetch notifications
+            val notifications = fetchNotifications(nationalId)
             if (notifications.isEmpty()) {
-                Log.d(TAG, "Step 8: No notifications to display")
-                Log.d(TAG, "Step 9: Worker Completed Successfully")
+                Log.d(TAG, "No new notifications found")
                 return Result.success()
             }
 
-            // Show notifications
+            Log.d(TAG, "Found ${notifications.size} notifications")
+            
+            // Process notifications
+            var successCount = 0
             notifications.forEach { notification ->
-                showNotification(notification)
+                try {
+                    showNotification(notification)
+                    successCount++
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error showing notification: ${e.message}")
+                }
             }
 
-            Log.d(TAG, "Step 9: Worker Completed Successfully")
+            Log.d(TAG, "Successfully showed $successCount notifications")
             Result.success()
         } catch (e: Exception) {
             Log.e(TAG, "Error in worker: ${e.message}", e)
-            // Only retry if it's a network error or similar recoverable error
             if (e is java.net.UnknownHostException || 
                 e is java.net.SocketTimeoutException || 
                 e is java.io.IOException) {
@@ -132,13 +154,29 @@ class NotificationWorker(
         }
     }
 
+    private fun areNotificationsEnabled(): Boolean {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        
+        // For Android O and above
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = notificationManager.getNotificationChannel("nayifat_notifications")
+            if (channel?.importance == NotificationManager.IMPORTANCE_NONE) {
+                return false
+            }
+        }
+
+        // Check if notifications are enabled for the app
+        return NotificationManagerCompat.from(context).areNotificationsEnabled()
+    }
+
     private fun fetchNotificationsWithRetry(nationalId: String, maxRetries: Int = 3): Pair<Int, List<Map<String, String>>> {
         var retryCount = 0
         var lastException: Exception? = null
 
         while (retryCount < maxRetries) {
             try {
-                return fetchNotifications(nationalId)
+                val notifications = fetchNotifications(nationalId)
+                return Pair(200, notifications)  // Return success status code with notifications
             } catch (e: Exception) {
                 lastException = e
                 Log.e(TAG, "Error fetching notifications (attempt ${retryCount + 1}/$maxRetries): ${e.message}")
@@ -189,8 +227,8 @@ class NotificationWorker(
         return result
     }
 
-    private fun fetchNotifications(nationalId: String?): Pair<Int, List<Map<String, String>>> {
-        Log.d(TAG, "Step 4.1: Setting up API calls")
+    private fun fetchNotifications(nationalId: String?): List<Map<String, String>> {
+        Log.d(TAG, "Step 4: Starting API calls")
         val allNotifications = mutableListOf<Map<String, String>>()
         val seenNotifications = getSeenNotifications()
         
@@ -218,14 +256,14 @@ class NotificationWorker(
             // 💡 Limit to 100 notifications for "all" target
             if (allNotifications.size > 100) {
                 allNotifications.subList(0, 100)
-                Log.d(TAG, "Step 8.4.3: Trimmed notifications to 100 for all users")
+                Log.d(TAG, "Trimmed notifications to latest 100")
             }
 
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching notifications: ${e.message}")
         }
         
-        return Pair(200, allNotifications)  // Return success status code and notifications
+        return allNotifications
     }
 
     private fun fetchFromApi(nationalId: String, markAsRead: Boolean): List<Map<String, String>>? {
