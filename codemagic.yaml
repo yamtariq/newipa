@@ -119,7 +119,7 @@ workflows:
     publishing:
       email:
         recipients:
-          - developers@nayifat.com
+          - yamtariq@gmail.com
         notify:
           success: true
           failure: true
