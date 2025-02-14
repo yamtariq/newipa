@@ -114,8 +114,8 @@ workflows:
           rm -f Podfile.lock
           flutter pub get
           pod install --verbose --repo-update
-          # Update build settings after pod install 💡
-          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Debug clean build SWIFT_EMIT_MODULE_INTERFACE=NO DEFINES_MODULE=NO
+          # Build using Xcode without module flag overrides 💡
+          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Debug clean build
           cd ..
       - name: Build iOS 💡
         script: | 
