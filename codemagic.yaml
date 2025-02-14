@@ -6,6 +6,7 @@ workflows:
     environment:
       flutter: stable
       xcode: latest
+      ruby: 3.0.6
       cocoapods: 1.12.1
       vars:
         BUNDLE_ID: "com.nayifat.app2025"
@@ -22,6 +23,7 @@ workflows:
           flutter --version
           xcodebuild -version
           pod --version
+          ruby --version
       - name: Clean and prepare 💡
         script: |
           echo "Current directory: $PWD"
@@ -40,6 +42,7 @@ workflows:
           rm -f Podfile
           rm -f Podfile.lock
           pod cache clean --all
+          gem install activesupport -v 7.0.8
           cd ..
           flutter pub get
       - name: Install CocoaPods dependencies 💡
@@ -49,7 +52,7 @@ workflows:
           rm -rf Pods
           rm -f Podfile.lock
           flutter pub get
-          pod install --verbose
+          pod install --verbose --repo-update
           cd ..
       - name: Build iOS 💡
         script: | 
