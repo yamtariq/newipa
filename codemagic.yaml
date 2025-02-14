@@ -1,13 +1,13 @@
 workflows:
   ios-workflow:
     name: iOS Workflow
-    max_build_duration: 120
+    max_build_duration: 180
     instance_type: mac_mini_m2
     environment:
       flutter: stable
       xcode: latest
-      ruby: 3.0.6
-      cocoapods: 1.12.1
+      ruby: 3.4.1
+      cocoapods: 1.16.2
       vars:
         BUNDLE_ID: "com.nayifat.app2025"
         XCODE_WORKSPACE: "Runner.xcworkspace"
@@ -22,6 +22,9 @@ workflows:
           flutter doctor -v
           flutter --version
           xcodebuild -version
+          gem update --system
+          gem install bundler
+          gem install cocoapods -v 1.16.2
           pod --version
           ruby --version
       - name: Clean and prepare 💡
@@ -42,7 +45,8 @@ workflows:
           rm -f Podfile
           rm -f Podfile.lock
           pod cache clean --all
-          gem install activesupport -v 7.0.8
+          gem uninstall cocoapods-core
+          gem install cocoapods-core -v 1.12.1
           cd ..
           flutter pub get
       - name: Install CocoaPods dependencies 💡
@@ -52,7 +56,7 @@ workflows:
           rm -rf Pods
           rm -f Podfile.lock
           flutter pub get
-          pod install --verbose --repo-update
+          pod install --verbose --repo-update --no-repo-update
           cd ..
       - name: Build iOS 💡
         script: | 
