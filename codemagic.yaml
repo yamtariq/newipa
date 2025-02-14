@@ -100,6 +100,12 @@ workflows:
                   config.build_settings['SWIFT_EMIT_MODULE_INTERFACE'] = 'NO'
                   config.build_settings['DEFINES_MODULE'] = 'NO'
                 end
+                
+                # Remove bridging header settings for Runner target ��
+                if target.name == 'Runner'
+                  config.build_settings['SWIFT_OBJC_BRIDGING_HEADER'] = ''
+                  config.build_settings['SWIFT_OBJC_INTERFACE_HEADER_NAME'] = ''
+                end
               end
             end
           end
