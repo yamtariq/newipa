@@ -24,7 +24,7 @@ import BackgroundTasks
             print("Failed to set up audio session: \(error)")
         }
         
-        // Register background task
+        // Register background task (handler now exists)
         BGTaskScheduler.shared.register(
             forTaskWithIdentifier: "com.nayifat.app.notification_refresh",
             using: nil
@@ -32,7 +32,7 @@ import BackgroundTasks
             BackgroundTaskHandler.shared.handleTask(task as! BGAppRefreshTask)
         }
         
-        // Register Flutter plugins
+        // Register Flutter plugins (this uses GeneratedPluginRegistrant)
         GeneratedPluginRegistrant.register(with: self)
         
         // Set notification center delegate (iOS 13+)

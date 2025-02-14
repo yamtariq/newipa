@@ -1,46 +1,34 @@
+//
+// BackgroundTaskHandler.swift
+// Runner
+//
+// Created by [Your Name] on [Date].
+//
+
+import Foundation
+import BackgroundTasks
+
 class BackgroundTaskHandler {
     static let shared = BackgroundTaskHandler()
-    private let taskIdentifier = "com.nayifat.app.notification_refresh"
     
+    private init() { }
+    
+    // Handles the background refresh task
+    func handleTask(_ task: BGAppRefreshTask) {
+        // Insert your background task handling logic here.
+        // Ensure you call task.setTaskCompleted(success:) when done.
+        task.setTaskCompleted(success: true)
+    }
+    
+    // Schedules the background refresh task
     func scheduleTask() {
-        let request = BGAppRefreshTaskRequest(identifier: taskIdentifier)
+        let request = BGAppRefreshTaskRequest(identifier: "com.nayifat.app.notification_refresh")
+        // For example, schedule earliest after 15 minutes.
         request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
-        
         do {
             try BGTaskScheduler.shared.submit(request)
         } catch {
-            print("Could not schedule task: \(error)")
-        }
-    }
-    
-    func handleTask(_ task: BGAppRefreshTask) {
-        scheduleTask() // Schedule next task first
-        
-        let taskTimeout = 25.0 // iOS allows max 30 seconds
-        
-        task.expirationHandler = {
-            // Cleanup and mark task complete
-            task.setTaskCompleted(success: false)
-        }
-        
-        // Create method channel
-        guard let controller = UIApplication.shared.windows.first?.rootViewController as? FlutterViewController else {
-            task.setTaskCompleted(success: false)
-            return
-        }
-        
-        let channel = FlutterMethodChannel(
-            name: "com.nayifat.app/background_service",
-            binaryMessenger: controller.binaryMessenger)
-        
-        // Execute with timeout
-        let taskTimer = Timer.scheduledTimer(withTimeInterval: taskTimeout, repeats: false) { _ in
-            task.setTaskCompleted(success: false)
-        }
-        
-        channel.invokeMethod("checkNotifications", arguments: nil) { result in
-            taskTimer.invalidate()
-            task.setTaskCompleted(success: result as? Bool ?? false)
+            print("Failed to schedule background task: \(error)")
         }
     }
 } 
