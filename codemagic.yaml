@@ -16,28 +16,61 @@ workflows:
         - ~/.pub-cache
         - vendor/bundle
     scripts:
-      - name: Get Flutter packages
+      - name: Set up environment 💡
         script: |
+          flutter doctor -v
+          flutter --version
+          xcodebuild -version
+          pod --version
+      - name: Clean and prepare 💡
+        script: |
+          # Ensure we're in the project root
+          echo "Current directory: $PWD"
+          # Clean previous builds
+          rm -rf build
+          rm -rf ios/Pods
+          rm -rf ios/Podfile.lock
+          rm -rf ios/.symlinks
+          rm -rf ios/Flutter/Flutter.framework
+          rm -rf ios/Flutter/Flutter.podspec
+          # Clean Flutter
           flutter clean
           flutter pub get
       - name: Setup iOS project 💡
         script: |
+          # Ensure iOS platform files exist
           flutter create . --platforms=ios
           cd ios
+          # Remove old Podfile to prevent conflicts
           rm -f Podfile
+          rm -f Podfile.lock
+          # Update Flutter dependencies
           flutter pub get
           cd ..
       - name: Install CocoaPods dependencies 💡
         script: |
           cd ios
+          # Initialize new Podfile
           pod init
+          # Update CocoaPods repos
           pod repo update
+          # Install pods with detailed logging
           pod install --verbose
-      - name: Build iOS
+          # Verify installation
+          ls -la Pods/
+          cd ..
+      - name: Build iOS 💡
         script: | 
-          flutter build ios --debug --no-codesign
+          # Ensure we're in the project root
+          pwd
+          # Build with detailed output
+          flutter build ios --debug --no-codesign --verbose
     artifacts:
       - build/ios/iphoneos/Runner.app
+      - ios/Pods/Manifest.lock
+      - ios/Podfile.lock
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+      - ios/build/Runner.build/Debug-iphoneos/Runner.build/build-state.dat
     publishing:
       email:
         recipients:
