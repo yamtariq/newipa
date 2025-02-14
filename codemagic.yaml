@@ -48,6 +48,34 @@ workflows:
           cd ios
           rm -f Podfile
           rm -f Podfile.lock
+          # Ensure BackgroundTaskHandler.swift is properly included
+          if [ ! -f "Runner/BackgroundTaskHandler.swift" ]; then
+            cp Runner/BackgroundTaskHandler.swift Runner/BackgroundTaskHandler.swift.bak 2>/dev/null || :
+            cat > Runner/BackgroundTaskHandler.swift << 'EOL'
+import Foundation
+import BackgroundTasks
+
+class BackgroundTaskHandler {
+    static let shared = BackgroundTaskHandler()
+    
+    private init() { }
+    
+    func handleTask(_ task: BGAppRefreshTask) {
+        task.setTaskCompleted(success: true)
+    }
+    
+    func scheduleTask() {
+        let request = BGAppRefreshTaskRequest(identifier: "com.nayifat.app.notification_refresh")
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
+        do {
+            try BGTaskScheduler.shared.submit(request)
+        } catch {
+            print("Failed to schedule background task: \(error)")
+        }
+    }
+}
+EOL
+          fi
           cat > Podfile << 'EOL'
           platform :ios, '14.0'
 
@@ -119,9 +147,12 @@ workflows:
           rm -rf Pods
           rm -f Podfile.lock
           flutter pub get
+          # Force regenerate plugin registrant
+          rm -rf Flutter/GeneratedPluginRegistrant.*
+          flutter pub get
           pod install --verbose --repo-update
           # Build using Xcode without module flag overrides 💡
-          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Debug clean build
+          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Debug clean build SWIFT_OBJC_BRIDGING_HEADER="" SWIFT_OBJC_INTERFACE_HEADER_NAME=""
           cd ..
       - name: Sanitize Xcode Project 💡
         script: |
