@@ -7,7 +7,7 @@ workflows:
       flutter: stable
       xcode: latest
       ruby: 3.2.2
-      cocoapods: 1.12.1
+      cocoapods: 1.14.3
       vars:
         BUNDLE_ID: "com.nayifat.app2025"
         XCODE_WORKSPACE: "Runner.xcworkspace"
@@ -24,7 +24,9 @@ workflows:
           xcodebuild -version
           gem update --system
           gem install bundler
-          gem install cocoapods -v 1.12.1
+          gem uninstall cocoapods --all --ignore-dependencies
+          gem install cocoapods -v 1.14.3
+          pod setup
           pod --version
           ruby --version
       - name: Clean and prepare 💡
@@ -45,8 +47,6 @@ workflows:
           rm -f Podfile
           rm -f Podfile.lock
           pod cache clean --all
-          gem uninstall cocoapods-core
-          gem install cocoapods-core -v 1.12.1
           cd ..
           flutter pub get
       - name: Install CocoaPods dependencies 💡
@@ -56,7 +56,10 @@ workflows:
           rm -rf Pods
           rm -f Podfile.lock
           flutter pub get
-          pod install --verbose --repo-update --no-repo-update
+          pod deintegrate
+          pod cache clean --all
+          pod setup --verbose
+          pod install --verbose
           cd ..
       - name: Build iOS 💡
         script: | 
