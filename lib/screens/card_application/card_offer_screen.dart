@@ -300,7 +300,7 @@ class _CardOfferScreenState extends State<CardOfferScreen> {
     final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
     
     return Scaffold(
-      backgroundColor: isDarkMode ? Color(Constants.darkBackgroundColor) : Colors.white,
+      backgroundColor: isDarkMode ? Color(Constants.darkBackgroundColor) : Color(Constants.lightBackgroundColor),
       body: Stack(
         children: [
           // Gradient Background

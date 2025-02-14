@@ -269,9 +269,9 @@ class Constants {
       0xFFE3F2FD; // Light baby blue background
   static const int lightSurfaceColor = 0xFFFFFFFF; // Pure white surface
 
-  // Dark Theme
+  // Dark Theme    0xFF121212
   static const int darkPrimaryColor = 0xFF0099E6; // Lighter blue for dark mode
-  static const int darkBackgroundColor = 0xFF121212; // Dark gray/black
+  static const int darkBackgroundColor = 0xFF121212; // Dark gray/black    0xFF121212
   static const int darkSurfaceColor = 0xFF242424; // Slightly lighter dark gray
 
   // Form and UI Colors with Opacity
