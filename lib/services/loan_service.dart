@@ -171,7 +171,7 @@ class LoanService {
         "nationnalID": storedUserData['national_id'],
         "dob": formatHijriDate(storedUserData['date_of_birth']),
         "doe": formatHijriDate(storedUserData['id_expiry_date']),
-        "finPurpose": userData['loan_purpose'] ?? "BUF",
+        "finPurpose": "BUF", //userData['loan_purpose'] ?? 
         "language": isArabic ? 1 : 0,
         "productType": 0,
         "mobileNo": formattedPhone,
@@ -252,7 +252,7 @@ class LoanService {
       headers.forEach((key, value) {
         request.headers.set(key, value);
       });
-
+      
       // Add body
       request.write(jsonEncode(requestData));
       
@@ -493,6 +493,60 @@ class LoanService {
       return {
         'status': 'error',
         'message': e.toString(),
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> insertLoanApplication(Map<String, dynamic> loanData) async {
+    try {
+      print('\n=== INSERT LOAN APPLICATION - START ===');
+      print('Request Data:');
+      print(const JsonEncoder.withIndent('  ').convert(loanData));
+
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      final client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+
+      final request = await client.postUrl(Uri.parse('${Constants.apiBaseUrl}${Constants.endpointInsertLoanApplication}'));
+      
+      // Add headers
+      final headers = {
+        ...Constants.defaultHeaders,
+        'api-key': Constants.apiKey,
+      };
+      
+      headers.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+      
+      // Add body
+      request.write(jsonEncode(loanData));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      print('\nAPI Response:');
+      print('Status Code: ${response.statusCode}');
+      print('Response Body: $responseBody');
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to insert loan application: ${response.statusCode}');
+      }
+
+      // Parse response
+      final responseData = jsonDecode(responseBody);
+      
+      print('\n=== INSERT LOAN APPLICATION - END (SUCCESS) ===\n');
+      return responseData;
+
+    } catch (e) {
+      print('\nERROR in insertLoanApplication:');
+      print('Error Type: ${e.runtimeType}');
+      print('Error Message: $e');
+      print('\n=== INSERT LOAN APPLICATION - END (WITH ERROR) ===\n');
+      return {
+        'status': 'error',
+        'message': 'Failed to insert loan application: $e',
       };
     }
   }

@@ -5,6 +5,8 @@ using NayifatAPI.Data;
 using NayifatAPI.Models;
 using System.Text.Json;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 
 namespace NayifatAPI.Controllers
 {
@@ -310,7 +312,7 @@ namespace NayifatAPI.Controllers
             try
             {
                 _logger.LogInformation("=== Inserting Loan Application ===");
-                _logger.LogInformation($"Request Data: NationalId={request.NationalId}, Amount={request.LoanAmount}, Purpose={request.LoanPurpose}");
+                _logger.LogInformation($"Request Data: NationalId={request.national_id}, Amount={request.loan_amount}, Purpose={request.loan_purpose}");
 
                 // Start transaction
                 await using var transaction = await _context.Database.BeginTransactionAsync();
@@ -322,23 +324,24 @@ namespace NayifatAPI.Controllers
                     // Create new loan application
                     var application = new LoanApplication
                     {
-                        ApplicationNo = request.ApplicationNo,
-                        NationalId = request.NationalId,
-                        CustomerDecision = request.CustomerDecision,
-                        Amount = request.LoanAmount,
-                        Purpose = request.LoanPurpose,
-                        Tenure = request.LoanTenure,
-                        InterestRate = request.InterestRate,
-                        Status = request.Status,
-                        StatusDate = saudiTime,
-                        Remarks = request.Remarks,
-                        NoteUser = request.NoteUser ?? "CUSTOMER",
-                        Note = request.Note ?? "Application created from mobile app",
+                        ApplicationNo = request.application_no,
+                        NationalId = request.national_id,
+                        CustomerDecision = request.customerDecision,
+                        Amount = request.loan_amount ?? 0,
+                        Purpose = request.loan_purpose,
+                        Tenure = request.loan_tenure ?? 0,
+                        InterestRate = request.interest_rate ?? 0,
+                        Status = request.status,
+                        StatusDate = request.status_date ?? DateTime.Now,
+                        Remarks = request.remarks,
+                        NoteUser = request.noteUser,
+                        Note = request.note,
                         // Set fixed values for Consent and Nafath
                         ConsentStatus = "True",
-                        ConsentStatusDate = saudiTime,
+                        ConsentStatusDate = request.consent_status_date,
                         NafathStatus = "True",
-                        NafathStatusDate = saudiTime
+                        NafathStatusDate = request.nafath_status_date,
+                        LoanEmi = request.loan_emi
                     };
 
                     _context.LoanApplications.Add(application);
@@ -368,7 +371,8 @@ namespace NayifatAPI.Controllers
                             consent_status = application.ConsentStatus,
                             consent_status_date = application.ConsentStatusDate,
                             nafath_status = application.NafathStatus,
-                            nafath_status_date = application.NafathStatusDate
+                            nafath_status_date = application.NafathStatusDate,
+                            loan_emi = application.LoanEmi
                         }
                     });
                 }
@@ -381,7 +385,7 @@ namespace NayifatAPI.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error inserting loan application for National ID: {NationalId}. Error details: {ErrorMessage}, Stack trace: {StackTrace}", 
-                    request.NationalId, 
+                    request.national_id, 
                     ex.Message,
                     ex.StackTrace);
                 return Error($"Internal server error: {ex.Message}", 500);
@@ -414,50 +418,60 @@ namespace NayifatAPI.Controllers
 
     public class InsertLoanApplicationRequest
     {
+        [Required] 
+        public int application_no { get; set; }
+        
         [Required]
-        public required string NationalId { get; set; }
-
+        [StringLength(50)] 
+        public required string national_id { get; set; }
+        
         [Required]
-        public required int ApplicationNo { get; set; }
-
+        [StringLength(50)] 
+        public required string customerDecision { get; set; }
+        
+        [Column(TypeName = "decimal(18,2)")] 
+        public decimal? loan_amount { get; set; }
+        
         [Required]
-        [StringLength(50)]
-        public required string CustomerDecision { get; set; }
-
+        [StringLength(100)] 
+        public required string loan_purpose { get; set; }
+        
+        public int? loan_tenure { get; set; }
+        
+        [Column(TypeName = "decimal(5,2)")] 
+        public decimal? interest_rate { get; set; }
+        
         [Required]
-        public required decimal LoanAmount { get; set; }
-
+        [StringLength(50)] 
+        public required string status { get; set; } = "pending";
+        
+        public DateTime? status_date { get; set; } = DateTime.Now;
+        
         [Required]
-        [StringLength(100)]
-        public required string LoanPurpose { get; set; }
-
+        [StringLength(255)] 
+        public required string remarks { get; set; }
+        
         [Required]
-        public required int LoanTenure { get; set; }
-
+        [StringLength(50)] 
+        public required string noteUser { get; set; }
+        
         [Required]
-        public required decimal InterestRate { get; set; }
-
+        [StringLength(255)] 
+        public required string note { get; set; }
+        
         [Required]
-        [StringLength(50)]
-        public required string Status { get; set; }
-
-        [StringLength(255)]
-        public string? Remarks { get; set; }
-
-        [StringLength(50)]
-        public string? NoteUser { get; set; }
-
-        [StringLength(255)]
-        public string? Note { get; set; }
-
-        [StringLength(50)]
-        public string? ConsentStatus { get; set; }
-
-        public DateTime? ConsentStatusDate { get; set; }
-
-        [StringLength(50)]
-        public string? NafathStatus { get; set; }
-
-        public DateTime? NafathStatusDate { get; set; }
+        [StringLength(50)] 
+        public required string consent_status { get; set; } = "True";
+        
+        public DateTime? consent_status_date { get; set; } = DateTime.Now;
+        
+        [Required]
+        [StringLength(50)] 
+        public required string nafath_status { get; set; } = "True";
+        
+        public DateTime? nafath_status_date { get; set; } = DateTime.Now;
+        
+        [Column(TypeName = "decimal(18,2)")] 
+        public decimal? loan_emi { get; set; }
     }
 } 

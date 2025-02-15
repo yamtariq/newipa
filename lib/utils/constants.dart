@@ -228,13 +228,17 @@ class Constants {
 //   static String endpointCreateCustomer = 
 //       '$apiBaseUrl/proxy/forward?url=https://172.22.226.203:9443/api/Bank/CreateCustomer';
 
-//   static String endpointUpdateAmount = 
+//   static String endpointFinnoneUpdateAmount = 
 //       '$apiBaseUrl/proxy/forward?url=http://172.22.226.189:100/api/v1/Finnone/UpdateAmount';
 
   static String endpointCreateCustomer = 
       '$apiBaseUrl/proxy/forward?url=https://icreditdept.com/api/Bank/test_local_CreateCustomer.php';
 
- //remove this endpoint
+  // 💡 Finnone API Endpoints
+  static String endpointFinnoneUpdateAmount = 
+      '$apiBaseUrl/proxy/forward?url=https://icreditdept.com/api/Bank/test_local_FinnOne_UpdateCustomer.php';
+
+  //remove this endpoint
   static String endpointUpdateAmount = 
       '$apiBaseUrl/proxy/forward?url=https://icreditdept.com/api/Bank/test_local_UpdateCustomer.php';
 
@@ -582,6 +586,10 @@ static String endpointUpdateCustomer =
     fetchInterval: Duration(minutes: 15),
     minFetchInterval: Duration(minutes: 13),
   );
+
+  // 💡 Loan Application Insert Endpoint
+  static const String endpointInsertLoanApplication = '/loan-application/insert';
+  // Used in: LoanService (loan_service.dart) - insertLoanApplication()
 }
 
 class NotificationConfig {

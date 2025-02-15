@@ -332,21 +332,28 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
       };
 
       print('DEBUG - Calling UpdateAmount API:');
-      print('URL: ${Constants.endpointUpdateAmount}');
+      print('URL: ${Constants.endpointFinnoneUpdateAmount}');
       print('Data: $updateAmountData');
 
       final client = HttpClient()
         ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
 
-      final request = await client.postUrl(Uri.parse(Constants.endpointUpdateAmount));
+      final request = await client.postUrl(Uri.parse(Constants.endpointFinnoneUpdateAmount));
       
-      // Add headers
-      Constants.defaultHeaders.forEach((key, value) {
+      // Add headers - combining bank headers and proxy API key
+      final headers = {
+        ...Constants.bankApiHeaders,  // Bank headers (Authorization, X-APP-ID, etc.)
+        'api-key': Constants.apiKey,  // Proxy API key
+      };
+      
+      headers.forEach((key, value) {
         request.headers.set(key, value);
       });
 
-      // Add body
-      request.write(jsonEncode(updateAmountData));
+      // Add body - using jsonEncode only once
+      final jsonBody = jsonEncode(updateAmountData);
+      print('DEBUG - Request Body: $jsonBody');
+      request.write(jsonBody);
       
       final response = await request.close();
       final responseBody = await response.transform(utf8.decoder).join();
@@ -365,40 +372,54 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
         throw Exception(updateAmountResponse['message'] ?? 'Failed to update amount');
       }
 
-      // If UpdateAmount API call is successful, proceed with updating loan application
+      // If UpdateAmount API call is successful, proceed with inserting loan application
       final loanService = LoanService();
       
-      // Round all numeric values to 2 decimal places and keep UI display values
+      // 💡 Extract and validate national_id first
+      final nationalId = widget.userData['national_id'];
+      if (nationalId == null || nationalId.toString().trim().isEmpty) {
+        throw Exception('National ID is required but was not found in user data');
+      }
+
+      print('DEBUG - Using National ID: $nationalId'); // Debug print
+
       final loanData = {
-        'national_id': widget.userData['national_id'],
-        'application_no': widget.userData['application_number'],
         'customerDecision': 'ACCEPTED',
-        'loan_amount': financeAmount.toStringAsFixed(2),
-        'loan_tenure': tenure,
-        'interest_rate': (_flatRate * 100).toStringAsFixed(2),
-        'loan_purpose': widget.userData['loan_purpose'],
-        'status': 'pending',
-        'remarks': 'Loan offer accepted by customer',
         'noteUser': 'CUSTOMER',
+        'loan_emi': double.parse(emi.toStringAsFixed(2)),
+        'national_id': nationalId.toString(),
+        'application_no': int.tryParse(widget.userData['application_number']?.toString() ?? '') ?? 0,
+        'consent_status': 'True',
+        'nafath_status': 'True',
+        'loan_amount': double.parse(financeAmount.toStringAsFixed(2)),
+        'loan_purpose': widget.userData['loan_purpose'] ?? 'Personal',
+        'loan_tenure': tenure,
+        'interest_rate': double.parse((_flatRate * 100).toStringAsFixed(2)),
+        'status': 'pending',
+        'status_date': DateTime.now().toIso8601String(),
+        'remarks': 'Loan offer accepted by customer',
         'note': 'Customer accepted the loan offer with amount ${financeAmount.toStringAsFixed(2)} SAR for $tenure months',
-        // Keep these for UI display
-        'emi': emi.toStringAsFixed(2),
-        'total_repayment': _totalRepayment.toStringAsFixed(2),
-        'interest': _interest.toStringAsFixed(2),
+        'consent_status_date': DateTime.now().toIso8601String(),
+        'nafath_status_date': DateTime.now().toIso8601String(),
+        'loan_emi': double.parse(emi.toStringAsFixed(2))
       };
 
       print('DEBUG - Sending loan data to API:');
-      print('Loan Purpose: ${widget.userData['loan_purpose']}');  // Debug print
-      print(loanData);
+      print('National ID: $nationalId'); // 💡 Debug print for national_id
+      print('Loan Purpose: ${widget.userData['loan_purpose']}');
+      print(const JsonEncoder.withIndent('  ').convert(loanData));
 
-      final response2 = await loanService.updateLoanApplication(loanData);
+      final response2 = await loanService.insertLoanApplication(loanData);
 
       setState(() => _isLoading = false);
 
       if (!mounted) return;
 
+      print('\nDEBUG - Insert Loan Application Response:');
+      print(const JsonEncoder.withIndent('  ').convert(response2));
+
       if (response2['status'] != 'success') {
-        throw Exception(response2['message'] ?? 'Failed to update loan application');
+        throw Exception(response2['message'] ?? 'Failed to insert loan application');
       }
 
       // Get application number from the loan decision response
@@ -631,9 +652,13 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
       final loanService = LoanService();
       
       final loanData = {
+        'customerDecision': 'DECLINED',
+        'noteUser': 'CUSTOMER',
+        'loan_emi': double.parse(emi.toStringAsFixed(2)),
         'national_id': widget.userData['national_id'],
         'application_no': widget.userData['application_number'],
-        'customerDecision': 'DECLINED',
+        'consent_status': 'True',
+        'nafath_status': 'True',
         'loan_amount': '0.00',
         'loan_tenure': '0',
         'emi': '0.00',
@@ -645,12 +670,8 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
         'status': 'declined',
         'remarks': 'Loan offer declined by customer',
         'application_number': widget.userData['application_number'],
-        'noteUser': 'CUSTOMER',
         'note': 'Customer declined the loan offer',
-        // Keep these for consistency
-        'emi': '0.00',
-        'total_repayment': '0.00',
-        'interest': '0.00',
+        'loan_emi': double.parse(emi.toStringAsFixed(2))
       };
 
       print('DEBUG - Sending decline data to API:');

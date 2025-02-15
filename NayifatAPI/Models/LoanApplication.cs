@@ -8,6 +8,7 @@ namespace NayifatAPI.Models
     {
         [Key]
         [Column("loan_id")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int Id { get; set; }
 
         [Required]
@@ -72,6 +73,9 @@ namespace NayifatAPI.Models
 
         [Column("nafath_status_date")]
         public DateTime? NafathStatusDate { get; set; }
+
+        [Column("loan_emi", TypeName = "decimal(18,2)")]
+        public decimal? LoanEmi { get; set; }
 
         [ForeignKey(nameof(NationalId))]
         public virtual Customer Customer { get; set; } = null!;
