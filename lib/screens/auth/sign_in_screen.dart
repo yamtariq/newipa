@@ -44,15 +44,15 @@ class SignInScreen extends StatefulWidget {
 class _SignInScreenState extends State<SignInScreen> {
   final LocalAuthentication _localAuth = LocalAuthentication();
   final AuthService _authService = AuthService();
-  final TextEditingController _nationalIdController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+  late TextEditingController _nationalIdController;
+  late TextEditingController _passwordController;
   final List<String> _mpinDigits = List.filled(6, '');
 
   bool _isLoading = false;
   bool _isBiometricsAvailable = false;
   List<BiometricType> _availableBiometrics = [];
   bool _isMPINSet = false;
-  bool _isPasswordMode = false;
+  bool _isPasswordMode = true;
   String? _lastUsedNationalId;
   bool _isTimerActive = false;
 
@@ -219,6 +219,7 @@ class _SignInScreenState extends State<SignInScreen> {
   @override
   void initState() {
     super.initState();
+    _initializeScreen();
     if (widget.nationalId != null) {
       _nationalIdController.text = widget.nationalId!;
     }
@@ -241,6 +242,8 @@ class _SignInScreenState extends State<SignInScreen> {
 
   Future<void> _checkAuthenticationStatus() async {
     try {
+      print('\n=== CHECKING AUTH STATUS ===');
+      
       // Check biometric availability
       _isBiometricsAvailable = await _authService.checkBiometricsAvailable();
       if (_isBiometricsAvailable) {
@@ -252,33 +255,28 @@ class _SignInScreenState extends State<SignInScreen> {
 
       // Check if device is registered and get last used national ID
       final isDeviceRegistered = await _authService.isDeviceRegistered();
-      if (isDeviceRegistered) {
-        final prefs = await SharedPreferences.getInstance();
-        _lastUsedNationalId = prefs.getString('device_user_id');
-        if (_lastUsedNationalId != null) {
-          _nationalIdController.text = _lastUsedNationalId!;
-        }
-      }
+      final prefs = await SharedPreferences.getInstance();
+      _lastUsedNationalId = prefs.getString('device_user_id');
+      
+      // Check if session is active
+      final sessionActive = await _authService.isSessionActive();
+      final manualSignOff = Provider.of<SessionProvider>(context, listen: false).manualSignOff;
 
       setState(() {
-        // If device is registered and has quick sign-in methods, show them
-        if (isDeviceRegistered && (_isBiometricsAvailable || _isMPINSet)) {
-          _isPasswordMode = widget.startWithPassword;
+        // Show quick sign-in methods only if:
+        // 1. Device is registered
+        // 2. Has quick sign-in methods available
+        // 3. Not manually signed off
+        // 4. Not forced to use password
+        if (isDeviceRegistered && 
+            (_isBiometricsAvailable || _isMPINSet) && 
+            !manualSignOff && 
+            !widget.startWithPassword) {
+          _isPasswordMode = false;
         } else {
-          // Otherwise, always use password mode
           _isPasswordMode = true;
         }
       });
-
-      // If device is registered and biometrics are enabled, trigger it automatically
-      if (isDeviceRegistered && _isBiometricsAvailable && !widget.startWithPassword) {
-        final isBiometricEnabled = await _authService.isBiometricEnabled();
-        if (isBiometricEnabled) {
-          Future.delayed(const Duration(milliseconds: 500), () {
-            _authenticateWithBiometrics();
-          });
-        }
-      }
 
       print('Auth Status Check:');
       print('- Biometrics Available: $_isBiometricsAvailable');
@@ -286,8 +284,14 @@ class _SignInScreenState extends State<SignInScreen> {
       print('- Device Registered: $isDeviceRegistered');
       print('- Last Used ID: $_lastUsedNationalId');
       print('- Password Mode: $_isPasswordMode');
+      print('- Session Active: $sessionActive');
+      print('- Manual Sign Off: $manualSignOff');
+      print('=== AUTH STATUS CHECK END ===\n');
     } catch (e) {
       print('Error checking authentication status: $e');
+      setState(() {
+        _isPasswordMode = true;
+      });
     }
   }
 
@@ -2037,5 +2041,30 @@ class _SignInScreenState extends State<SignInScreen> {
         ),
       ],
     );
+  }
+
+  Future<void> _initializeScreen() async {
+    try {
+      print('\n=== INITIALIZING SIGN IN SCREEN ===');
+      
+      // Initialize controllers
+      _nationalIdController = TextEditingController();
+      _passwordController = TextEditingController();
+      
+      // Get last used national ID if available
+      final prefs = await SharedPreferences.getInstance();
+      _lastUsedNationalId = prefs.getString('device_user_id');
+      if (_lastUsedNationalId != null) {
+        _nationalIdController.text = _lastUsedNationalId!;
+      }
+      
+      // Check authentication status
+      await _checkAuthenticationStatus();
+      
+      print('Screen Initialization Complete');
+      print('=== SCREEN INIT END ===\n');
+    } catch (e) {
+      print('Error initializing screen: $e');
+    }
   }
 }

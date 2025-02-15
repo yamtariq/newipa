@@ -9,6 +9,7 @@ class SessionProvider with ChangeNotifier {
   
   bool get isSignedIn => _isSignedIn;
   bool get hasActiveSession => _hasActiveSession;
+  bool get manualSignOff => _manualSignOff;
 
   // Initialize the session state
   Future<void> initializeSession() async {
@@ -126,9 +127,10 @@ class SessionProvider with ChangeNotifier {
       print('3. AuthService.signOff() completed');
       
       print('4. Updating provider state');
+      _isSignedIn = false;
       _hasActiveSession = false;
       _manualSignOff = true;
-      // Do not change _isSignedIn state
+      
       print('5. New states:');
       print('   - isSignedIn: $_isSignedIn');
       print('   - manualSignOff: $_manualSignOff');
