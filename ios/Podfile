@@ -24,11 +24,11 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 target 'Runner' do
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   
-  # Use static frameworks for Xcode 15+
-  use_frameworks! :linkage => :static
+  # Use frameworks with module support
+  use_frameworks! :linkage => :dynamic
 
-  # Third-party pods
-  pod 'PhoneNumberKit', '~> 3.3.4'
+  # Third-party pods with modular headers
+  pod 'PhoneNumberKit', '~> 3.3.4', :modular_headers => true
   pod 'DKImagePickerController', '~> 4.3'
 end
 
@@ -45,10 +45,7 @@ post_install do |installer|
       
       # Disable module interfaces for Flutter targets
       if target.name == 'Flutter'
-        config.build_settings['DEFINES_MODULE'] = 'NO'
-        config.build_settings['CLANG_ENABLE_MODULES'] = 'NO'
         config.build_settings['SWIFT_OBJC_BRIDGING_HEADER'] = '""'
-        config.build_settings['SWIFT_OBJC_INTERFACE_HEADER'] = '""'
       end
     end
     flutter_additional_ios_build_settings(target)
