@@ -1026,22 +1026,29 @@ class AuthService {
   Future<void> signOff() async {
     try {
       print('\n=== AUTH SERVICE SIGN OFF START ===');
-      print('1. Attempting to clear session and auth states');
+      print('1. Attempting to clear session token');
       
-      // Clear all session and auth related data
+      // Check current token before clearing
+      final currentToken = await _secureStorage.read(key: 'auth_token');
+      print('2. Current auth token exists: ${currentToken != null}');
+      
+      // Clear session token and related data
       await _secureStorage.delete(key: 'auth_token');
       await _secureStorage.delete(key: 'session_active');
-      await _secureStorage.delete(key: 'session_user_id');
       await _secureStorage.delete(key: 'device_registered');
+      await _secureStorage.write(key: 'device_registered', value: 'false');
       
       // Clear from SharedPreferences too
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('session_active');
-      await prefs.remove('session_user_id');
-      await prefs.remove('device_registered');
-      await prefs.remove('isSessionActive');
+      await prefs.setBool('device_registered', false);
       
-      print('2. Session and auth states cleared');
+      // Verify token is cleared
+      final tokenAfterDelete = await _secureStorage.read(key: 'auth_token');
+      print('3. Auth token deleted from secure storage');
+      print('4. Auth token after deletion exists: ${tokenAfterDelete != null}');
+      
+      print('5. Session signed off successfully');
       print('=== AUTH SERVICE SIGN OFF END ===\n');
     } catch (e) {
       print('ERROR in AuthService.signOff(): $e');
