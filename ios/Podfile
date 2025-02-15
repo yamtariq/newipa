@@ -11,7 +11,7 @@ def flutter_root
   generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
   unless File.exist?(generated_xcode_build_settings_path)
     raise "#{generated_xcode_build_settings_path} must exist. Run flutter pub get first"
-  end
+end
   File.foreach(generated_xcode_build_settings_path) do |line|
     matches = line.match(/FLUTTER_ROOT\=(.*)/)
     return matches[1].strip if matches
@@ -47,6 +47,8 @@ post_install do |installer|
       if target.name == 'Flutter'
         config.build_settings['DEFINES_MODULE'] = 'NO'
         config.build_settings['CLANG_ENABLE_MODULES'] = 'NO'
+        config.build_settings['SWIFT_OBJC_BRIDGING_HEADER'] = '""'
+        config.build_settings['SWIFT_OBJC_INTERFACE_HEADER'] = '""'
       end
     end
     flutter_additional_ios_build_settings(target)
