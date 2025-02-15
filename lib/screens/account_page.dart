@@ -482,10 +482,10 @@ class _AccountPageState extends State<AccountPage> {
       final prefs = await SharedPreferences.getInstance();
       final nationalId = prefs.getString('national_id') ?? '';
 
-      // Call the complete signOut method
-      print('2. Calling AuthService.signOut()');
-      await _authService.signOut();
-      print('3. AuthService.signOut() completed');
+      // Call the complete signOff method
+      print('2. Calling AuthService.signOff()');
+      await _authService.signOff();
+      print('3. AuthService.signOff() completed');
 
       if (!mounted) return;
       

@@ -41,6 +41,7 @@ post_install do |installer|
       config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
       config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
       config.build_settings['OTHER_SWIFT_FLAGS'] = '-DCOCOAPODS'
+      config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
     end
     flutter_additional_ios_build_settings(target)
   end

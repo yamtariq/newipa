@@ -492,8 +492,8 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
         }
         
         // Then sign out completely using auth service
-        print('4. Calling AuthService.signOut()');
-        await _authService.signOut();
+        print('4. Calling AuthService.signOff()');
+        await _authService.signOff();
         
         print('\n5. Checking storage data AFTER sign out:');
         await _logStorageData();
