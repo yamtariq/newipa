@@ -176,7 +176,7 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
     } else {
       setState(() {
         _isLoading = false;
-        _error = widget.isArabic 
+        _error = isArabic 
           ? 'عذراً، لم نتمكن من معالجة طلبك في هذا الوقت'
           : 'Sorry, we could not process your request at this time';
       });
@@ -322,6 +322,14 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
     try {
       setState(() => _isLoading = true);
 
+      // Get user data from secure storage
+      final authService = AuthService();
+      final userData = await authService.getUserData();
+      
+      if (userData == null || userData['national_id'] == null) {
+        throw Exception('Could not retrieve user data from secure storage');
+      }
+
       // 💡 First call the UpdateAmount API
       final updateAmountData = {
         'AgreementId': widget.userData['application_number']?.toString() ?? '',
@@ -374,20 +382,12 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
 
       // If UpdateAmount API call is successful, proceed with inserting loan application
       final loanService = LoanService();
-      
-      // 💡 Extract and validate national_id first
-      final nationalId = widget.userData['national_id'];
-      if (nationalId == null || nationalId.toString().trim().isEmpty) {
-        throw Exception('National ID is required but was not found in user data');
-      }
-
-      print('DEBUG - Using National ID: $nationalId'); // Debug print
 
       final loanData = {
         'customerDecision': 'ACCEPTED',
         'noteUser': 'CUSTOMER',
         'loan_emi': double.parse(emi.toStringAsFixed(2)),
-        'national_id': nationalId.toString(),
+        'national_id': userData['national_id'],  // 💡 Use national ID from secure storage
         'application_no': int.tryParse(widget.userData['application_number']?.toString() ?? '') ?? 0,
         'consent_status': 'True',
         'nafath_status': 'True',
@@ -405,7 +405,7 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
       };
 
       print('DEBUG - Sending loan data to API:');
-      print('National ID: $nationalId'); // 💡 Debug print for national_id
+      print('National ID: ${userData['national_id']}'); // 💡 Debug print for national_id
       print('Loan Purpose: ${widget.userData['loan_purpose']}');
       print(const JsonEncoder.withIndent('  ').convert(loanData));
 
@@ -418,7 +418,7 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
       print('\nDEBUG - Insert Loan Application Response:');
       print(const JsonEncoder.withIndent('  ').convert(response2));
 
-      if (response2['status'] != 'success') {
+      if (!response2['success']) {
         throw Exception(response2['message'] ?? 'Failed to insert loan application');
       }
 

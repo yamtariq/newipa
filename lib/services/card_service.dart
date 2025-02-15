@@ -69,11 +69,16 @@ class CardService {
       for (final constant in cardTypes) {
         if (constant['name'].toString().endsWith('_Limit')) {
           final cardType = constant['name'].toString().replaceAll('_Limit', '');
-          final limitRange = constant['value'].toString().split(' - ');
+          // 💡 Remove all spaces and handle different dash formats
+          final limitRange = constant['value'].toString().replaceAll(' ', '').split('-');
           
           if (limitRange.length == 2) {
-            final minLimit = double.tryParse(limitRange[0]) ?? 0;
-            final maxLimit = double.tryParse(limitRange[1]) ?? double.infinity;
+            final minLimit = double.tryParse(limitRange[0].trim()) ?? 0;
+            final maxLimit = double.tryParse(limitRange[1].trim()) ?? double.infinity;
+            
+            print('\nChecking range for $cardType:');
+            print('Amount: $amount');
+            print('Min: $minLimit, Max: $maxLimit');
             
             if (amount >= minLimit && amount <= maxLimit) {
               // Find corresponding card type name
@@ -162,7 +167,7 @@ class CardService {
         "productType": 1,
         "mobileNo": formattedPhone,
         "emailId": storedUserData['email']?.toString().toLowerCase() ?? '',
-        "finAmount": requestedAmount,
+        "finAmount": 10000, // 💡 Hardcoded high limit for initial request
         "tenure": 60,
         "propertyStatus": 1,
         "effRate": 1,
@@ -337,7 +342,7 @@ class CardService {
       print('\nCard Limits:');
       print(const JsonEncoder.withIndent('  ').convert(cardLimits));
 
-      // 💡 4. Check which limit band the eligible amount falls into
+      // 💡 4. Determine card type based on eligible amount
       var selectedCardType = 'REWARDS'; // Default type
       for (final limit in cardLimits) {
         if (eligibleAmount >= limit['minLimit'] && eligibleAmount <= limit['maxLimit']) {
@@ -402,22 +407,61 @@ class CardService {
         throw Exception('Application number is required');
       }
 
-      // First call UpdateCustomer endpoint
-      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      // 💡 First call Finnone UpdateAmount endpoint
+      final finnoneUpdateData = {
+        'AgreementId': cardData['application_number'].toString(),
+        'Amount': cardData['card_limit'],
+        'Tenure': 0,
+        'FinEmi': 0,
+        'RateEliGible': 0
+      };
+
+      print('\n2. Calling Finnone UpdateAmount API:');
+      print('URL: ${Constants.endpointFinnoneUpdateAmount}');
+      print('Data: $finnoneUpdateData');
+
+      final finnoneClient = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+
+      final finnoneRequest = await finnoneClient.postUrl(Uri.parse(Constants.endpointFinnoneUpdateAmount));
+      
+      // Add headers
+      final headers = {
+        ...Constants.bankApiHeaders,
+        'api-key': Constants.apiKey,
+      };
+      
+      headers.forEach((key, value) {
+        finnoneRequest.headers.set(key, value);
+      });
+
+      // Add body
+      finnoneRequest.write(jsonEncode(finnoneUpdateData));
+      
+      final finnoneResponse = await finnoneRequest.close();
+      final finnoneResponseBody = await finnoneResponse.transform(utf8.decoder).join();
+
+      print('\n3. Finnone UpdateAmount Response:');
+      print('Status Code: ${finnoneResponse.statusCode}');
+      print('Response Body: $finnoneResponseBody');
+
+      if (finnoneResponse.statusCode != 200) {
+        throw Exception('Failed to update amount in Finnone: ${finnoneResponse.statusCode}');
+      }
+
+      // Parse Finnone response
+      final finnoneUpdateResponse = jsonDecode(finnoneResponseBody);
+      if (finnoneUpdateResponse['success'].toString().toLowerCase() != 'record updated successfully') {
+        throw Exception('Finnone update failed: ${finnoneUpdateResponse['message'] ?? 'Unknown error'}');
+      }
+
+      // Now proceed with the original UpdateCustomer endpoint call
       final client = HttpClient()
         ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
 
       final request = await client.postUrl(Uri.parse(Constants.endpointUpdateCustomer));
       
       // 💡 Combine both proxy and bank headers
-      final headers = {
-        ...Constants.bankApiHeaders,  // Bank headers (Authorization, X-APP-ID, etc.)
-        'api-key': Constants.apiKey,  // Proxy API key
-      };
-      
-      print('\n2. Request Headers:');
-      print('Headers: ${headers.map((key, value) => MapEntry(key, key.toLowerCase() == 'authorization' ? '[REDACTED]' : value))}');
-
       headers.forEach((key, value) {
         request.headers.set(key, value);
       });
@@ -430,7 +474,7 @@ class CardService {
         'nameOnCard': cardData['nameOnCard'],
       };
 
-      print('\n3. Request Body:');
+      print('\n4. UpdateCustomer Request Body:');
       print(const JsonEncoder.withIndent('  ').convert(requestBody));
 
       // Add body
@@ -439,7 +483,7 @@ class CardService {
       final response = await request.close();
       final responseBody = await response.transform(utf8.decoder).join();
 
-      print('\n4. UpdateCustomer Response:');
+      print('\n5. UpdateCustomer Response:');
       print('Status Code: ${response.statusCode}');
       print('Response Body: ${responseBody}');
 

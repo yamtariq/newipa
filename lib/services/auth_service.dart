@@ -1421,12 +1421,22 @@ class AuthService {
   // Store user data in secure storage
   Future<void> storeUserData(Map<String, dynamic> userData) async {
     try {
-      print('Storing user data: $userData');
-      await _secureStorage.write(
-        key: 'user_data',
-        value: json.encode(userData),
-      );
-      print('User data stored successfully');
+      print('\n=== STORING USER DATA ===');
+      final prefs = await SharedPreferences.getInstance();
+      final storage = const FlutterSecureStorage();
+      
+      // Store user data
+      await prefs.setString('user_data', json.encode(userData));
+      await storage.write(key: 'user_data', value: json.encode(userData));
+      
+      // 💡 Store device ID separately if it exists
+      if (userData['device_id'] != null) {
+        await storage.write(key: 'device_id', value: userData['device_id']);
+        await prefs.setString('device_id', userData['device_id']);
+      }
+      
+      print('✅ User data stored successfully');
+      print('User data: $userData');
     } catch (e) {
       print('Error storing user data: $e');
       throw Exception('Failed to store user data: $e');
@@ -1849,7 +1859,7 @@ class AuthService {
       print('\n=== GETTING DEVICE ID ===');
       
       // Try secure storage first
-      String? deviceId = await _secureStorage.read(key: 'device_user_id');
+      String? deviceId = await _secureStorage.read(key: 'device_id');
       print('Secure Storage Device ID: $deviceId');
       
       if (deviceId != null) {
@@ -1859,15 +1869,28 @@ class AuthService {
       
       // Fall back to SharedPreferences
       final prefs = await SharedPreferences.getInstance();
-      deviceId = prefs.getString('device_user_id');
+      deviceId = prefs.getString('device_id');
       print('SharedPreferences Device ID: $deviceId');
       
       if (deviceId != null) {
         print('Device ID found in SharedPreferences');
         // Sync to secure storage for next time
-        await _secureStorage.write(key: 'device_user_id', value: deviceId);
+        await _secureStorage.write(key: 'device_id', value: deviceId);
+      } else {
+        // 💡 Try to get from user data as last resort
+        final userDataStr = await _secureStorage.read(key: 'user_data');
+        if (userDataStr != null) {
+          final userData = json.decode(userDataStr);
+          deviceId = userData['device_id'];
+          if (deviceId != null) {
+            print('Device ID found in user data');
+            await _secureStorage.write(key: 'device_id', value: deviceId);
+            await prefs.setString('device_id', deviceId);
+          }
+        }
       }
       
+      print('Final Device ID: $deviceId');
       print('=== GET DEVICE ID END ===\n');
       return deviceId;
     } catch (e) {

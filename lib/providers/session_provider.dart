@@ -26,9 +26,9 @@ class SessionProvider with ChangeNotifier {
 
       print('3. Fetching user data and session status');
       final userData = await _authService.getUserData();
-      final deviceId = await _authService.getDeviceId();
+      final deviceId = userData?['device_id'] ?? await _authService.getDeviceId();
       final sessionFromAuth = await _authService.isSessionActive();
-      final hasValidUserData = userData != null && deviceId != null;
+      final hasValidUserData = userData != null && (deviceId != null || userData['device_id'] != null);
       
       print('4. Session status:');
       print('   - User Data: $userData');
