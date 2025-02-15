@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using NayifatAPI.Data;
 using NayifatAPI.Models;
 using System.Text.Json;
+using System.ComponentModel.DataAnnotations;
 
 namespace NayifatAPI.Controllers
 {
@@ -297,6 +298,95 @@ namespace NayifatAPI.Controllers
                 return Error("Internal server error", 500);
             }
         }
+
+        [HttpPost("insert")]
+        public async Task<IActionResult> InsertLoanApplication([FromBody] InsertLoanApplicationRequest request)
+        {
+            if (!ValidateApiKey())
+            {
+                return Error("Invalid API key", 401);
+            }
+
+            try
+            {
+                _logger.LogInformation("=== Inserting Loan Application ===");
+                _logger.LogInformation($"Request Data: NationalId={request.NationalId}, Amount={request.LoanAmount}, Purpose={request.LoanPurpose}");
+
+                // Start transaction
+                await using var transaction = await _context.Database.BeginTransactionAsync();
+
+                try
+                {
+                    var saudiTime = TimeZoneInfo.ConvertTime(DateTime.UtcNow, SaudiTimeZone);
+
+                    // Create new loan application
+                    var application = new LoanApplication
+                    {
+                        ApplicationNo = request.ApplicationNo,
+                        NationalId = request.NationalId,
+                        CustomerDecision = request.CustomerDecision,
+                        Amount = request.LoanAmount,
+                        Purpose = request.LoanPurpose,
+                        Tenure = request.LoanTenure,
+                        InterestRate = request.InterestRate,
+                        Status = request.Status,
+                        StatusDate = saudiTime,
+                        Remarks = request.Remarks,
+                        NoteUser = request.NoteUser ?? "CUSTOMER",
+                        Note = request.Note ?? "Application created from mobile app",
+                        // Set fixed values for Consent and Nafath
+                        ConsentStatus = "True",
+                        ConsentStatusDate = saudiTime,
+                        NafathStatus = "True",
+                        NafathStatusDate = saudiTime
+                    };
+
+                    _context.LoanApplications.Add(application);
+                    await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
+
+                    _logger.LogInformation($"Successfully created loan application with ID: {application.Id}");
+
+                    return Success(new
+                    {
+                        message = "Loan application created successfully",
+                        loan_id = application.Id,
+                        application_no = application.ApplicationNo,
+                        details = new
+                        {
+                            national_id = application.NationalId,
+                            customer_decision = application.CustomerDecision,
+                            loan_amount = application.Amount,
+                            loan_purpose = application.Purpose,
+                            loan_tenure = application.Tenure,
+                            interest_rate = application.InterestRate,
+                            status = application.Status,
+                            status_date = application.StatusDate,
+                            remarks = application.Remarks,
+                            note_user = application.NoteUser,
+                            note = application.Note,
+                            consent_status = application.ConsentStatus,
+                            consent_status_date = application.ConsentStatusDate,
+                            nafath_status = application.NafathStatus,
+                            nafath_status_date = application.NafathStatusDate
+                        }
+                    });
+                }
+                catch (Exception)
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error inserting loan application for National ID: {NationalId}. Error details: {ErrorMessage}, Stack trace: {StackTrace}", 
+                    request.NationalId, 
+                    ex.Message,
+                    ex.StackTrace);
+                return Error($"Internal server error: {ex.Message}", 500);
+            }
+        }
     }
 
     public class InitialLoanApplicationRequest
@@ -320,5 +410,54 @@ namespace NayifatAPI.Controllers
         public string? Remarks { get; set; }
         public string? NoteUser { get; set; }
         public string? Note { get; set; }
+    }
+
+    public class InsertLoanApplicationRequest
+    {
+        [Required]
+        public required string NationalId { get; set; }
+
+        [Required]
+        public required int ApplicationNo { get; set; }
+
+        [Required]
+        [StringLength(50)]
+        public required string CustomerDecision { get; set; }
+
+        [Required]
+        public required decimal LoanAmount { get; set; }
+
+        [Required]
+        [StringLength(100)]
+        public required string LoanPurpose { get; set; }
+
+        [Required]
+        public required int LoanTenure { get; set; }
+
+        [Required]
+        public required decimal InterestRate { get; set; }
+
+        [Required]
+        [StringLength(50)]
+        public required string Status { get; set; }
+
+        [StringLength(255)]
+        public string? Remarks { get; set; }
+
+        [StringLength(50)]
+        public string? NoteUser { get; set; }
+
+        [StringLength(255)]
+        public string? Note { get; set; }
+
+        [StringLength(50)]
+        public string? ConsentStatus { get; set; }
+
+        public DateTime? ConsentStatusDate { get; set; }
+
+        [StringLength(50)]
+        public string? NafathStatus { get; set; }
+
+        public DateTime? NafathStatusDate { get; set; }
     }
 } 

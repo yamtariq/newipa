@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using NayifatAPI.Data;
 using NayifatAPI.Models;
 using System.Text.Json;
+using System.ComponentModel.DataAnnotations;
 
 namespace NayifatAPI.Controllers
 {
@@ -324,15 +325,20 @@ namespace NayifatAPI.Controllers
                     {
                         NationalId = request.NationalId,
                         ApplicationNo = request.ApplicationNo,
+                        CustomerDecision = request.CustomerDecision,
                         CardType = request.CardType,
                         CardLimit = request.CardLimit,
                         Status = request.Status,
                         StatusDate = saudiTime,
-                        CustomerDecision = request.CustomerDecision,
                         Remarks = request.Remarks,
                         NoteUser = request.NoteUser ?? "SYSTEM",
                         Note = request.Note ?? "Application created",
-                        NameOnCard = request.NameOnCard
+                        NameOnCard = request.NameOnCard,
+                        // Set fixed values for Consent and Nafath
+                        ConsentStatus = "True",
+                        ConsentStatusDate = saudiTime,
+                        NafathStatus = "True",
+                        NafathStatusDate = saudiTime
                     };
 
                     _context.CardApplications.Add(application);
@@ -350,12 +356,19 @@ namespace NayifatAPI.Controllers
                             card_id = application.Id,
                             national_id = application.NationalId,
                             application_no = application.ApplicationNo,
+                            customer_decision = application.CustomerDecision,
                             card_type = application.CardType,
                             card_limit = application.CardLimit,
                             status = application.Status,
-                            customer_decision = application.CustomerDecision,
+                            status_date = application.StatusDate,
+                            remarks = application.Remarks,
+                            note_user = application.NoteUser,
+                            note = application.Note,
                             name_on_card = application.NameOnCard,
-                            created_at = application.StatusDate
+                            consent_status = application.ConsentStatus,
+                            consent_status_date = application.ConsentStatusDate,
+                            nafath_status = application.NafathStatus,
+                            nafath_status_date = application.NafathStatusDate
                         }
                     });
                 }
@@ -396,10 +409,15 @@ namespace NayifatAPI.Controllers
     public class InsertCardApplicationRequest
     {
         [Required]
+        [StringLength(50)]
         public required string NationalId { get; set; }
 
         [Required]
         public required int ApplicationNo { get; set; }
+
+        [Required]
+        [StringLength(50)]
+        public required string CustomerDecision { get; set; }
 
         [Required]
         [StringLength(50)]
@@ -413,15 +431,16 @@ namespace NayifatAPI.Controllers
         public required string Status { get; set; }
 
         [Required]
-        [StringLength(50)]
-        public required string CustomerDecision { get; set; }
-
-        [Required]
         [StringLength(100)]
         public required string NameOnCard { get; set; }
 
+        [StringLength(255)]
         public string? Remarks { get; set; }
+
+        [StringLength(50)]
         public string? NoteUser { get; set; }
+
+        [StringLength(255)]
         public string? Note { get; set; }
     }
 } 

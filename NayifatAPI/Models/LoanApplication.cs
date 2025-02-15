@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace NayifatAPI.Models
 {
-    [Table("loan_application_details")]
+    [Table("loan_applications")]
     public class LoanApplication
     {
         [Key]
@@ -20,19 +20,20 @@ namespace NayifatAPI.Models
 
         [Required]
         [Column("customerDecision")]
-        public string CustomerDecision { get; set; } = "pending";
+        [StringLength(50)]
+        public string CustomerDecision { get; set; } = "PENDING";
 
-        [Required]
         [Column("loan_amount", TypeName = "decimal(18,2)")]
         public decimal Amount { get; set; }
 
         [Column("loan_purpose")]
+        [StringLength(100)]
         public string? Purpose { get; set; }
 
         [Column("loan_tenure")]
         public int? Tenure { get; set; }
 
-        [Column("interest_rate", TypeName = "decimal(5,2)")]
+        [Column("interest_rate", TypeName = "decimal(18,2)")]
         public decimal? InterestRate { get; set; }
 
         [Required]
@@ -45,15 +46,32 @@ namespace NayifatAPI.Models
         public DateTime StatusDate { get; set; } = DateTime.UtcNow;
 
         [Column("remarks")]
+        [StringLength(255)]
         public string? Remarks { get; set; }
 
         [Required]
         [Column("noteUser")]
+        [StringLength(50)]
         public string NoteUser { get; set; } = "CUSTOMER";
 
         [Required]
         [Column("note")]
+        [StringLength(255)]
         public string Note { get; set; } = string.Empty;
+
+        [Column("consent_status")]
+        [StringLength(50)]
+        public string? ConsentStatus { get; set; }
+
+        [Column("consent_status_date")]
+        public DateTime? ConsentStatusDate { get; set; }
+
+        [Column("nafath_status")]
+        [StringLength(50)]
+        public string? NafathStatus { get; set; }
+
+        [Column("nafath_status_date")]
+        public DateTime? NafathStatusDate { get; set; }
 
         [ForeignKey(nameof(NationalId))]
         public virtual Customer Customer { get; set; } = null!;

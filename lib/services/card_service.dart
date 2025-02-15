@@ -205,31 +205,48 @@ class CardService {
         'api-key': Constants.apiKey,  // Proxy API key
       };
       
-      print('\n4. Request Headers:');
-      print('Headers: ${headers.map((key, value) => MapEntry(key, key.toLowerCase() == 'authorization' ? '[REDACTED]' : value))}');
+      // 💡 Log complete request details
+      print('\n=== CREATE CUSTOMER REQUEST DETAILS ===');
+      print('Endpoint: ${Constants.endpointCreateCustomer}');
+      print('Headers:');
+      headers.forEach((key, value) {
+        print('$key: ${key.toLowerCase() == 'authorization' ? '[REDACTED]' : value}');
+      });
+      print('\nRequest Body:');
+      print(const JsonEncoder.withIndent('  ').convert(requestData));
 
+      // Set headers and send request
       headers.forEach((key, value) {
         request.headers.set(key, value);
       });
-
-      // Add body
       request.write(jsonEncode(requestData));
       
+      // Get response
       final response = await request.close();
       final responseBody = await response.transform(utf8.decoder).join();
 
-      print('\n5. API Response:');
+      // 💡 Log complete response details
+      print('\n=== CREATE CUSTOMER RESPONSE DETAILS ===');
       print('Status Code: ${response.statusCode}');
-      print('Response Body: "$responseBody"');  // Added quotes to see if empty
-      print('Response Body Length: ${responseBody.length}');
       print('Response Headers:');
       response.headers.forEach((name, values) {
         print('$name: $values');
       });
+      print('\nResponse Body:');
+      if (responseBody.isNotEmpty) {
+        try {
+          print(const JsonEncoder.withIndent('  ').convert(json.decode(responseBody)));
+        } catch (e) {
+          print('Raw response: $responseBody');
+          print('(Could not parse as JSON: $e)');
+        }
+      } else {
+        print('(Empty response body)');
+      }
+      print('=== END CREATE CUSTOMER DETAILS ===\n');
 
-      // 💡 Handle empty response
+      // Handle empty response
       if (responseBody.isEmpty) {
-        print('\nEmpty response body received');
         throw Exception('Empty response received from server');
       }
 
@@ -237,14 +254,12 @@ class CardService {
         throw Exception('Failed to create customer: ${response.statusCode}');
       }
 
-      // 💡 Add try-catch for JSON parsing
+      // Parse JSON response
       Map<String, dynamic> responseData;
       try {
         responseData = jsonDecode(responseBody);
       } catch (e) {
-        print('\nError parsing JSON response: $e');
-        print('Raw response body: "$responseBody"');
-        throw Exception('Invalid response format from server');
+        throw Exception('Invalid response format from server: $e');
       }
 
       if (!responseData['success']) {
@@ -388,27 +403,70 @@ class CardService {
       }
 
       // First call UpdateCustomer endpoint
-      final updateCustomerResponse = await http.post(
-        Uri.parse(Constants.endpointUpdateCustomer),
-        headers: {
-          ...Constants.bankApiHeaders,  // Bank headers (Authorization, X-APP-ID, etc.)
-          'api-key': Constants.apiKey,  // Proxy API key
-        },
-        body: json.encode({
-          'nationalId': cardData['national_id'],  // Changed from nationnalID to nationalId
-          'applicationId': cardData['application_number'],  // Changed from applicationID to applicationId
-          'acceptFlag': cardData['customerDecision'] == 'ACCEPTED' ? 1 : 0,  // Set based on decision
-          'nameOnCardCode': cardData['nameOnCard'],
-        }),
-      );
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      final client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
 
-      print('\n2. UpdateCustomer Response:');
-      print('Status Code: ${updateCustomerResponse.statusCode}');
-      print('Response Body: ${updateCustomerResponse.body}');
+      final request = await client.postUrl(Uri.parse(Constants.endpointUpdateCustomer));
+      
+      // 💡 Combine both proxy and bank headers
+      final headers = {
+        ...Constants.bankApiHeaders,  // Bank headers (Authorization, X-APP-ID, etc.)
+        'api-key': Constants.apiKey,  // Proxy API key
+      };
+      
+      print('\n2. Request Headers:');
+      print('Headers: ${headers.map((key, value) => MapEntry(key, key.toLowerCase() == 'authorization' ? '[REDACTED]' : value))}');
 
-      final updateCustomerData = json.decode(updateCustomerResponse.body);
+      headers.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+
+      // 💡 Prepare request body
+      final requestBody = {
+        'nationnalID': cardData['national_id'],
+        'applicationID': cardData['application_number'],
+        'acceptFlag': cardData['customerDecision'] == 'ACCEPTED' ? 1 : 0,
+        'nameOnCard': cardData['nameOnCard'],
+      };
+
+      print('\n3. Request Body:');
+      print(const JsonEncoder.withIndent('  ').convert(requestBody));
+
+      // Add body
+      request.write(jsonEncode(requestBody));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      print('\n4. UpdateCustomer Response:');
+      print('Status Code: ${response.statusCode}');
+      print('Response Body: ${responseBody}');
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to update customer: HTTP ${response.statusCode}');
+      }
+
+      // 💡 Handle empty response
+      if (responseBody.isEmpty) {
+        print('\nEmpty response body received');
+        throw Exception('Empty response received from server');
+      }
+
+      // 💡 Parse response with error handling
+      Map<String, dynamic> updateCustomerData;
+      try {
+        updateCustomerData = jsonDecode(responseBody);
+      } catch (e) {
+        print('\nError parsing JSON response: $e');
+        print('Raw response body: "$responseBody"');
+        throw Exception('Invalid response format from server');
+      }
+
       if (!updateCustomerData['success']) {
-        throw Exception('Failed to update customer: ${updateCustomerData['errors']?.join(', ') ?? updateCustomerData['result']?['errMsg'] ?? 'Unknown error'}');
+        final errors = updateCustomerData['errors'] ?? [];
+        final errMsg = updateCustomerData['result']?['errMsg'] ?? '';
+        throw Exception('Failed to update customer: ${errors.isNotEmpty ? errors.join(', ') : errMsg}');
       }
 
       // 💡 After successful updateCustomer, insert the final application status
@@ -427,17 +485,17 @@ class CardService {
       });
 
       print('\n3. Insert Card Application Response:');
-      print('Status Code: ${insertResponse['status']}');
-      print('Response Body: ${insertResponse['message']}');
+      print('Response Data: ${const JsonEncoder.withIndent('  ').convert(insertResponse)}');
 
-      if (insertResponse['status'] != 'success') {
-        throw Exception('Failed to save card application: ${insertResponse['message']}');
+      if (!insertResponse['success']) {
+        throw Exception('Failed to save card application: ${insertResponse['data']?['message'] ?? 'Unknown error'}');
       }
 
       print('\n=== UPDATE CUSTOMER CARD REQUEST - END (SUCCESS) ===\n');
       return {
         'status': 'success',
-        'message': 'Card application processed successfully',
+        'message': insertResponse['data']['message'],
+        'details': insertResponse['data']['details']
       };
     } catch (e) {
       print('\nERROR in updateCustomerCardRequest:');
@@ -604,40 +662,55 @@ class CardService {
       print('Endpoint: ${Constants.apiBaseUrl}${Constants.endpointInsertCardApplication}');
       print('Headers: ${Constants.defaultHeaders}');
 
-      // Format request body according to database schema
+      // 💡 Format request body according to API schema
       final requestBody = {
-        'national_id': nationalId,
-        'application_no': cardData['application_no'],
-        'customerDecision': cardData['customerDecision'],
-        'card_type': cardData['card_type'],
-        'card_limit': cardData['card_limit'],
-        'status': cardData['status'],
-        'status_date': cardData['status_date'] ?? DateTime.now().toIso8601String(),
-        'remarks': cardData['remarks'] ?? 'New card application',
-        'noteUser': cardData['noteUser'] ?? 'CUSTOMER',
-        'note': cardData['note'] ?? 'Application submitted via mobile app',
-        'NameOnCard': cardData['NameOnCard'],
+        'nationalId': cardData['national_id'].toString(),
+        'applicationNo': int.parse(cardData['application_no'].toString()),
+        'cardType': cardData['card_type'].toString(),
+        'cardLimit': int.parse(cardData['card_limit'].toString()),
+        'status': cardData['status'].toString(),
+        'customerDecision': cardData['customerDecision'].toString(),
+        'nameOnCard': (cardData['NameOnCard'] ?? '').toString(),
+        'remarks': (cardData['remarks'] ?? '').toString(),
+        'noteUser': (cardData['noteUser'] ?? '').toString(),
+        'note': (cardData['note'] ?? '').toString()
       };
 
       print('\n3. Request Body:');
       print(const JsonEncoder.withIndent('  ').convert(requestBody));
 
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointInsertCardApplication}'),
-        headers: Constants.defaultHeaders,
-        body: json.encode(requestBody),
-      );
+      // 💡 Create a custom HttpClient that accepts self-signed certificates
+      final client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+
+      final request = await client.postUrl(Uri.parse('${Constants.apiBaseUrl}${Constants.endpointInsertCardApplication}'));
+      
+      // Add headers
+      final headers = {
+        ...Constants.defaultHeaders,
+        'Accept': 'application/json',
+      };
+      
+      headers.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+
+      // Add body
+      request.write(jsonEncode(requestBody));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
 
       print('\n4. API Response:');
       print('Status Code: ${response.statusCode}');
       print('Headers:');
-      response.headers.forEach((key, value) {
-        print('$key: $value');
+      response.headers.forEach((name, values) {
+        print('$name: $values');
       });
-      print('Response Body: ${response.body}');
+      print('Response Body: ${responseBody}');
 
       if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
+        final responseData = json.decode(responseBody);
         print('\n5. Parsed Response:');
         print(const JsonEncoder.withIndent('  ').convert(responseData));
         print('\n=== INSERT CARD APPLICATION - END (SUCCESS) ===\n');
@@ -645,7 +718,19 @@ class CardService {
       } else {
         print('\nERROR: Non-200 status code received');
         print('=== INSERT CARD APPLICATION - END (ERROR) ===\n');
-        throw Exception('Failed to insert card application');
+        
+        // Try to parse error response for more details
+        try {
+          final errorData = json.decode(responseBody);
+          final errorMessage = errorData['errors']?.values
+              ?.expand((e) => e as List)
+              ?.join(', ') ?? 
+              errorData['title'] ??
+              'Failed to insert card application';
+          throw Exception(errorMessage);
+        } catch (e) {
+          throw Exception('Failed to insert card application: ${response.statusCode}');
+        }
       }
     } catch (e) {
       print('\nERROR in insertCardApplication:');

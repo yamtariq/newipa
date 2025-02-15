@@ -1512,10 +1512,11 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                                     print('\n=== LOAN APPLICATION NEXT BUTTON CLICKED ===');
                                     print('Timestamp: ${DateTime.now()}');
                                     
-                                    // Call the loan service to create offer
+                                    // Call the loan service to create request
                                     final loanService = LoanService();
-                                    final response = await loanService.createLoanApplicationOffer(
-                                      isArabic: isArabic
+                                    final response = await loanService.createCustomerLoanRequest(
+                                      _userData,
+                                      isArabic
                                     );
                                     
                                     if (!mounted) return;
@@ -1550,14 +1551,14 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                                       ),
                                     );
                                   } catch (e) {
-                                    print('Error creating loan offer: $e');
+                                    print('Error creating loan request: $e');
                                     if (mounted) {
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(
                                           content: Text(
                                             isArabic 
-                                              ? 'حدث خطأ أثناء إنشاء عرض التمويل'
-                                              : 'Error creating loan offer',
+                                              ? 'حدث خطأ أثناء إنشاء طلب التمويل'
+                                              : 'Error creating loan request',
                                             textAlign: isArabic ? TextAlign.right : TextAlign.left,
                                           ),
                                           backgroundColor: Colors.red,
