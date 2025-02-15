@@ -42,6 +42,12 @@ post_install do |installer|
       config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
       config.build_settings['OTHER_SWIFT_FLAGS'] = '-DCOCOAPODS'
       config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
+      
+      # Disable module interfaces for Flutter targets
+      if target.name == 'Flutter'
+        config.build_settings['DEFINES_MODULE'] = 'NO'
+        config.build_settings['CLANG_ENABLE_MODULES'] = 'NO'
+      end
     end
     flutter_additional_ios_build_settings(target)
   end

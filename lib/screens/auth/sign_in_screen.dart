@@ -252,11 +252,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
       // Check if device is registered and get last used national ID
       final isDeviceRegistered = await _authService.isDeviceRegistered();
-      final secureStorage = const FlutterSecureStorage();
-      final deviceRegistered = await secureStorage.read(key: 'device_registered');
-      
-      // 💡 Double check device registration in both storages
-      if (isDeviceRegistered && deviceRegistered == 'true') {
+      if (isDeviceRegistered) {
         final prefs = await SharedPreferences.getInstance();
         _lastUsedNationalId = prefs.getString('device_user_id');
         if (_lastUsedNationalId != null) {
@@ -266,7 +262,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
       setState(() {
         // If device is registered and has quick sign-in methods, show them
-        if (isDeviceRegistered && deviceRegistered == 'true' && (_isBiometricsAvailable || _isMPINSet)) {
+        if (isDeviceRegistered && (_isBiometricsAvailable || _isMPINSet)) {
           _isPasswordMode = widget.startWithPassword;
         } else {
           // Otherwise, always use password mode
@@ -275,7 +271,7 @@ class _SignInScreenState extends State<SignInScreen> {
       });
 
       // If device is registered and biometrics are enabled, trigger it automatically
-      if (isDeviceRegistered && deviceRegistered == 'true' && _isBiometricsAvailable && !widget.startWithPassword) {
+      if (isDeviceRegistered && _isBiometricsAvailable && !widget.startWithPassword) {
         final isBiometricEnabled = await _authService.isBiometricEnabled();
         if (isBiometricEnabled) {
           Future.delayed(const Duration(milliseconds: 500), () {
@@ -288,7 +284,6 @@ class _SignInScreenState extends State<SignInScreen> {
       print('- Biometrics Available: $_isBiometricsAvailable');
       print('- MPIN Set: $_isMPINSet');
       print('- Device Registered: $isDeviceRegistered');
-      print('- Device Registered in Secure Storage: ${deviceRegistered == 'true'}');
       print('- Last Used ID: $_lastUsedNationalId');
       print('- Password Mode: $_isPasswordMode');
     } catch (e) {

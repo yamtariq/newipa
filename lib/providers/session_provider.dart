@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import '../services/auth_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class SessionProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
@@ -20,60 +19,39 @@ class SessionProvider with ChangeNotifier {
       print('   - manualSignOff: $_manualSignOff');
       print('   - hasActiveSession: $_hasActiveSession');
 
-      // 💡 First check persisted isSignedIn state
-      final prefs = await SharedPreferences.getInstance();
-      final persistedSignedIn = prefs.getBool('is_signed_in') ?? false;
-      _isSignedIn = persistedSignedIn;
-
-      // 💡 Check device registration status
-      final isDeviceRegistered = await _authService.isDeviceRegistered();
-      print('2. Device registration status: $isDeviceRegistered');
-
       if (_manualSignOff) {
-        print('3. Manual sign off is true, keeping isSignedIn as $persistedSignedIn');
-        notifyListeners();
+        print('2. Manual sign off is true, skipping initialization');
         return;
       }
 
-      print('4. Fetching user data and session status');
+      print('3. Fetching user data and session status');
       final userData = await _authService.getUserData();
       final deviceId = userData?['device_id'] ?? await _authService.getDeviceId();
       final sessionFromAuth = await _authService.isSessionActive();
       final hasValidUserData = userData != null && (deviceId != null || userData['device_id'] != null);
       
-      print('5. Session status:');
+      print('4. Session status:');
       print('   - User Data: $userData');
       print('   - Device ID: $deviceId');
       print('   - Session from Auth: $sessionFromAuth');
       print('   - Has Valid User Data: $hasValidUserData');
-      print('   - Device Registered: $isDeviceRegistered');
 
       _hasActiveSession = sessionFromAuth;
-      
-      // 💡 Update isSignedIn based on all conditions
-      if (!persistedSignedIn || !isDeviceRegistered) {
-        _isSignedIn = false;
-        await prefs.setBool('is_signed_in', false);
-      }
-      
-      print('6. New states:');
+      _isSignedIn = sessionFromAuth && hasValidUserData;
+      print('5. New states:');
       print('   - isSignedIn: $_isSignedIn');
       print('   - hasActiveSession: $_hasActiveSession');
-      print('   - Device Registered: $isDeviceRegistered');
       
-      print('7. Notifying listeners');
+      print('6. Notifying listeners');
       notifyListeners();
       print('=== SESSION PROVIDER INITIALIZE END ===\n');
     } catch (e) {
       print('\n!!! ERROR IN SESSION PROVIDER INITIALIZE !!!');
       print('Error details: $e');
-      // Reset all states on error
       _isSignedIn = false;
       _hasActiveSession = false;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('is_signed_in', false);
       notifyListeners();
-      print('Session state reset due to error');
+      print('Session state reset to false due to error');
       print('!!! ERROR HANDLING COMPLETE !!!\n');
     }
   }
@@ -150,10 +128,7 @@ class SessionProvider with ChangeNotifier {
       print('4. Updating provider state');
       _hasActiveSession = false;
       _manualSignOff = true;
-      // 💡 Keep isSignedIn true and persist it
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('is_signed_in', true);
-      
+      // Do not change _isSignedIn state
       print('5. New states:');
       print('   - isSignedIn: $_isSignedIn');
       print('   - manualSignOff: $_manualSignOff');
@@ -171,7 +146,7 @@ class SessionProvider with ChangeNotifier {
   }
 
   // Reset manual sign off flag (call this when user signs in)
-  void resetManualSignOff() async {
+  void resetManualSignOff() {
     print('\n=== RESET MANUAL SIGN OFF START ===');
     print('1. Current states:');
     print('   - isSignedIn: $_isSignedIn');
@@ -179,10 +154,6 @@ class SessionProvider with ChangeNotifier {
     print('   - hasActiveSession: $_hasActiveSession');
     
     _manualSignOff = false;
-    // 💡 Update persisted isSignedIn state
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('is_signed_in', _isSignedIn);
-    
     print('2. New states:');
     print('   - isSignedIn: $_isSignedIn');
     print('   - manualSignOff: $_manualSignOff');
@@ -191,7 +162,7 @@ class SessionProvider with ChangeNotifier {
   }
 
   // Set signed in state explicitly
-  void setSignedIn(bool value) async {
+  void setSignedIn(bool value) {
     print('\n=== SET SIGNED IN STATE START ===');
     print('1. Current states:');
     print('   - isSignedIn: $_isSignedIn');
@@ -204,10 +175,6 @@ class SessionProvider with ChangeNotifier {
       _manualSignOff = false;
       _hasActiveSession = true;
     }
-    
-    // 💡 Persist the isSignedIn state
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('is_signed_in', value);
     
     print('2. New states:');
     print('   - isSignedIn: $_isSignedIn');

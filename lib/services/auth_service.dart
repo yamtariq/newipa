@@ -887,63 +887,87 @@ class AuthService {
   }
 
   // Sign out
-  Future<void> signOff() async {
+  Future<void> signOut() async {
     try {
-      print('\n=== AUTH SERVICE SIGN OFF START ===');
-      print('1. Attempting to clear session token');
+      print('\n=== SIGN OUT PROCESS START ===');
       
-      // Check current token before clearing
-      final currentToken = await _secureStorage.read(key: 'auth_token');
-      print('2. Current auth token exists: ${currentToken != null}');
+      // 1. Cancel refresh timer first to prevent re-initialization
+      _refreshTimer?.cancel();
+      _refreshTimer = null;
       
-      // 💡 Save device registration data before clearing
-      final deviceUserId = await _secureStorage.read(key: 'device_user_id');
-      final deviceRegistered = await _secureStorage.read(key: 'device_registered');
-      final biometricsEnabled = await _secureStorage.read(key: 'biometrics_enabled');
-      final biometricUserId = await _secureStorage.read(key: 'biometric_user_id');
-      final mpinData = await getStoredMPIN();
+      // 2. Clear session data
+      await signOff();
       
-      // Clear only session-related data
-      await _secureStorage.delete(key: 'auth_token');
-      await _secureStorage.delete(key: 'session_active');
-      await _secureStorage.write(key: 'session_active', value: 'false');
+      // 3. Sign out device (this includes server call)
+      await signOutDevice();
       
-      // 💡 Restore device registration data
-      if (deviceUserId != null && deviceRegistered == 'true') {
-        await _secureStorage.write(key: 'device_user_id', value: deviceUserId);
-        await _secureStorage.write(key: 'device_registered', value: 'true');
-        if (biometricsEnabled == 'true' && biometricUserId != null) {
-          await _secureStorage.write(key: 'biometrics_enabled', value: 'true');
-          await _secureStorage.write(key: 'biometric_user_id', value: biometricUserId);
-        }
-        if (mpinData != null) {
-          await storeMPIN(mpinData);
-        }
-      }
-      
-      // 💡 Also preserve in SharedPreferences
+      // 4. Get storage instances
       final prefs = await SharedPreferences.getInstance();
-      if (deviceUserId != null && deviceRegistered == 'true') {
-        await prefs.setString('device_user_id', deviceUserId);
-        await prefs.setBool('device_registered', true);
-        if (biometricsEnabled == 'true' && biometricUserId != null) {
-          await prefs.setBool('biometrics_enabled', true);
-          await prefs.setString('biometric_user_id', biometricUserId);
-        }
+      
+      // Store temporary values we want to keep
+      final isArabic = prefs.getBool('isArabic') ?? false;
+      final isDarkMode = prefs.getBool('is_dark_mode') ?? false;
+      
+      // 5. Clear user-specific data from SharedPreferences
+      print('Clearing user-specific data from SharedPreferences...');
+      final keysToRemove = [
+        'user_data',
+        'registration_data',  // Added registration data
+        'national_id',
+        'device_user_id',
+        'auth_token',
+        'refresh_token',
+        'session_data',
+        'biometrics_enabled',
+        'mpin_set',
+        'last_sign_in',
+        'user_preferences',
+        'session_active',
+        'session_user_id',
+        'biometric_user_id',
+        'device_registered',
+        'mpin',
+      ];
+      
+      for (var key in keysToRemove) {
+        await prefs.remove(key);
       }
-      await prefs.setBool('session_active', false);
       
-      // Verify token is cleared
-      final tokenAfterDelete = await _secureStorage.read(key: 'auth_token');
-      print('3. Auth token deleted from secure storage');
-      print('4. Auth token after deletion exists: ${tokenAfterDelete != null}');
-      print('5. Device registration preserved: ${deviceRegistered == 'true'}');
+      // 6. Clear user-specific data from SecureStorage
+      print('Clearing user-specific data from SecureStorage...');
+      final secureKeysToRemove = [
+        'user_data',
+        'registration_data',  // Added registration data
+        'auth_token',
+        'refresh_token',
+        'device_user_id',
+        'mpin',
+        'biometrics_enabled',
+        'device_registered',
+        'session_data',
+        'session_active',
+        'session_user_id',
+        'biometric_user_id',
+        'national_id',
+        'user_password',
+      ];
       
-      print('6. Session signed off successfully');
-      print('=== AUTH SERVICE SIGN OFF END ===\n');
+      for (var key in secureKeysToRemove) {
+        await _secureStorage.delete(key: key);
+      }
+      
+      // 7. Reset device registration and biometric flags
+      await _secureStorage.write(key: 'device_registered', value: 'false');
+      await _secureStorage.write(key: 'biometrics_enabled', value: 'false');
+      
+      // 8. Restore app settings
+      await prefs.setBool('isArabic', isArabic);
+      await prefs.setBool('is_dark_mode', isDarkMode);
+      
+      print('=== SIGN OUT PROCESS COMPLETE ===\n');
     } catch (e) {
-      print('ERROR in AuthService.signOff(): $e');
-      throw Exception('Failed to sign off: $e');
+      print('Error during sign out: $e');
+      throw Exception('Failed to sign out: $e');
     }
   }
 
@@ -995,6 +1019,32 @@ class AuthService {
     } catch (e) {
       print('Error during device sign out: $e');
       // Don't throw, just log the error
+    }
+  }
+
+  // Session Management Methods
+  Future<void> signOff() async {
+    try {
+      print('\n=== AUTH SERVICE SIGN OFF START ===');
+      print('1. Attempting to clear session token');
+      
+      // Check current token before clearing
+      final currentToken = await _secureStorage.read(key: 'auth_token');
+      print('2. Current auth token exists: ${currentToken != null}');
+      
+      // Only clear session token
+      await _secureStorage.delete(key: 'auth_token');
+      print('3. Auth token deleted from secure storage');
+      
+      // Verify token is cleared
+      final tokenAfterDelete = await _secureStorage.read(key: 'auth_token');
+      print('4. Auth token after deletion exists: ${tokenAfterDelete != null}');
+      
+      print('5. Session signed off successfully');
+      print('=== AUTH SERVICE SIGN OFF END ===\n');
+    } catch (e) {
+      print('ERROR in AuthService.signOff(): $e');
+      throw Exception('Failed to sign off: $e');
     }
   }
 
