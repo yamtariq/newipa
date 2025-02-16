@@ -67,14 +67,14 @@ class _CardsPageState extends State<CardsPage> {
     if (!mounted) return;
     
     try {
-      // Only show loading indicator if we don't have any content yet
+      // 💡 Only show loading indicator for initial load
       if (_cards.isEmpty && _cardAd == null) {
         setState(() {
           _isLoading = true;
         });
       }
       
-      // Load card ad first - use default if not available
+      // 💡 Load card ad first with fallback
       final newCardAd = _contentUpdateService.getCardAd(isArabic: false) ?? Constants.cardAd['en'];
       
       final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
@@ -90,6 +90,8 @@ class _CardsPageState extends State<CardsPage> {
         } catch (e) {
           debugPrint('Error loading user cards: $e');
           // Don't show error, just use empty list
+          cards = [];
+          status = null;
         }
       }
       
@@ -106,15 +108,11 @@ class _CardsPageState extends State<CardsPage> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          // Set default ad if loading failed
+          // 💡 Set default ad if loading failed
           _cardAd = Constants.cardAd['en'];
+          _cards = [];
+          _applicationStatus = null;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading data: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
     }
   }
@@ -255,6 +253,11 @@ class _CardsPageState extends State<CardsPage> {
   }
 
   Widget _buildAdvertBanner() {
+    // 💡 Safe null check for card ad and image bytes
+    final hasValidAd = _cardAd != null && 
+        _cardAd!.containsKey('image_bytes') && 
+        _cardAd!['image_bytes'] != null;
+
     return Container(
       height: 180,
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -263,11 +266,18 @@ class _CardsPageState extends State<CardsPage> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
-        child: _cardAd != null && _cardAd!['image_bytes'] != null
+        child: hasValidAd
             ? Image.memory(
                 _cardAd!['image_bytes'],
                 fit: BoxFit.fill,
                 width: double.infinity,
+                errorBuilder: (context, error, stackTrace) {
+                  return Image.asset(
+                    'assets/images/cards_ad.JPG',
+                    fit: BoxFit.fill,
+                    width: double.infinity,
+                  );
+                },
               )
             : Image.asset(
                 'assets/images/cards_ad.JPG',
@@ -391,7 +401,10 @@ class _CardsPageState extends State<CardsPage> {
           final actualIndex = (_selectedCardIndex + index) % _cards.length;
           final card = _cards[actualIndex];
           
+          // 💡 Add null checks and default values
           final cardStatus = card['status']?.toString() ?? 'Active';
+          final availableLimit = card['available_limit']?.toString() ?? 'SAR 0.00';
+          final cardLimit = card['card_limit']?.toString() ?? 'SAR 0.00';
           
           final bool isClickable = index > 0;
 
@@ -405,7 +418,7 @@ class _CardsPageState extends State<CardsPage> {
               duration: const Duration(milliseconds: 500),
               scale: _isCardAnimating[index] ? 0.95 : 1.0,
               child: Container(
-                width: MediaQuery.of(context).size.width - 32, // Full width minus margins
+                width: MediaQuery.of(context).size.width - 32,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -439,6 +452,13 @@ class _CardsPageState extends State<CardsPage> {
                               child: Image.asset(
                                 'assets/images/platinum.jpg',
                                 fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) {
+                                  // 💡 Return a colored container if image fails to load
+                                  return Container(
+                                    color: Colors.grey[300],
+                                    child: Icon(Icons.credit_card, size: 48, color: Colors.grey[600]),
+                                  );
+                                },
                               ),
                             ),
                           ),
@@ -476,7 +496,7 @@ class _CardsPageState extends State<CardsPage> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              card['available_limit']?.toString() ?? 'SAR 0.00',
+                              availableLimit,
                               style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
@@ -493,7 +513,7 @@ class _CardsPageState extends State<CardsPage> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              card['card_limit']?.toString() ?? 'SAR 0.00',
+                              cardLimit,
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w500,

@@ -721,59 +721,73 @@ class ContentUpdateService extends ChangeNotifier {
   }
 
   Map<String, dynamic>? getLoanAd({bool isArabic = false}) {
-    final adData = _memoryCache['loan_ad'];
-    if (adData != null) {
+    try {
+      // First try to get cached content
+      final adData = _memoryCache['loan_ad'];
       final imageBytes = _memoryCache['loan_ad_image_bytes'];
-      if (imageBytes != null) {
+      
+      if (adData != null && imageBytes != null) {
         return {
           ...adData,
           'image_bytes': imageBytes,
         };
       }
-      return adData;
+      
+      // Fallback to default content
+      final defaultAd = Constants.loanAd[isArabic ? 'ar' : 'en'];
+      if (defaultAd != null) {
+        return defaultAd;
+      }
+    } catch (e) {
+      _log('TTT_Error getting loan ad: $e');
     }
-    return Constants.loanAd[isArabic ? 'ar' : 'en'];
+    return null;
   }
 
   Map<String, dynamic>? getCardAd({bool isArabic = false}) {
-    final adData = _memoryCache['card_ad'];
-    if (adData != null) {
+    try {
+      // First try to get cached content
+      final adData = _memoryCache['card_ad'];
       final imageBytes = _memoryCache['card_ad_image_bytes'];
-      if (imageBytes != null) {
+      
+      if (adData != null && imageBytes != null) {
         return {
           ...adData,
           'image_bytes': imageBytes,
         };
       }
-      return adData;
+      
+      // Fallback to default content
+      final defaultAd = Constants.cardAd[isArabic ? 'ar' : 'en'];
+      if (defaultAd != null) {
+        return defaultAd;
+      }
+    } catch (e) {
+      _log('TTT_Error getting card ad: $e');
     }
-    return Constants.cardAd[isArabic ? 'ar' : 'en'];
+    return null;
   }
 
-  // 💡 Add new initialization method
+  // 💡 Modified initialization method
   Future<bool> initializeContent() async {
     _log('\nTTT_=== Initializing Content ===');
     
     try {
-      // Step 1: Try to load cached content first
+      // Always load default assets first to ensure we have fallback content
+      await _loadDefaultAssets();
+      _hasDefaultContent = true;
+      
+      // Try to load cached content
       final hasCached = await _loadCachedContent();
       if (hasCached) {
         _hasCachedContent = true;
         _initialLoadDone = true;
         notifyListeners();
         _log('TTT_Successfully loaded cached content');
-        
-        // Start background update check without blocking
-        _checkForUpdatesInBackground();
         return true;
       }
 
-      // Step 2: If no cache, load default assets
-      await _loadDefaultAssets();
-      _hasDefaultContent = true;
-      _initialLoadDone = true;
-      
-      // Initialize default ad images
+      // Initialize default ad images if no cached content
       if (_memoryCache['default_loan_ad'] != null) {
         try {
           final defaultLoanAdBytes = await _loadAssetBytes('assets/images/loans_ad.JPG');
@@ -796,14 +810,18 @@ class ContentUpdateService extends ChangeNotifier {
         }
       }
       
+      _initialLoadDone = true;
       notifyListeners();
       _log('TTT_Successfully loaded default content');
-      
-      // Start background update check without blocking
-      _checkForUpdatesInBackground();
       return true;
     } catch (e) {
       _log('TTT_Error initializing content: $e');
+      // Load minimal default content even on error
+      _memoryCache['default_loan_ad'] = Constants.loanAd;
+      _memoryCache['default_card_ad'] = Constants.cardAd;
+      _hasDefaultContent = true;
+      _initialLoadDone = true;
+      notifyListeners();
       return false;
     }
   }

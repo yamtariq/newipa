@@ -1,6 +1,6 @@
 workflows:
   ios-workflow:
-    name: iOS Workflow 1
+    name: iOS Workflow 2
     max_build_duration: 120
     instance_type: mac_mini_m2
     environment:
@@ -50,11 +50,10 @@ workflows:
           cd ios
           rm -f Podfile
           rm -f Podfile.lock
-          # Instead of deleting the bridging header, leave it (or you could create an empty one)
-          # mkdir -p Runner is already present in a new Flutter project, but ensuring:
+          # DO NOT remove the Runner-Bridging-Header.h file – it must remain in place.
           mkdir -p Runner
           
-          # Create BackgroundTaskHandler.swift
+          # Create BackgroundTaskHandler.swift (ensure it’s part of the Runner target)
           cat > Runner/BackgroundTaskHandler.swift << 'EOF'
           import Foundation
           import BackgroundTasks
@@ -80,7 +79,12 @@ workflows:
           }
           EOF
           
-          # Create Podfile
+          cd ..
+          flutter pub get
+
+      - name: Create Podfile 💡
+        script: |
+          cd ios
           cat > Podfile << 'EOF'
           platform :ios, '14.0'
 
@@ -129,13 +133,11 @@ workflows:
                 config.build_settings['SWIFT_VERSION'] = '5.0'
                 config.build_settings['DEFINES_MODULE'] = 'YES'
                 
-                # Apply module settings only to PhoneNumberKit
                 if target.name == 'PhoneNumberKit'
                   config.build_settings['SWIFT_EMIT_MODULE_INTERFACE'] = 'NO'
                   config.build_settings['DEFINES_MODULE'] = 'NO'
                 end
                 
-                # Configure Runner target settings
                 if target.name == 'Runner'
                   config.build_settings['BUILD_LIBRARIES_FOR_DISTRIBUTION'] = 'NO'
                   config.build_settings['DEFINES_MODULE'] = 'NO'
@@ -144,18 +146,15 @@ workflows:
                   config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'YES'
                   config.build_settings['SWIFT_EMIT_MODULE_INTERFACE'] = 'NO'
                   config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
-                  # Clear bridging header references
-                  config.build_settings['SWIFT_OBJC_BRIDGING_HEADER'] = ''
-                  config.build_settings['SWIFT_INCLUDE_OBJC_HEADER'] = ''
+                  # Set the bridging header path so that Swift can see Objective-C symbols:
+                  config.build_settings['SWIFT_OBJC_BRIDGING_HEADER'] = '$(SRCROOT)/Runner/Runner-Bridging-Header.h'
                 end
               end
             end
           end
           EOF
-          
           cd ..
-          flutter pub get
-
+          
       - name: Install CocoaPods dependencies 💡
         script: |
           cd ios
@@ -166,8 +165,6 @@ workflows:
           rm -rf Flutter/GeneratedPluginRegistrant.*
           flutter pub get
           pod install --verbose --repo-update --clean-install
-          # Remove bridging header reference from the Xcode project
-          sed -i '' '/SWIFT_OBJC_BRIDGING_HEADER/d' Runner.xcodeproj/project.pbxproj
           cd ..
 
       - name: Build iOS 💡

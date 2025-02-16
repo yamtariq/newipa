@@ -68,20 +68,20 @@ class _SplashScreenState extends State<SplashScreen> {
       // 💡 Initialize content service and load initial content
       final contentService = Provider.of<ContentUpdateService>(context, listen: false);
       
-      // First try to load cached content
-      bool hasContent = await contentService.initializeContent();
+      // First try to load cached content or default content
+      await contentService.initializeContent();
       
       // Wait for minimum animation time
       await Future.delayed(const Duration(milliseconds: 2000));
 
       if (mounted) {
-        // Navigate even if we only have default content
+        // Navigate to main page
         _navigateToMainPage(widget.isDarkMode);
         
         // Start background update after navigation
-        if (hasContent) {
+        Future.microtask(() {
           contentService.checkAndUpdateContent(force: false, isInitialLoad: false, isResumed: true);
-        }
+        });
       }
     } catch (e) {
       debugPrint('Error during app initialization: $e');
