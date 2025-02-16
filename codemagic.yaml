@@ -124,7 +124,7 @@ workflows:
                 config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
                 config.build_settings['SWIFT_VERSION'] = '5.0'
                 config.build_settings['DEFINES_MODULE'] = 'YES'
-                config.build_settings['Build Libraries for Distribution'] = 'NO'
+                
                 
                 # Apply module settings only to PhoneNumberKit 💡
                 if target.name == 'PhoneNumberKit'
@@ -143,6 +143,7 @@ workflows:
                   config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
                   config.build_settings['SWIFT_VERSION'] = '5.0'
                   config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'YES'
+                  config.build_settings['BUILD LIBRARIES FOR DISTRIBUTION'] = 'NO'
                 end
               end
             end
