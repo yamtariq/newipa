@@ -1,58 +1,36 @@
-# Nayifat App Implementation Summary
+I want to change the begining! I want when the app starts, it loads the cached details before doing anything and before even running 1st check api call. if cached details are not available then load the local assets. after loaded and only after loaded, a backend api check starts to see if there is any updated timestamp for any content, if there is any updated timestamp, then save the keys to be updated the start downloading them in the background. after downloaded and cached and only then, update the actual app contents with the new downloaded and cached details. hopefully your understand!
+!1
 
-## Completed Tasks
 
-### 1. Contact Details Fallback
-- Added fallback values for phone and email in main page
-- Phone fallback: "8001000088"
-- Email fallback: "CustomerCare@nayifat.com"
+understand we want to optimize the content loading workflow to prioritize cached/local content first, then handle updates in the background. Here's my plan:
 
-### 2. Ads Implementation
-#### English Versions
-- Implemented in loans_page.dart
-- Implemented in cards_page.dart
-- Added ContentUpdateService integration
-- Added fallback images
+1. Initial Load Phase:
+A. Load Cached Content First
+   - Immediately try to load from disk cache
+   - If successful, make content available to app
 
-#### Arabic Versions
-- Implemented in loans_page_ar.dart
-- Implemented in cards_page_ar.dart
-- Added RTL support
-- Added Arabic-specific fallback images
+B. Fallback to Local Assets
+   - If no cache exists, load default static content
+   - Make this content available immediately
 
-## Verification Status
-- ✅ All implementations complete
-- ✅ Both English and Arabic versions working
-- ✅ Proper fallback mechanisms in place
-- ✅ RTL support verified
-- ✅ Cross-platform compatibility checked
+2. Background Update Phase:
+A. Check for Updates
+   - After initial content is loaded and available
+   - Compare server timestamps with local ones
+   - Create list of content that needs updating
 
-## Remaining Tasks
+B. Download and Cache New Content
+   - Download new content in background
+   - Process and cache to temporary storage
+   - Verify downloaded content integrity
 
-### 1. Testing
-- Unit tests for ad implementation
-- Integration tests
-- UI tests
-- Performance testing
+C. Apply Updates
+   - Only after successful download and caching
+   - Update in-memory content
+   - Update disk cache
 
-### 2. Documentation
-- API documentation updates
-- Technical documentation
-- Implementation guides
-
-### 3. Optimization
-- Image caching
-- Load time optimization
-- Memory management
-- Bandwidth optimization
-
-### 4. Monitoring
-- Analytics implementation
-- Performance monitoring
-- Error tracking
-
-## Notes
-- All implementations maintain existing architecture
-- Follows app design guidelines
-- Includes proper error handling
-- Cross-platform compatibility maintained 
+3. Code Changes Required:
+- Modify checkAndUpdateContent() to be non-blocking
+- Create new method for initial content loading
+- Separate update checking from content downloading
+- Add proper state management for update status
