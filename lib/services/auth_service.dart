@@ -377,7 +377,15 @@ class AuthService {
         print('\nStep 6: Successful Sign In');
         print('- Processing user data and tokens');
 
-        // 💡 Return the response without storing any data
+        // 💡 Set sign-in flags in SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('is_signed_in', true);
+        await prefs.setBool('device_registered', true);
+        
+        // 💡 Set sign-in flags in SecureStorage
+        await _secureStorage.write(key: 'device_registered', value: 'true');
+
+        // Return the response without storing any data
         return parsedResponse;
       }
 
@@ -1035,6 +1043,10 @@ class AuthService {
       // Only clear session token
       await _secureStorage.delete(key: 'auth_token');
       print('3. Auth token deleted from secure storage');
+
+      // 💡 Clear is_signed_in flag
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('is_signed_in', false);
       
       // Verify token is cleared
       final tokenAfterDelete = await _secureStorage.read(key: 'auth_token');
@@ -1165,6 +1177,7 @@ class AuthService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('device_user_id');
       await prefs.remove('device_registered');
+      await prefs.remove('is_signed_in');  // 💡 Also clear is_signed_in flag
       
       print('SharedPreferences cleared');
       print('Device registration data cleared successfully');

@@ -24,8 +24,8 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 target 'Runner' do
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   
-  # Use frameworks with module support
-  use_frameworks! :linkage => :dynamic
+  # Use static frameworks without module interfaces
+  use_frameworks! :linkage => :static
 
   # Third-party pods with modular headers
   pod 'PhoneNumberKit', '~> 3.3.4', :modular_headers => true
