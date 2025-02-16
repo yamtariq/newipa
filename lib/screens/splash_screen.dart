@@ -80,7 +80,7 @@ class _SplashScreenState extends State<SplashScreen> {
         
         // Start background update after navigation
         if (hasContent) {
-          contentService._checkForUpdatesInBackground();
+          contentService.checkAndUpdateContent(force: false, isInitialLoad: false, isResumed: true);
         }
       }
     } catch (e) {

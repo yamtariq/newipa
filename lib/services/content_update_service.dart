@@ -126,24 +126,60 @@ class ContentUpdateService extends ChangeNotifier {
         }
       }
 
-      // Check update interval
-      if (!force && !isInitialLoad) {
-        final prefs = await SharedPreferences.getInstance();
-        final lastCheckStr = prefs.getString(_lastCheckKey);
-        if (lastCheckStr != null) {
-          final lastCheck = DateTime.parse(lastCheckStr);
-          final now = DateTime.now();
-          if (now.difference(lastCheck) < _minimumCheckInterval) {
-            _log('TTT_Skipping update check - minimum interval not passed');
-            return;
+      // If this is a background update (not initial load), run in a microtask
+      if (!isInitialLoad) {
+        Future.microtask(() async {
+          try {
+            // Check update interval
+            if (!force && !isInitialLoad) {
+              final prefs = await SharedPreferences.getInstance();
+              final lastCheckStr = prefs.getString(_lastCheckKey);
+              if (lastCheckStr != null) {
+                final lastCheck = DateTime.parse(lastCheckStr);
+                final now = DateTime.now();
+                if (now.difference(lastCheck) < _minimumCheckInterval) {
+                  _log('TTT_Skipping update check - minimum interval not passed');
+                  return;
+                }
+              }
+            }
+
+            // Check for updates in background without blocking UI
+            bool hasUpdates = await _hasContentUpdates();
+            if (hasUpdates) {
+              _isUpdating = true;
+              notifyListeners();
+              
+              final tempCache = Map<String, dynamic>.from(_memoryCache);
+              final success = await _updateAllContent(tempCache);
+
+              if (success) {
+                _memoryCache.addAll(tempCache);
+                await _saveContentToCache();
+                
+                if (await _verifySavedContent()) {
+                  _hasCachedContent = true;
+                }
+              }
+              
+              _isUpdating = false;
+              notifyListeners();
+            }
+          } catch (e) {
+            _log('TTT_Error in background update: $e');
+            _isUpdating = false;
+            notifyListeners();
           }
-        }
+        });
+        return;
       }
 
-      // Check for updates in background without blocking UI
+      // For initial load, run synchronously
+      // Check for updates without blocking
       bool hasUpdates = await _hasContentUpdates();
       if (hasUpdates) {
         _isUpdating = true;
+        notifyListeners();
         
         final tempCache = Map<String, dynamic>.from(_memoryCache);
         final success = await _updateAllContent(tempCache);
@@ -154,16 +190,16 @@ class ContentUpdateService extends ChangeNotifier {
           
           if (await _verifySavedContent()) {
             _hasCachedContent = true;
-            _isUpdating = false;
-            notifyListeners();
           }
-        } else {
-          _isUpdating = false;
         }
+        
+        _isUpdating = false;
+        notifyListeners();
       }
     } catch (e) {
       _log('TTT_Error in content update: $e');
       _isUpdating = false;
+      notifyListeners();
     }
   }
 
