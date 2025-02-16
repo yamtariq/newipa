@@ -986,6 +986,30 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                           ),
                         ),
 
+                        // 💡 Add Check Storage Button
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: ElevatedButton(
+                            onPressed: _checkLocalStorage,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.storage),
+                                SizedBox(width: 8),
+                                Text(widget.isArabic ? 'فحص التخزين المحلي' : 'Check Local Storage'),
+                              ],
+                            ),
+                          ),
+                        ),
+
                         // Apply for Product Container
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -2183,5 +2207,33 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
         ],
       ),
     );
+  }
+
+  // 💡 Add function to check local storage contents
+  Future<void> _checkLocalStorage() async {
+    try {
+      print('\n=== T_LocalStorage_START ===');
+      
+      // Check SharedPreferences
+      print('\nT_LocalStorage_SharedPreferences:');
+      final prefs = await SharedPreferences.getInstance();
+      final keys = prefs.getKeys();
+      for (String key in keys) {
+        final value = prefs.get(key);
+        print('T_LocalStorage_SP_$key: $value');
+      }
+      
+      // Check SecureStorage
+      print('\nT_LocalStorage_SecureStorage:');
+      final secureStorage = const FlutterSecureStorage();
+      final allSecureValues = await secureStorage.readAll();
+      allSecureValues.forEach((key, value) {
+        print('T_LocalStorage_SS_$key: $value');
+      });
+      
+      print('\n=== T_LocalStorage_END ===');
+    } catch (e) {
+      print('T_LocalStorage_ERROR: $e');
+    }
   }
 }
