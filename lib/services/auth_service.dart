@@ -922,31 +922,77 @@ class AuthService {
   // Sign out
   Future<void> signOut() async {
     try {
-      print('\n=== AUTH SERVICE SIGN OFF START ===');
-      print('1. Attempting to clear session token');
+      print('\n=== AUTH SERVICE SIGN OUT START ===');
+      print('1. Starting to clear specific data from both storages');
       
-      // Check current token before clearing
-      final currentToken = await _secureStorage.read(key: 'auth_token');
-      print('2. Current auth token exists: ${currentToken != null}');
-      
-      // Only clear session token
-      await _secureStorage.delete(key: 'auth_token');
-      print('3. Auth token deleted from secure storage');
-
-      // 💡 Clear only session flags, keep is_signed_in as true
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('session_active', false);
-      await _secureStorage.write(key: 'session_active', value: 'false');
       
-      // Verify token is cleared
-      final tokenAfterDelete = await _secureStorage.read(key: 'auth_token');
-      print('4. Auth token after deletion exists: ${tokenAfterDelete != null}');
+      // 💡 Clear specific data from SharedPreferences
+      print('2. Clearing SharedPreferences data:');
+      final spKeysToRemove = [
+        'device_id',
+        'device_registered',
+        'mpin',
+        'national_id',
+        'device_user_id',
+        'user_phone',
+        'is_signed_in',
+        'user_data',
+        'session_active',
+        'session_user_id',
+        'isSessionActive',
+        'biometrics_enabled',
+        'biometric_user_id',
+        'last_login',
+        'dakhli_salary_data',
+        'user_settings',
+        'user_preferences'
+      ];
       
-      print('5. Session signed off successfully');
-      print('=== AUTH SERVICE SIGN OFF END ===\n');
+      for (var key in spKeysToRemove) {
+        await prefs.remove(key);
+        print('   - Removed SP: $key');
+      }
+      
+      // 💡 Clear specific data from SecureStorage
+      print('3. Clearing SecureStorage data:');
+      final ssKeysToRemove = [
+        'device_id',
+        'device_registered',
+        'mpin',
+        'national_id',
+        'device_user_id',
+        'user_data',
+        'session_active',
+        'session_user_id',
+        'biometrics_enabled',
+        'biometric_user_id',
+        'auth_token',
+        'refresh_token',
+        'token_expiry',
+        'card_offer_data',
+        'loan_offer_data',
+        'selected_salary_data',
+        'dakhli_salary_data',
+        'selected_card_type',
+        'user_phone',
+        'application_data'
+      ];
+      
+      for (var key in ssKeysToRemove) {
+        await _secureStorage.delete(key: key);
+        print('   - Removed SS: $key');
+      }
+      
+      // Cancel refresh timer if active
+      _refreshTimer?.cancel();
+      _refreshTimer = null;
+      
+      print('4. All specified data cleared successfully');
+      print('=== AUTH SERVICE SIGN OUT END ===\n');
     } catch (e) {
-      print('ERROR in AuthService.signOff(): $e');
-      throw Exception('Failed to sign off: $e');
+      print('ERROR in AuthService.signOut(): $e');
+      throw Exception('Failed to sign out: $e');
     }
   }
 
@@ -954,7 +1000,8 @@ class AuthService {
   Future<void> signOutDevice() async {
     HttpClient? client;
     try {
-      print('Signing out device completely...');
+      print('\n=== DEVICE SIGN OUT START ===');
+      print('1. Starting device sign out process');
       
       // Get the user ID before clearing storage
       final userId = await _secureStorage.read(key: 'device_user_id');
@@ -981,7 +1028,7 @@ class AuthService {
           final response = await request.close();
           final responseBody = await response.transform(utf8.decoder).join();
 
-          print('Device unregister response: $responseBody');
+          print('2. Device unregister response: $responseBody');
           // Don't throw on 404, just log it
           if (response.statusCode != 200 && response.statusCode != 404) {
             print('Server returned status code: ${response.statusCode}');
@@ -994,7 +1041,15 @@ class AuthService {
         }
       }
       
-      print('Device signed out successfully');
+      // 💡 Clear ALL data from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear(); // This removes everything
+      
+      // 💡 Clear ALL data from SecureStorage
+      await _secureStorage.deleteAll();
+      
+      print('3. All local data cleared');
+      print('=== DEVICE SIGN OUT COMPLETE ===\n');
     } catch (e) {
       print('Error during device sign out: $e');
       // Don't throw, just log the error

@@ -225,29 +225,29 @@ class Constants {
   // Used in: LoanService (loan_service.dart) - getLoanDecision()
   
   // 💡 Bank API Endpoints
-//   static String endpointCreateCustomer = 
-//       '$apiBaseUrl/proxy/forward?url=https://172.22.226.203:9443/api/Bank/CreateCustomer';
-
-//   static String endpointFinnoneUpdateAmount = 
-//       '$apiBaseUrl/proxy/forward?url=http://172.22.226.189:100/api/v1/Finnone/UpdateAmount';
-
   static String endpointCreateCustomer = 
-      '$apiBaseUrl/proxy/forward?url=https://icreditdept.com/api/Bank/test_local_CreateCustomer.php';
+      '$apiBaseUrl/proxy/forward?url=https://172.22.226.203:9443/api/Bank/CreateCustomer';
 
-  // 💡 Finnone API Endpoints
   static String endpointFinnoneUpdateAmount = 
-      '$apiBaseUrl/proxy/forward?url=https://icreditdept.com/api/Bank/test_local_FinnOne_UpdateCustomer.php';
+      '$apiBaseUrl/proxy/forward?url=http://172.22.226.189:100/api/v1/Finnone/UpdateAmount';
+
+//   static String endpointCreateCustomer = 
+//       '$apiBaseUrl/proxy/forward?url=https://icreditdept.com/api/Bank/test_local_CreateCustomer.php';
+
+//   // 💡 Finnone API Endpoints
+//   static String endpointFinnoneUpdateAmount = 
+//       '$apiBaseUrl/proxy/forward?url=https://icreditdept.com/api/Bank/test_local_FinnOne_UpdateCustomer.php';
 
   //remove this endpoint
-  static String endpointUpdateAmount = 
-      '$apiBaseUrl/proxy/forward?url=https://icreditdept.com/api/Bank/test_local_UpdateCustomer.php';
+//   static String endpointUpdateAmount = 
+//       '$apiBaseUrl/proxy/forward?url=https://icreditdept.com/api/Bank/test_local_UpdateCustomer.php';
 
   // 💡 Bank Customer Update Endpoint
-//   static String endpointUpdateCustomer = 
-//       '$apiBaseUrl/proxy/forward?url=https://172.22.226.203:9443/api/Bank/UpdateCustomer';
+  static String endpointUpdateCustomer = 
+      '$apiBaseUrl/proxy/forward?url=https://172.22.226.203:9443/api/Bank/UpdateCustomer';
 
-static String endpointUpdateCustomer = 
-      '$apiBaseUrl/proxy/forward?url=https://icreditdept.com/api/Bank/test_local_UpdateCustomer.php';
+// static String endpointUpdateCustomer = 
+//       '$apiBaseUrl/proxy/forward?url=https://icreditdept.com/api/Bank/test_local_UpdateCustomer.php';
 
   // Old: static const String endpointUpdateLoanApplication = '/update_loan_application.php';
   static const String endpointUpdateLoanApplication = '/loan/update';
@@ -553,8 +553,8 @@ static String endpointUpdateCustomer =
   static const String bankApiUsername = 'Nayifat'; // Change in production
   static const String bankApiPassword = 'Nayifat@123'; // Change in production
   static const String bankApiAppId = '3162C93C-3C9E-4613-A4D9-53BF99BB9CB1'; // Change in production
-//   static const String bankApiKey = 'A624BA39-BFDA-4F09-829C-9F6294D6DF23'; // Change in production
-  static const String bankApiKey = apiKey; // Change in production
+  static const String bankApiKey = 'A624BA39-BFDA-4F09-829C-9F6294D6DF23'; // Change in production
+//   static const String bankApiKey = apiKey; // Change in production
   static const String bankApiOrgNo = 'Nayifat'; // Change in production
 
   // 💡 Bank API Headers

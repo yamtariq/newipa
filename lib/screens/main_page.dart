@@ -359,10 +359,26 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
 
   Future<void> _checkDeviceRegistration() async {
     try {
+      print('\n=== CHECKING DEVICE REGISTRATION AND SESSION STATE ===');
+      final hasActiveSession = Provider.of<SessionProvider>(context, listen: false).hasActiveSession;
       final isDeviceReg = await _authService.isDeviceRegistered();
-      setState(() {
-        isDeviceRegistered = isDeviceReg;
-      });
+      
+      // 💡 Also check if user is signed in from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final isSignedIn = prefs.getBool('is_signed_in') ?? false;
+      
+      print('Device Registration Check:');
+      print('- Device Registered: $isDeviceReg');
+      print('- Has Active Session: $hasActiveSession');
+      print('- Is Signed In: $isSignedIn');
+      
+      if (mounted) {
+        setState(() {
+          // Hide register button if device is registered, has active session, or is signed in
+          isDeviceRegistered = isDeviceReg || hasActiveSession || isSignedIn;
+        });
+      }
+      print('=== DEVICE REGISTRATION CHECK END ===\n');
     } catch (e) {
       print('Error checking device registration: $e');
     }
@@ -2088,7 +2104,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     if (response.statusCode == 200) {
       return json.decode(response.body) as Map<String, dynamic>;
     }
-    throw Exception('Failed to fetch salary data');
+    throw Exception('Failed to fetch salary data : ${Constants.dakhliSalaryEndpoint}?customerId=$nationalId&dob=$dob&reason=$reason');
   }
 
   // 💡 Add new function to handle application start
