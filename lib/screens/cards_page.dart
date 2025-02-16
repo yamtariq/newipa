@@ -74,8 +74,8 @@ class _CardsPageState extends State<CardsPage> {
         });
       }
       
-      // Load card ad first
-      final newCardAd = _contentUpdateService.getCardAd(isArabic: false);
+      // Load card ad first - use default if not available
+      final newCardAd = _contentUpdateService.getCardAd(isArabic: false) ?? Constants.cardAd['en'];
       
       final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
       await sessionProvider.checkSession();
@@ -84,8 +84,13 @@ class _CardsPageState extends State<CardsPage> {
       String? status;
       
       if (sessionProvider.hasActiveSession) {
-        cards = await _cardService.getUserCards();
-        status = await _cardService.getCurrentApplicationStatus(isArabic: false);
+        try {
+          cards = await _cardService.getUserCards();
+          status = await _cardService.getCurrentApplicationStatus(isArabic: false);
+        } catch (e) {
+          debugPrint('Error loading user cards: $e');
+          // Don't show error, just use empty list
+        }
       }
       
       if (mounted) {
@@ -101,6 +106,8 @@ class _CardsPageState extends State<CardsPage> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          // Set default ad if loading failed
+          _cardAd = Constants.cardAd['en'];
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

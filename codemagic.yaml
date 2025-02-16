@@ -1,6 +1,6 @@
 workflows:
   ios-workflow:
-    name: iOS Workflow
+    name: iOS Workflow 1
     max_build_duration: 120
     instance_type: mac_mini_m2
     environment:
@@ -50,8 +50,8 @@ workflows:
           cd ios
           rm -f Podfile
           rm -f Podfile.lock
-          # Remove the bridging header file so it isn’t used
-          rm -f Runner/Runner-Bridging-Header.h
+          # Instead of deleting the bridging header, leave it (or you could create an empty one)
+          # mkdir -p Runner is already present in a new Flutter project, but ensuring:
           mkdir -p Runner
           
           # Create BackgroundTaskHandler.swift
@@ -144,7 +144,7 @@ workflows:
                   config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'YES'
                   config.build_settings['SWIFT_EMIT_MODULE_INTERFACE'] = 'NO'
                   config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
-                  # Clear any bridging header references
+                  # Clear bridging header references
                   config.build_settings['SWIFT_OBJC_BRIDGING_HEADER'] = ''
                   config.build_settings['SWIFT_INCLUDE_OBJC_HEADER'] = ''
                 end
@@ -166,8 +166,8 @@ workflows:
           rm -rf Flutter/GeneratedPluginRegistrant.*
           flutter pub get
           pod install --verbose --repo-update --clean-install
-          # Remove module interface flags from xcodebuild command
-          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Debug clean build
+          # Remove bridging header reference from the Xcode project
+          sed -i '' '/SWIFT_OBJC_BRIDGING_HEADER/d' Runner.xcodeproj/project.pbxproj
           cd ..
 
       - name: Build iOS 💡

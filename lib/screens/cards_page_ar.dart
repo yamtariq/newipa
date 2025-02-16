@@ -28,12 +28,14 @@ class CardsPageAr extends StatefulWidget {
 class _CardsPageArState extends State<CardsPageAr> {
   final CardService _cardService = CardService();
   final AuthService _authService = AuthService();
+  final ContentUpdateService _contentUpdateService = ContentUpdateService();
   bool _isLoading = true;
   List<dynamic> _cards = [];
   String? _applicationStatus;
   int _selectedCardIndex = 0;
   bool isDeviceRegistered = false;
   int _tabIndex = 3;
+  dynamic _cardAd;
 
   double get screenHeight => MediaQuery.of(context).size.height;
 
@@ -45,13 +47,25 @@ class _CardsPageArState extends State<CardsPageAr> {
     super.initState();
     _checkDeviceRegistration();
     _initializeData();
+    _loadData();
+    _contentUpdateService.addListener(_onContentUpdated);
+  }
+
+  @override
+  void dispose() {
+    _contentUpdateService.removeListener(_onContentUpdated);
+    super.dispose();
+  }
+
+  void _onContentUpdated() {
+    if (mounted) {
+      _loadData();
+    }
   }
 
   Future<void> _initializeData() async {
     if (mounted) {
       await Provider.of<SessionProvider>(context, listen: false).checkSession();
-      await _loadData();
-      _setupPeriodicSessionCheck();
     }
   }
 
@@ -135,10 +149,18 @@ class _CardsPageArState extends State<CardsPageAr> {
   }
 
   Future<void> _loadData() async {
+    if (!mounted) return;
+    
     try {
-      setState(() {
-        _isLoading = true;
-      });
+      // Only show loading indicator if we don't have any content yet
+      if (_cards.isEmpty && _cardAd == null) {
+        setState(() {
+          _isLoading = true;
+        });
+      }
+      
+      // Load card ad first - use default if not available
+      final newCardAd = _contentUpdateService.getCardAd(isArabic: true) ?? Constants.cardAd['ar'];
       
       final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
       await sessionProvider.checkSession();
@@ -147,21 +169,31 @@ class _CardsPageArState extends State<CardsPageAr> {
       String? status;
       
       if (sessionProvider.hasActiveSession) {
-        cards = await _cardService.getUserCards();
-        status = await _cardService.getCurrentApplicationStatus(isArabic: true);
+        try {
+          cards = await _cardService.getUserCards();
+          status = await _cardService.getCurrentApplicationStatus(isArabic: true);
+        } catch (e) {
+          debugPrint('Error loading user cards: $e');
+          // Don't show error, just use empty list
+        }
       }
       
-      setState(() {
-        _cards = cards;
-        _applicationStatus = status;
-        _isLoading = false;
-        _isCardAnimating = List.generate(cards.length, (index) => false);
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
       if (mounted) {
+        setState(() {
+          _cardAd = newCardAd;
+          _cards = cards;
+          _applicationStatus = status;
+          _isLoading = false;
+          _isCardAnimating = List.generate(cards.length, (index) => false);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          // Set default ad if loading failed
+          _cardAd = Constants.cardAd['ar'];
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('حدث خطأ أثناء تحميل البيانات: $e'),
@@ -244,9 +276,6 @@ class _CardsPageArState extends State<CardsPageAr> {
   }
 
   Widget _buildAdvertBanner() {
-    final contentUpdateService = ContentUpdateService();
-    final adData = contentUpdateService.getCardAd(isArabic: true);
-    
     return Container(
       height: 180,
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -255,9 +284,9 @@ class _CardsPageArState extends State<CardsPageAr> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
-        child: adData != null && adData['image_bytes'] != null
+        child: _cardAd != null && _cardAd['image_bytes'] != null
             ? Image.memory(
-                adData['image_bytes'],
+                _cardAd['image_bytes'],
                 fit: BoxFit.fill,
                 width: double.infinity,
               )

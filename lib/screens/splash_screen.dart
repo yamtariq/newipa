@@ -65,25 +65,28 @@ class _SplashScreenState extends State<SplashScreen> {
         _startAnimations = true;
       });
 
-      // 💡 Use new optimized content loading
+      // 💡 Initialize content service and load initial content
       final contentService = Provider.of<ContentUpdateService>(context, listen: false);
-      final contentLoaded = await contentService.initializeContent();
-
+      
+      // First try to load cached content
+      bool hasContent = await contentService.initializeContent();
+      
       // Wait for minimum animation time
       await Future.delayed(const Duration(milliseconds: 2000));
 
       if (mounted) {
-        if (contentLoaded) {
-          _navigateToMainPage(widget.isDarkMode);
-        } else {
-          // Even if content failed to load, still navigate to main page
-          // The app will use default content
-          _navigateToMainPage(widget.isDarkMode);
+        // Navigate even if we only have default content
+        _navigateToMainPage(widget.isDarkMode);
+        
+        // Start background update after navigation
+        if (hasContent) {
+          contentService._checkForUpdatesInBackground();
         }
       }
     } catch (e) {
       debugPrint('Error during app initialization: $e');
       if (mounted) {
+        // Navigate even on error, app will use default content
         _navigateToMainPage(widget.isDarkMode);
       }
     }

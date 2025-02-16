@@ -32,25 +32,34 @@ class LoansPageAr extends StatefulWidget {
 class _LoansPageArState extends State<LoansPageAr> {
   final LoanService _loanService = LoanService();
   final AuthService _authService = AuthService();
+  final ContentUpdateService _contentUpdateService = ContentUpdateService();
   bool _isLoading = true;
   List<Loan> _loans = [];
   String? _applicationStatus;
   int _tabIndex = 3;
   bool isDeviceRegistered = false;
+  Map<String, dynamic>? _loanAd;
 
   double get screenHeight => MediaQuery.of(context).size.height;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
     _checkDeviceRegistration();
-    Future.delayed(const Duration(seconds: 1), () {
-      if (mounted) {
-        Provider.of<SessionProvider>(context, listen: false).checkSession();
-        _setupPeriodicSessionCheck();
-      }
-    });
+    _loadData();
+    _contentUpdateService.addListener(_onContentUpdated);
+  }
+
+  @override
+  void dispose() {
+    _contentUpdateService.removeListener(_onContentUpdated);
+    super.dispose();
+  }
+
+  void _onContentUpdated() {
+    if (mounted) {
+      _loadData();
+    }
   }
 
   Future<void> _checkDeviceRegistration() async {
@@ -97,23 +106,22 @@ class _LoansPageArState extends State<LoansPageAr> {
     }
   }
 
-  void _setupPeriodicSessionCheck() {
-    Future.delayed(const Duration(seconds: 30), () {
-      if (mounted) {
-        Provider.of<SessionProvider>(context, listen: false).checkSession();
-        _setupPeriodicSessionCheck();
-      }
-    });
-  }
-
   Future<void> _loadData() async {
+    if (!mounted) return;
+    
     try {
-      setState(() {
-        _isLoading = true;
-      });
+      // Only show loading indicator if we don't have any content yet
+      if (_loans.isEmpty && _loanAd == null) {
+        setState(() {
+          _isLoading = true;
+        });
+      }
+      
+      // Load loan ad first
+      final newLoanAd = _contentUpdateService.getLoanAd(isArabic: true);
       
       final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
-      await sessionProvider.checkSession(); // Ensure session is up to date
+      await sessionProvider.checkSession();
       
       List<Loan> loans = [];
       String? status;
@@ -123,16 +131,19 @@ class _LoansPageArState extends State<LoansPageAr> {
         status = await _loanService.getCurrentApplicationStatus(isArabic: true);
       }
       
-      setState(() {
-        _loans = loans;
-        _applicationStatus = status;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
       if (mounted) {
+        setState(() {
+          _loanAd = newLoanAd;
+          _loans = loans;
+          _applicationStatus = status;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('حدث خطأ أثناء تحميل البيانات: $e'),
@@ -218,9 +229,6 @@ class _LoansPageArState extends State<LoansPageAr> {
   }
 
   Widget _buildAdvertBanner() {
-    final contentUpdateService = ContentUpdateService();
-    final adData = contentUpdateService.getLoanAd(isArabic: true);
-    
     return Container(
       height: 180,
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -229,9 +237,9 @@ class _LoansPageArState extends State<LoansPageAr> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
-        child: adData != null && adData['image_bytes'] != null
+        child: _loanAd != null && _loanAd!['image_bytes'] is Uint8List
             ? Image.memory(
-                adData['image_bytes'],
+                _loanAd!['image_bytes'] as Uint8List,
                 fit: BoxFit.fill,
                 width: double.infinity,
               )
