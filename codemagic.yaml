@@ -134,7 +134,7 @@ workflows:
                 
                 # Configure Runner target settings
                 if target.name == 'Runner'
-                  config.build_settings['BUILD LIBRARIES FOR DISTRIBUTION'] = 'NO'
+                  config.build_settings['BUILD_LIBRARIES_FOR_DISTRIBUTION'] = 'NO'
                   config.build_settings['SWIFT_OBJC_BRIDGING_HEADER'] = '$(SRCROOT)/Runner/Runner-Bridging-Header.h'
                   config.build_settings['SWIFT_OBJC_INTERFACE_HEADER_NAME'] = 'Runner-Swift.h'
                   config.build_settings['SWIFT_INSTALL_OBJC_HEADER'] = 'YES'
