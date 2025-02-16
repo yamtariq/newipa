@@ -65,23 +65,20 @@ class _SplashScreenState extends State<SplashScreen> {
         _startAnimations = true;
       });
 
-      // 💡 Initialize content service and load initial content
+      // 💡 Initialize content service in background without waiting
       final contentService = Provider.of<ContentUpdateService>(context, listen: false);
-      
-      // First try to load cached content or default content
-      await contentService.initializeContent();
-      
-      // Wait for minimum animation time
-      await Future.delayed(const Duration(milliseconds: 2000));
+      Future.microtask(() async {
+        await contentService.initializeContent();
+        // After content is loaded, start background update
+        contentService.checkAndUpdateContent(force: false, isInitialLoad: false, isResumed: true);
+      });
+
+      // Wait for minimum animation time (increased to match animation duration)
+      await Future.delayed(const Duration(milliseconds: 6000));
 
       if (mounted) {
-        // Navigate to main page
+        // Navigate to main page without waiting for content
         _navigateToMainPage(widget.isDarkMode);
-        
-        // Start background update after navigation
-        Future.microtask(() {
-          contentService.checkAndUpdateContent(force: false, isInitialLoad: false, isResumed: true);
-        });
       }
     } catch (e) {
       debugPrint('Error during app initialization: $e');
