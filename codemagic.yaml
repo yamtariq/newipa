@@ -107,13 +107,13 @@ workflows:
           flutter_ios_podfile_setup
 
           target 'Runner' do
-            use_frameworks!
-            use_modular_headers!
-
+            # Use static frameworks without module interfaces
+            use_frameworks! :linkage => :static
+            
             flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
             
-            # Add PhoneNumberKit dependency 💡
-            pod 'PhoneNumberKit', '~> 3.7'
+            # Disable modular headers for PhoneNumberKit
+            pod 'PhoneNumberKit', '~> 3.7', :modular_headers => false
           end
 
           post_install do |installer|
@@ -139,7 +139,7 @@ workflows:
                   config.build_settings['CLANG_ENABLE_MODULES'] = 'NO'
                   config.build_settings['SWIFT_VERSION'] = '5.0'
                   config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'YES'
-                  
+                  config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
                 end
               end
             end
