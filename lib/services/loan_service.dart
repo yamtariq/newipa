@@ -214,40 +214,24 @@ class LoanService {
       print('\n1. ENDPOINT:');
       print('   ${Constants.endpointCreateCustomer}');
       
-      // 💡 Combine both proxy and bank headers
-      final headers = {
-        ...Constants.bankApiHeaders,  // Bank headers (Authorization, X-APP-ID, etc.)
-        'api-key': Constants.apiKey,  // Proxy API key
-      };
-      
-      print('\n2. Request Headers:');
-      print('Headers: ${headers.map((key, value) => MapEntry(key, key.toLowerCase() == 'authorization' ? '[REDACTED]' : value))}');
-
-      print('\n3. REQUEST BODY DETAILS:');
-      print('   National ID: ${requestData['nationalID']}');
-      print('   Date of Birth (formatted): ${requestData['dob']} (Original: ${storedUserData['date_of_birth']})');
-      print('   ID Expiry Date (formatted): ${requestData['doe']} (Original: ${storedUserData['id_expiry_date']})');
-      print('   Loan Purpose: ${requestData['finPurpose']}');
-      print('   Language: ${requestData['language']} (${isArabic ? 'Arabic' : 'English'})');
-      print('   Product Type: ${requestData['productType']}');
-      print('   Mobile Number: ${requestData['mobileNo']}');
-      print('   Email: ${requestData['emailId']}');
-      print('   Finance Amount: ${requestData['finAmount']} SAR');
-      print('   Tenure: ${requestData['tenure']} months');
-      print('   Property Status: ${requestData['propertyStatus']} (1 = Owned)');
-      print('   Effective Rate: ${requestData['effRate']}');
-      print('   IBAN: ${requestData['ibanNo']}');
-
-      print('\n4. COMPLETE REQUEST JSON:');
-      print(const JsonEncoder.withIndent('   ').convert(requestData));
-      print('\n********************************************************\n');
-
       // 💡 Create a custom HttpClient that accepts self-signed certificates
       final client = HttpClient()
         ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
 
       final request = await client.postUrl(Uri.parse(Constants.endpointCreateCustomer));
       
+      // 💡 Combine both proxy and bank headers
+      final headers = {
+        ...Constants.defaultHeaders,  // Proxy headers with api-key
+        'bank-headers': base64.encode(utf8.encode(json.encode(Constants.bankApiHeaders))),  // Bank headers encoded for proxy
+      };
+      
+      print('\n2. Request Headers:');
+      print('Headers: ${headers.map((key, value) => MapEntry(key, key.toLowerCase() == 'authorization' || key.toLowerCase() == 'bank-headers' ? '[REDACTED]' : value))}');
+
+      print('\n3. REQUEST BODY DETAILS:');
+      print('   National ID: ${requestData['nationnalID']}');
+
       // Add headers
       headers.forEach((key, value) {
         request.headers.set(key, value);

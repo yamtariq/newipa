@@ -275,14 +275,15 @@ class Constants {
   static const String endpointSendNotification = '/notifications/send';
   // Used in: NotificationService (notification_service.dart) - sendNotification()
 
+
+// baby blue primaryColor.withOpacity(0.1)
   // Colors
   static const int primaryColorValue = 0xFF0077B6;
 
   // Theme Base Colors
   // Light Theme
   static const int lightPrimaryColor = 0xFF0077B6; // Primary blue
-  static const int lightBackgroundColor =
-      0xFFE3F2FD; // Light baby blue background
+  static const int lightBackgroundColor = 0xFFFFFFFF; // Pure white background 💡
   static const int lightSurfaceColor = 0xFFFFFFFF; // Pure white surface
 
   // Dark Theme    0xFF121212
@@ -292,16 +293,11 @@ class Constants {
 
   // Form and UI Colors with Opacity
   // Light Theme Form Colors
-  static const int lightFormBackgroundColor =
-      0xFFFFFFFF; // Pure white for forms
-  static const int lightFormBorderColor =
-      0x330077B6; // Primary blue with 20% opacity
-  static const int lightFormFocusedBorderColor =
-      0x800077B6; // Primary blue with 50% opacity
-  static const int lightLabelTextColor =
-      0xFF0077B6; // Primary blue (full opacity)
-  static const int lightHintTextColor =
-      0x800077B6; // Primary blue with 50% opacity
+  static const int lightFormBackgroundColor = 0xFFFFFFFF; // Pure white for forms 💡
+  static const int lightFormBorderColor = 0x330077B6; // Primary blue with 20% opacity 💡
+  static const int lightFormFocusedBorderColor = 0x800077B6; // Primary blue with 50% opacity 💡
+  static const int lightLabelTextColor = 0xFF0077B6; // Primary blue (full opacity) 💡
+  static const int lightHintTextColor = 0x800077B6; // Primary blue with 50% opacity 💡
   static const int lightIconColor = 0xFF0077B6; // Primary blue (full opacity)
 
   // Dark Theme Form Colors
@@ -359,25 +355,16 @@ class Constants {
 
   // Navigation Bar Colors
   // Light Theme Navbar
-  static const int lightNavbarBackground = 0xFFFFFFFF; // White background
-  static const int lightNavbarPageBackground =
-      0xFFFFFFFF; // White page background
-  static const int lightNavbarGradientStart =
-      lightBackgroundColor; // Primary blue with 10% opacity
-  static const int lightNavbarGradientEnd =
-      lightBackgroundColor; // Primary blue with 5% opacity
-  static const int lightNavbarShadowPrimary =
-      lightBackgroundColor; // Primary blue with 20% opacity
-  static const int lightNavbarShadowSecondary =
-      lightBackgroundColor; // Primary blue with 10% opacity
-  static const int lightNavbarActiveIcon =
-      0xFF0077B6; // Primary blue (full opacity)
-  static const int lightNavbarInactiveIcon =
-      0xFF0077B6; // Primary blue with 50% opacity
-  static const int lightNavbarActiveText =
-      0xFF0077B6; // Primary blue (full opacity)
-  static const int lightNavbarInactiveText =
-      0xFF0077B6; // Primary blue with 50% opacity
+  static const int lightNavbarBackground = 0xFFFFFFFF; // White background 💡
+  static const int lightNavbarPageBackground = 0xFFFFFFFF; // White page background 💡
+  static const int lightNavbarGradientStart = 0xFF0077B6; // Primary blue with 10% opacity 💡
+  static const int lightNavbarGradientEnd = 0xFF0077B6; // Primary blue with 5% opacity 💡
+  static const int lightNavbarShadowPrimary = 0x800077B6; // Primary blue with 20% opacity 💡
+  static const int lightNavbarShadowSecondary = 0x1A0077B6; // Primary blue with 10% opacity 💡
+  static const int lightNavbarActiveIcon = 0xFF0077B6; // Primary blue (full opacity)
+  static const int lightNavbarInactiveIcon = 0xFF0077B6; // Primary blue with 50% opacity 💡
+  static const int lightNavbarActiveText = 0xFF0077B6; // Primary blue (full opacity)
+  static const int lightNavbarInactiveText = 0xFF0077B6; // Primary blue with 50% opacity 💡
 
   // Dark Theme Navbar
   static const int darkNavbarBackground =

@@ -1239,9 +1239,27 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
         print('Message: ${response['message']}');
         print('=== CARD APPLICATION REQUEST END (WITH ERROR) ===\n');
         
+        // If it's a NOT_ELIGIBLE error, navigate to card offer screen with error details
+        if (response['error_type'] == 'NOT_ELIGIBLE' || response['should_contact_support']) {
+          if (!mounted) return;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => CardOfferScreen(
+                userData: response,  // Pass the error response directly
+                isArabic: isArabic,
+                maxCreditLimit: 0,
+                minCreditLimit: 0,
+              ),
+            ),
+          );
+          return;
+        }
+        
+        // For other errors, show error message
         _showError(isArabic 
-          ? 'حدث خطأ أثناء إنشاء طلب البطاقة' 
-          : response['message'] ?? 'Error creating card request');
+          ? (response['message_ar'] ?? response['message'] ?? 'حدث خطأ أثناء إنشاء طلب البطاقة')
+          : (response['message'] ?? 'Error creating card request'));
         return;
       }
 

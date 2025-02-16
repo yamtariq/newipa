@@ -8,6 +8,7 @@ import '../../screens/main_page.dart';
 import '../../screens/cards_page.dart';
 import '../../screens/cards_page_ar.dart';
 import '../../providers/theme_provider.dart';
+import '../../screens/customer_service_screen.dart';
 import 'package:provider/provider.dart';
 import 'dart:math' as math;
 import 'dart:convert';
@@ -38,6 +39,7 @@ class _CardOfferScreenState extends State<CardOfferScreen> {
   String? _applicationNumber;
   String? _cardType;
   String? _cardTypeAr;
+  bool _shouldContactSupport = false;
 
   // 💡 Add new variables for slider
   late int _originalCreditLimit;
@@ -54,6 +56,14 @@ class _CardOfferScreenState extends State<CardOfferScreen> {
     _cardType = widget.userData['card_type']; // Get card type from userData
     _cardTypeAr = widget.userData['card_type_ar']; // Get Arabic card type from userData
     _applicationNumber = widget.userData['application_number'];
+    
+    // Check if this is an error response and set appropriate state
+    if (widget.userData['status'] == 'error') {
+      _error = widget.isArabic 
+        ? (widget.userData['message_ar'] ?? widget.userData['message'])
+        : widget.userData['message'];
+      _shouldContactSupport = widget.userData['should_contact_support'] ?? false;
+    }
   }
 
   // 💡 Update credit limit method to respect new minimum
@@ -388,12 +398,52 @@ class _CardOfferScreenState extends State<CardOfferScreen> {
                               ),
                             ),
                             const SizedBox(height: 24),
+                            if (_shouldContactSupport)
+                              Column(
+                                children: [
+                                  Text(
+                                    widget.isArabic 
+                                      ? 'يرجى التواصل مع خدمة العملاء للمزيد من المعلومات'
+                                      : 'Please contact customer service for more information',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => CustomerServiceScreen(
+                                            isArabic: widget.isArabic,
+                                            source: 'card_application',
+                                            applicationNumber: widget.userData['application_number']?.toString(),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
+                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                    ),
+                                    child: Text(
+                                      widget.isArabic ? 'تواصل مع خدمة العملاء' : 'Contact Customer Service',
+                                      style: const TextStyle(fontSize: 16),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            const SizedBox(height: 16),
                             ElevatedButton(
                               onPressed: () {
                                 Navigator.pop(context);
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
+                                backgroundColor: Colors.grey,
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                               ),
                               child: Text(widget.isArabic ? 'رجوع' : 'Go Back'),
                             ),

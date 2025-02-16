@@ -22,8 +22,15 @@ import 'dart:convert';
 
 class CustomerServiceScreen extends StatefulWidget {
   final bool isArabic;
+  final String? source;
+  final String? applicationNumber;
 
-  const CustomerServiceScreen({super.key, required this.isArabic});
+  const CustomerServiceScreen({
+    super.key,
+    required this.isArabic,
+    this.source,
+    this.applicationNumber,
+  });
 
   @override
   State<CustomerServiceScreen> createState() => _CustomerServiceScreenState();

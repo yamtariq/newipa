@@ -206,8 +206,8 @@ class CardService {
       
       // 💡 Combine both proxy and bank headers
       final headers = {
-        ...Constants.bankApiHeaders,  // Bank headers (Authorization, X-APP-ID, etc.)
-        'api-key': Constants.apiKey,  // Proxy API key
+        ...Constants.defaultHeaders,  // Proxy headers with api-key
+        'bank-headers': base64.encode(utf8.encode(json.encode(Constants.bankApiHeaders))),  // Bank headers encoded for proxy
       };
       
       // 💡 Log complete request details
@@ -215,7 +215,7 @@ class CardService {
       print('Endpoint: ${Constants.endpointCreateCustomer}');
       print('Headers:');
       headers.forEach((key, value) {
-        print('$key: ${key.toLowerCase() == 'authorization' ? '[REDACTED]' : value}');
+        print('$key: ${key.toLowerCase() == 'authorization' || key.toLowerCase() == 'bank-headers' ? '[REDACTED]' : value}');
       });
       print('\nRequest Body:');
       print(const JsonEncoder.withIndent('  ').convert(requestData));
@@ -268,6 +268,20 @@ class CardService {
       }
 
       if (!responseData['success']) {
+        // 💡 Special handling for NOT ELIGIBLE error
+        final errorMessage = responseData['errors']?.join(', ') ?? responseData['message'] ?? 'Unknown error occurred';
+        if (errorMessage.toUpperCase().contains('NOT ELIGIBLE')) {
+          return {
+            'status': 'error',
+            'error_type': 'NOT_ELIGIBLE',
+            'message': isArabic 
+              ? 'عذراً، أنت غير مؤهل للحصول على البطاقة في الوقت الحالي'
+              : 'Sorry, you are not eligible for a card at this time',
+            'message_ar': 'عذراً، أنت غير مؤهل للحصول على البطاقة في الوقت الحالي',
+            'should_contact_support': true
+          };
+        }
+
         // Get card type for rejected application
         final cardTypeData = await _getCardTypeForAmount(requestedAmount.toDouble());
         final selectedCardType = cardTypeData['type'] ?? 'REWARDS';
@@ -292,7 +306,10 @@ class CardService {
 
         return {
           'status': 'error',
+          'error_type': 'GENERAL',
           'message': responseData['errors']?.join(', ') ?? responseData['message'] ?? 'Unknown error occurred',
+          'message_ar': 'حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى',
+          'should_contact_support': false
         };
       }
 

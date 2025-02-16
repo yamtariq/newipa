@@ -28,12 +28,14 @@ class CardsPage extends StatefulWidget {
 class _CardsPageState extends State<CardsPage> {
   final CardService _cardService = CardService();
   final AuthService _authService = AuthService();
+  final ContentUpdateService _contentUpdateService = ContentUpdateService();
   bool _isLoading = true;
   List<dynamic> _cards = [];
   String? _applicationStatus;
   int _selectedCardIndex = 0;
   bool isDeviceRegistered = false;
   int _tabIndex = 1;
+  Map<String, dynamic>? _cardAd;
 
   double get screenHeight => MediaQuery.of(context).size.height;
 
@@ -46,6 +48,19 @@ class _CardsPageState extends State<CardsPage> {
     _checkDeviceRegistration();
     _initializeData();
     _loadData();
+    _contentUpdateService.addListener(_onContentUpdated);
+  }
+
+  @override
+  void dispose() {
+    _contentUpdateService.removeListener(_onContentUpdated);
+    super.dispose();
+  }
+
+  void _onContentUpdated() {
+    if (mounted) {
+      _loadData();
+    }
   }
 
   Future<void> _loadData() async {
@@ -55,6 +70,9 @@ class _CardsPageState extends State<CardsPage> {
       setState(() {
         _isLoading = true;
       });
+      
+      // Load card ad
+      _cardAd = _contentUpdateService.getCardAd(isArabic: false);
       
       final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
       await sessionProvider.checkSession();
@@ -88,11 +106,6 @@ class _CardsPageState extends State<CardsPage> {
         );
       }
     }
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
   }
 
   Future<void> _checkDeviceRegistration() async {
@@ -231,9 +244,6 @@ class _CardsPageState extends State<CardsPage> {
   }
 
   Widget _buildAdvertBanner() {
-    final contentUpdateService = ContentUpdateService();
-    final adData = contentUpdateService.getCardAd(isArabic: false);
-    
     return Container(
       height: 180,
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -242,9 +252,9 @@ class _CardsPageState extends State<CardsPage> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
-        child: adData != null && adData['image_bytes'] != null
+        child: _cardAd != null && _cardAd!['image_bytes'] != null
             ? Image.memory(
-                adData['image_bytes'],
+                _cardAd!['image_bytes'],
                 fit: BoxFit.fill,
                 width: double.infinity,
               )

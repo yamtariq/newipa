@@ -31,6 +31,7 @@ workflows:
           pod setup
           pod --version
           ruby --version
+
       - name: Clean and prepare 💡
         script: |
           echo "Current directory: $PWD"
@@ -42,6 +43,7 @@ workflows:
           rm -rf ios/Flutter/Flutter.podspec
           flutter clean
           flutter pub get
+
       - name: Setup iOS project 💡
         script: |
           flutter create . --platforms=ios
@@ -125,8 +127,7 @@ workflows:
                 config.build_settings['SWIFT_VERSION'] = '5.0'
                 config.build_settings['DEFINES_MODULE'] = 'YES'
                 
-                
-                # Apply module settings only to PhoneNumberKit 💡
+                # Apply module settings only to PhoneNumberKit
                 if target.name == 'PhoneNumberKit'
                   config.build_settings['SWIFT_EMIT_MODULE_INTERFACE'] = 'NO'
                   config.build_settings['DEFINES_MODULE'] = 'NO'
@@ -139,6 +140,7 @@ workflows:
                   config.build_settings['CLANG_ENABLE_MODULES'] = 'NO'
                   config.build_settings['SWIFT_VERSION'] = '5.0'
                   config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'YES'
+                  config.build_settings['SWIFT_EMIT_MODULE_INTERFACE'] = 'NO'
                   config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
                 end
               end
@@ -148,6 +150,7 @@ workflows:
           
           cd ..
           flutter pub get
+
       - name: Install CocoaPods dependencies 💡
         script: |
           cd ios
@@ -161,15 +164,18 @@ workflows:
           # Remove module interface flags from xcodebuild command
           xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Debug clean build
           cd ..
+
       - name: Build iOS 💡
-        script: | 
+        script: |
           flutter build ios --debug --no-codesign --verbose
+
     artifacts:
       - build/ios/iphoneos/Runner.app
       - ios/Pods/Manifest.lock
       - ios/Podfile.lock
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
       - ios/build/Runner.build/Debug-iphoneos/Runner.build/build-state.dat
+
     publishing:
       email:
         recipients:

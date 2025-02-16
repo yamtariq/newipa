@@ -32,11 +32,13 @@ class LoansPage extends StatefulWidget {
 class _LoansPageState extends State<LoansPage> {
   final LoanService _loanService = LoanService();
   final AuthService _authService = AuthService();
+  final ContentUpdateService _contentUpdateService = ContentUpdateService();
   bool _isLoading = true;
   List<Loan> _loans = [];
   String? _applicationStatus;
   int _tabIndex = 3;
   bool isDeviceRegistered = false;
+  Map<String, dynamic>? _loanAd;
 
   double get screenHeight => MediaQuery.of(context).size.height;
 
@@ -45,6 +47,19 @@ class _LoansPageState extends State<LoansPage> {
     super.initState();
     _checkDeviceRegistration();
     _loadData();
+    _contentUpdateService.addListener(_onContentUpdated);
+  }
+
+  @override
+  void dispose() {
+    _contentUpdateService.removeListener(_onContentUpdated);
+    super.dispose();
+  }
+
+  void _onContentUpdated() {
+    if (mounted) {
+      _loadData();
+    }
   }
 
   Future<void> _checkDeviceRegistration() async {
@@ -108,13 +123,16 @@ class _LoansPageState extends State<LoansPage> {
         _isLoading = true;
       });
       
+      // Load loan ad
+      _loanAd = _contentUpdateService.getLoanAd(isArabic: false);
+      
       final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
-      await sessionProvider.checkSession(); // Ensure session is up to date
+      await sessionProvider.checkSession();
       
       List<Loan> loans = [];
       String? status;
       
-      if (sessionProvider.isSignedIn) {
+      if (sessionProvider.hasActiveSession) {
         loans = await _loanService.getUserLoans();
         status = await _loanService.getCurrentApplicationStatus(isArabic: false);
       }

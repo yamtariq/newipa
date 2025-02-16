@@ -602,11 +602,11 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
   }
 
   void _launchEmail() {
-    _launchUrl('mailto:CustomerCare@nayifat.com');
+    _launchUrl('mailto:${_contactDetails?.email ?? "CustomerCare@nayifat.com"}');
   }
 
   void _launchPhone() {
-    _launchUrl('tel:8001000088');
+    _launchUrl('tel:${_contactDetails?.phone ?? "8001000088"}');
   }
 
   void _navigateToPage(String route) async {
@@ -1237,7 +1237,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                                     }
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: surfaceColor,
+                                    backgroundColor: isDarkMode ? surfaceColor : primaryColor,
                                     padding: const EdgeInsets.symmetric(vertical: 16.0),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8.0),
@@ -1252,7 +1252,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
-                                      color: isDarkMode ? const Color(0xFF8AA4D0) : primaryColor,
+                                      color: isDarkMode ? const Color(0xFF8AA4D0) : surfaceColor,
                                     ),
                                   ),
                                 ),
@@ -1464,7 +1464,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                                     }
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: surfaceColor,
+                                    backgroundColor: isDarkMode ? surfaceColor : primaryColor,
                                     padding: const EdgeInsets.symmetric(vertical: 16.0),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8.0),
@@ -1479,7 +1479,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
-                                      color: isDarkMode ? const Color(0xFF8AA4D0) : primaryColor,
+                                      color: isDarkMode ? const Color(0xFF8AA4D0) : surfaceColor,
                                     ),
                                   ),
                                 ),
@@ -1526,7 +1526,9 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                                     child: Center(
                                       child: Icon(
                                         Icons.calculate,
-                                        color: primaryColor,
+                                        color: Color(isDarkMode 
+                                            ? Constants.darkLabelTextColor 
+                                            : Constants.lightLabelTextColor),
                                         size: 36,
                                       ),
                                     ),
@@ -1549,7 +1551,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                                   Padding(
                                     padding: const EdgeInsets.all(16.0),
                                     child: Icon(
-                                      widget.isArabic ? Icons.chevron_left : Icons.chevron_right,
+                                      widget.isArabic ? Icons.chevron_right : Icons.chevron_right,
                                       color: primaryColor,
                                       size: 20,
                                     ),
@@ -1587,7 +1589,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                                   const SizedBox(height: 4),
                                   _buildContactItem(
                                                 Icons.phone,
-                                                _contactDetails!.phone,
+                                                _contactDetails?.phone ?? "8001000088",
                                                 fontSize: 13,
                                                 isLink: true,
                                                 color: primaryColor,
@@ -1595,7 +1597,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                                   const SizedBox(height: 8),
                                   _buildContactItem(
                                                 Icons.email,
-                                                _contactDetails!.email,
+                                                _contactDetails?.email ?? "CustomerCare@nayifat.com",
                                                 fontSize: 13,
                                                 isLink: true,
                                                 color: primaryColor,
