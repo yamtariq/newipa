@@ -11,6 +11,7 @@ import '../models/contact_details.dart';
 import 'package:flutter/foundation.dart' as foundation;
 import 'package:path/path.dart';
 import 'package:collection/collection.dart';
+import 'package:flutter/services.dart';
 
 class ContentUpdateService extends ChangeNotifier {
   static String get updateCheckUrl => Constants.masterFetchUrl;
@@ -711,6 +712,105 @@ class ContentUpdateService extends ChangeNotifier {
       return adData;
     }
     return Constants.cardAd[isArabic ? 'ar' : 'en'];
+  }
+
+  // 💡 Add new initialization method
+  Future<bool> initializeContent() async {
+    _log('\nTTT_=== Initializing Content ===');
+    
+    try {
+      // Step 1: Try to load cached content first
+      final hasCached = await _loadCachedContent();
+      if (hasCached) {
+        _hasCachedContent = true;
+        _initialLoadDone = true;
+        notifyListeners();
+        _log('TTT_Successfully loaded cached content');
+        
+        // Start background update check without blocking
+        _checkForUpdatesInBackground();
+        return true;
+      }
+
+      // Step 2: If no cache, load default assets
+      await _loadDefaultAssets();
+      _hasDefaultContent = true;
+      _initialLoadDone = true;
+      
+      // Initialize default ad images
+      if (_memoryCache['default_loan_ad'] != null) {
+        try {
+          final defaultLoanAdBytes = await _loadAssetBytes('assets/images/loans_ad.JPG');
+          if (defaultLoanAdBytes != null) {
+            _memoryCache['loan_ad_image_bytes'] = defaultLoanAdBytes;
+          }
+        } catch (e) {
+          _log('TTT_Error loading default loan ad image: $e');
+        }
+      }
+
+      if (_memoryCache['default_card_ad'] != null) {
+        try {
+          final defaultCardAdBytes = await _loadAssetBytes('assets/images/cards_ad.JPG');
+          if (defaultCardAdBytes != null) {
+            _memoryCache['card_ad_image_bytes'] = defaultCardAdBytes;
+          }
+        } catch (e) {
+          _log('TTT_Error loading default card ad image: $e');
+        }
+      }
+      
+      notifyListeners();
+      _log('TTT_Successfully loaded default content');
+      
+      // Start background update check without blocking
+      _checkForUpdatesInBackground();
+      return true;
+    } catch (e) {
+      _log('TTT_Error initializing content: $e');
+      return false;
+    }
+  }
+
+  // 💡 Add helper method to load asset bytes
+  Future<Uint8List?> _loadAssetBytes(String assetPath) async {
+    try {
+      final ByteData data = await rootBundle.load(assetPath);
+      return data.buffer.asUint8List();
+    } catch (e) {
+      _log('TTT_Error loading asset bytes for $assetPath: $e');
+      return null;
+    }
+  }
+
+  // 💡 Modified background update method
+  Future<void> _checkForUpdatesInBackground() async {
+    try {
+      if (_isUpdating) return; // Prevent multiple simultaneous updates
+      
+      final hasUpdates = await _hasContentUpdates();
+      if (hasUpdates) {
+        _isUpdating = true;
+        notifyListeners();
+        
+        final tempCache = Map<String, dynamic>.from(_memoryCache);
+        final success = await _updateAllContent(tempCache);
+
+        if (success) {
+          _memoryCache.addAll(tempCache);
+          await _saveContentToCache();
+          
+          if (await _verifySavedContent()) {
+            _hasCachedContent = true;
+          }
+        }
+      }
+    } catch (e) {
+      _log('TTT_Error in background update: $e');
+    } finally {
+      _isUpdating = false;
+      notifyListeners();
+    }
   }
 }
 

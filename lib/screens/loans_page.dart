@@ -119,12 +119,15 @@ class _LoansPageState extends State<LoansPage> {
     if (!mounted) return;
     
     try {
-      setState(() {
-        _isLoading = true;
-      });
+      // Only show loading indicator if we don't have any content yet
+      if (_loans.isEmpty && _loanAd == null) {
+        setState(() {
+          _isLoading = true;
+        });
+      }
       
-      // Load loan ad
-      _loanAd = _contentUpdateService.getLoanAd(isArabic: false);
+      // Load loan ad first
+      final newLoanAd = _contentUpdateService.getLoanAd(isArabic: false);
       
       final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
       await sessionProvider.checkSession();
@@ -139,6 +142,7 @@ class _LoansPageState extends State<LoansPage> {
       
       if (mounted) {
         setState(() {
+          _loanAd = newLoanAd;
           _loans = loans;
           _applicationStatus = status;
           _isLoading = false;

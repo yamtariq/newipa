@@ -59,21 +59,27 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _initializeApp() async {
     try {
+      // Start animations after a short delay
       await Future.delayed(const Duration(milliseconds: 500));
       setState(() {
         _startAnimations = true;
       });
 
+      // 💡 Use new optimized content loading
       final contentService = Provider.of<ContentUpdateService>(context, listen: false);
-      final contentFuture = contentService.checkAndUpdateContent(force: true, isInitialLoad: true);
+      final contentLoaded = await contentService.initializeContent();
 
-      await Future.wait([
-        contentFuture,
-        Future.delayed(const Duration(milliseconds: 6000)),
-      ]);
+      // Wait for minimum animation time
+      await Future.delayed(const Duration(milliseconds: 2000));
 
       if (mounted) {
-        _navigateToMainPage(widget.isDarkMode);
+        if (contentLoaded) {
+          _navigateToMainPage(widget.isDarkMode);
+        } else {
+          // Even if content failed to load, still navigate to main page
+          // The app will use default content
+          _navigateToMainPage(widget.isDarkMode);
+        }
       }
     } catch (e) {
       debugPrint('Error during app initialization: $e');

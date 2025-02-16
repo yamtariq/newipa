@@ -67,12 +67,15 @@ class _CardsPageState extends State<CardsPage> {
     if (!mounted) return;
     
     try {
-      setState(() {
-        _isLoading = true;
-      });
+      // Only show loading indicator if we don't have any content yet
+      if (_cards.isEmpty && _cardAd == null) {
+        setState(() {
+          _isLoading = true;
+        });
+      }
       
-      // Load card ad
-      _cardAd = _contentUpdateService.getCardAd(isArabic: false);
+      // Load card ad first
+      final newCardAd = _contentUpdateService.getCardAd(isArabic: false);
       
       final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
       await sessionProvider.checkSession();
@@ -87,6 +90,7 @@ class _CardsPageState extends State<CardsPage> {
       
       if (mounted) {
         setState(() {
+          _cardAd = newCardAd;
           _cards = cards;
           _applicationStatus = status;
           _isLoading = false;
