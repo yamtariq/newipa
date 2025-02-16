@@ -235,9 +235,17 @@ class _LoansPageState extends State<LoansPage> {
   }
 
   Widget _buildAdvertBanner() {
-    final contentUpdateService = ContentUpdateService();
-    final adData = contentUpdateService.getLoanAd(isArabic: false);
-    
+    Uint8List? imageBytes;
+    if (_loanAd != null && 
+        _loanAd!.containsKey('image_bytes') && 
+        _loanAd!['image_bytes'] != null) {
+      if (_loanAd!['image_bytes'] is Uint8List) {
+        imageBytes = _loanAd!['image_bytes'];
+      } else if (_loanAd!['image_bytes'] is List<int>) {
+        imageBytes = Uint8List.fromList(_loanAd!['image_bytes'] as List<int>);
+      }
+    }
+
     return Container(
       height: 180,
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -246,11 +254,18 @@ class _LoansPageState extends State<LoansPage> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
-        child: adData != null && adData['image_bytes'] != null
+        child: imageBytes != null
             ? Image.memory(
-                adData['image_bytes'],
+                imageBytes,
                 fit: BoxFit.fill,
                 width: double.infinity,
+                errorBuilder: (context, error, stackTrace) {
+                  return Image.asset(
+                    'assets/images/loans_ad.JPG',
+                    fit: BoxFit.fill,
+                    width: double.infinity,
+                  );
+                },
               )
             : Image.asset(
                 'assets/images/loans_ad.JPG',

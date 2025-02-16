@@ -1,6 +1,6 @@
 workflows:
   ios-workflow:
-    name: iOS Workflow 2
+    name: iOS Workflow 3
     max_build_duration: 120
     instance_type: mac_mini_m2
     environment:
@@ -50,10 +50,10 @@ workflows:
           cd ios
           rm -f Podfile
           rm -f Podfile.lock
-          # DO NOT remove the Runner-Bridging-Header.h file – it must remain in place.
+          # Ensure Runner-Bridging-Header.h exists. Do not delete it!
           mkdir -p Runner
           
-          # Create BackgroundTaskHandler.swift (ensure it’s part of the Runner target)
+          # Create BackgroundTaskHandler.swift in Runner folder
           cat > Runner/BackgroundTaskHandler.swift << 'EOF'
           import Foundation
           import BackgroundTasks
@@ -145,8 +145,9 @@ workflows:
                   config.build_settings['SWIFT_VERSION'] = '5.0'
                   config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'YES'
                   config.build_settings['SWIFT_EMIT_MODULE_INTERFACE'] = 'NO'
-                  config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
-                  # Set the bridging header path so that Swift can see Objective-C symbols:
+                  # Set compilation mode to incremental instead of wholemodule
+                  config.build_settings['SWIFT_COMPILATION_MODE'] = 'incremental'
+                  # Explicitly set the bridging header path so Swift sees it:
                   config.build_settings['SWIFT_OBJC_BRIDGING_HEADER'] = '$(SRCROOT)/Runner/Runner-Bridging-Header.h'
                 end
               end

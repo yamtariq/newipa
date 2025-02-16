@@ -6,6 +6,7 @@ import '../services/card_service.dart';
 import '../providers/session_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/provider.dart' as provider;
+import 'dart:typed_data';  // Add this at the top with other imports
 // Import pages
 import 'loans_page.dart';
 import 'account_page.dart';
@@ -253,10 +254,17 @@ class _CardsPageState extends State<CardsPage> {
   }
 
   Widget _buildAdvertBanner() {
-    // 💡 Safe null check for card ad and image bytes
-    final hasValidAd = _cardAd != null && 
+    // 💡 Safe null check and type conversion for card ad and image bytes
+    Uint8List? imageBytes;
+    if (_cardAd != null && 
         _cardAd!.containsKey('image_bytes') && 
-        _cardAd!['image_bytes'] != null;
+        _cardAd!['image_bytes'] != null) {
+      if (_cardAd!['image_bytes'] is Uint8List) {
+        imageBytes = _cardAd!['image_bytes'];
+      } else if (_cardAd!['image_bytes'] is List<int>) {
+        imageBytes = Uint8List.fromList(_cardAd!['image_bytes'] as List<int>);
+      }
+    }
 
     return Container(
       height: 180,
@@ -266,9 +274,9 @@ class _CardsPageState extends State<CardsPage> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
-        child: hasValidAd
+        child: imageBytes != null
             ? Image.memory(
-                _cardAd!['image_bytes'],
+                imageBytes,
                 fit: BoxFit.fill,
                 width: double.infinity,
                 errorBuilder: (context, error, stackTrace) {

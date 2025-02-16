@@ -17,6 +17,7 @@ import '../services/content_update_service.dart';
 import '../providers/theme_provider.dart';
 import '../services/theme_service.dart';
 import '../utils/constants.dart';
+import 'dart:typed_data';  // Add this at the top with other imports
 
 class CardsPageAr extends StatefulWidget {
   const CardsPageAr({Key? key}) : super(key: key);
@@ -276,6 +277,18 @@ class _CardsPageArState extends State<CardsPageAr> {
   }
 
   Widget _buildAdvertBanner() {
+    // 💡 Safe null check and type conversion for card ad and image bytes
+    Uint8List? imageBytes;
+    if (_cardAd != null && 
+        _cardAd!.containsKey('image_bytes') && 
+        _cardAd!['image_bytes'] != null) {
+      if (_cardAd!['image_bytes'] is Uint8List) {
+        imageBytes = _cardAd!['image_bytes'];
+      } else if (_cardAd!['image_bytes'] is List<int>) {
+        imageBytes = Uint8List.fromList(_cardAd!['image_bytes'] as List<int>);
+      }
+    }
+
     return Container(
       height: 180,
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -284,11 +297,18 @@ class _CardsPageArState extends State<CardsPageAr> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(Constants.containerBorderRadius),
-        child: _cardAd != null && _cardAd['image_bytes'] != null
+        child: imageBytes != null
             ? Image.memory(
-                _cardAd['image_bytes'],
+                imageBytes,
                 fit: BoxFit.fill,
                 width: double.infinity,
+                errorBuilder: (context, error, stackTrace) {
+                  return Image.asset(
+                    'assets/images/cards_ad_ar.JPG',
+                    fit: BoxFit.fill,
+                    width: double.infinity,
+                  );
+                },
               )
             : Image.asset(
                 'assets/images/cards_ad_ar.JPG',
