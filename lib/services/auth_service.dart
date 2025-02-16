@@ -381,9 +381,11 @@ class AuthService {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('is_signed_in', true);
         await prefs.setBool('device_registered', true);
+        await prefs.setString('device_user_id', nationalId);
         
         // 💡 Set sign-in flags in SecureStorage
         await _secureStorage.write(key: 'device_registered', value: 'true');
+        await _secureStorage.write(key: 'device_user_id', value: nationalId);
 
         // Return the response without storing any data
         return parsedResponse;
@@ -510,10 +512,33 @@ class AuthService {
   // Check if device is registered (for quick sign-in methods)
   Future<bool> isDeviceRegistered() async {
     try {
+      print('\n=== CHECKING DEVICE REGISTRATION ===');
+      
+      // Check SharedPreferences
       final prefs = await SharedPreferences.getInstance();
-      final isRegistered = prefs.getBool('device_registered') ?? false;
-      final deviceUserId = prefs.getString('device_user_id');
-      return isRegistered && deviceUserId != null;
+      final isRegisteredPrefs = prefs.getBool('device_registered') ?? false;
+      final deviceUserIdPrefs = prefs.getString('device_user_id');
+      
+      print('SharedPreferences Check:');
+      print('- device_registered: $isRegisteredPrefs');
+      print('- device_user_id: $deviceUserIdPrefs');
+      
+      // Check SecureStorage
+      final isRegisteredSecure = await _secureStorage.read(key: 'device_registered');
+      final deviceUserIdSecure = await _secureStorage.read(key: 'device_user_id');
+      
+      print('SecureStorage Check:');
+      print('- device_registered: $isRegisteredSecure');
+      print('- device_user_id: $deviceUserIdSecure');
+      
+      // 💡 Check both storages and ensure we have both flags and IDs
+      final isRegistered = (isRegisteredPrefs && deviceUserIdPrefs != null) || 
+                         (isRegisteredSecure == 'true' && deviceUserIdSecure != null);
+      
+      print('Final Registration Status: $isRegistered');
+      print('=== DEVICE REGISTRATION CHECK END ===\n');
+      
+      return isRegistered;
     } catch (e) {
       print('Error checking device registration: $e');
       return false;
