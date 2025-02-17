@@ -31,36 +31,9 @@ workflows:
       - name: Get dependencies
         script: |
           flutter pub get
-          
-          # Ensure plugin registration is generated
           cd ios
-          if [ ! -f Runner/GeneratedPluginRegistrant.h ] || [ ! -f Runner/GeneratedPluginRegistrant.m ]; then
-            flutter pub get
-            cd ..
-            flutter clean
-            flutter pub get
-            cd ios
-          fi
-          
-          # Install pods
           pod install --repo-update
-          
-          # Verify plugin registration
-          if [ ! -f Runner/GeneratedPluginRegistrant.h ] || [ ! -f Runner/GeneratedPluginRegistrant.m ]; then
-            echo "Error: Plugin registration files not generated"
-            exit 1
-          fi
-          
-          echo "Content of GeneratedPluginRegistrant.h:"
-          cat Runner/GeneratedPluginRegistrant.h
-          echo "Content of GeneratedPluginRegistrant.m:"
-          cat Runner/GeneratedPluginRegistrant.m
-          
           cd ..
-          
-      - name: Build Flutter bundle
-        script: |
-          flutter build ios --release --no-codesign --config-only
           
       - name: Build unsigned app
         script: |
@@ -82,8 +55,11 @@ workflows:
             DEVELOPMENT_TEAM="" \
             COMPILER_INDEX_STORE_ENABLE=NO \
             STRIP_INSTALLED_PRODUCT=NO \
-            GCC_PREPROCESSOR_DEFINITIONS='${inherited} COCOAPODS=1' \
-            HEADER_SEARCH_PATHS='${inherited} ${SRCROOT}/Flutter ${SRCROOT}/Runner'
+            SWIFT_OPTIMIZATION_LEVEL="-Onone" \
+            SWIFT_COMPILATION_MODE="singlefile" \
+            GCC_OPTIMIZATION_LEVEL="0" \
+            ONLY_ACTIVE_ARCH=NO \
+            BUILD_LIBRARY_FOR_DISTRIBUTION=NO
             
           # Find the built app
           APP_PATH=$(find build/DerivedData -name "Runner.app" | grep Release-iphoneos)
