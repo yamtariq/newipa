@@ -1,6 +1,6 @@
 workflows:
   ios-workflow:
-    name: iOS Workflow final1
+    name: iOS Workflow final 2
     max_build_duration: 120
     instance_type: mac_mini_m2
     environment:
@@ -158,17 +158,17 @@ workflows:
         script: |
           flutter build ios --release --no-codesign
           cd ios
-          xcodebuild -workspace Runner.xcworkspace -scheme Runner -sdk iphoneos -configuration Release archive -archivePath $HOME/export/Runner.xcarchive
-          xcodebuild -exportArchive -archivePath $HOME/export/Runner.xcarchive -exportOptionsPlist exportOptions.plist -exportPath $HOME/export
+          xcodebuild -workspace Runner.xcworkspace -scheme Runner -sdk iphoneos -configuration Release -archivePath build/Runner.xcarchive clean archive
+          xcodebuild -exportArchive -archivePath build/Runner.xcarchive -exportOptionsPlist exportOptions.plist -exportPath build/ios/ipa
           cd ..
 
     artifacts:
-      - $HOME/export/Runner.ipa
+      - build/ios/ipa/*.ipa
+      - ios/build/Runner.build/Release-iphoneos/Runner.build/build-state.dat
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
       - /tmp/xcodebuild_logs/*.log
       - ios/Pods/Manifest.lock
       - ios/Podfile.lock
-      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
-      - ios/build/Runner.build/Release-iphoneos/Runner.build/build-state.dat
 
     publishing:
       email:

@@ -368,7 +368,6 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
         password: _passwordController.text,
         email: widget.email,
         phone: widget.phone,
-        is_signed_in: true,
         userData: governmentData['data'],
         addressData: addressData['data'],
       );
