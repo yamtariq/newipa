@@ -14,15 +14,16 @@ workflows:
         XCODE_SCHEME: "Runner"
         PLATFORM: "ios"
         MIN_IOS_VERSION: "14.0"
-    app_store_connect:
-      api_key:
-        issuer_id: daded57c-c1f1-467b-a152-65f70fd5b0bc
-        key_identifier: MKW8C556XU
-        private_key: ${APP_STORE_CONNECT_PRIVATE_KEY}
     cache:
       cache_paths:
         - ~/.pub-cache
         - vendor/bundle
+    signing:
+      app_store_connect:
+        api_key:
+          issuer_id: daded57c-c1f1-467b-a152-65f70fd5b0bc
+          key_identifier: MKW8C556XU
+          private_key: ${APP_STORE_CONNECT_PRIVATE_KEY}
     scripts:
       - name: Set up environment 💡
         script: |

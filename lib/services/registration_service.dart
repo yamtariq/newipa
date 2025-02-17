@@ -573,9 +573,17 @@ class RegistrationService {
     await prefs.setBool('device_registered', true);
     await prefs.setString('device_user_id', nationalId);
     
+    // 💡 Add session-specific data
+    await prefs.setBool('session_active', true);
+    await prefs.setString('session_user_id', nationalId);
+    await prefs.setString('national_id', nationalId);
+    
     // 💡 Set session flags in SecureStorage
     await secureStorage.write(key: 'device_registered', value: 'true');
     await secureStorage.write(key: 'device_user_id', value: nationalId);
+    await secureStorage.write(key: 'session_active', value: 'true');
+    await secureStorage.write(key: 'session_user_id', value: nationalId);
+    await secureStorage.write(key: 'national_id', value: nationalId);
     
     print('✅ Session flags set for registration');
   }
