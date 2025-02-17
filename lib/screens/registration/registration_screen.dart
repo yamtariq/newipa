@@ -11,7 +11,6 @@ import 'steps/mpin_creation_step.dart';
 import 'steps/biometric_setup_step.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import '../../providers/session_provider.dart';
 
 class RegistrationScreen extends StatelessWidget {
   const RegistrationScreen({Key? key}) : super(key: key);
@@ -229,26 +228,12 @@ class RegistrationCompleteStep extends StatelessWidget {
                         await authService.storeTokens(result['token']);
                         print('=== TOKEN STORED ===\n');
                       }
-
-                      // 💡 Update session state and preferences
-                      final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
-                      sessionProvider.setSignedIn(true);
-                      sessionProvider.resetManualSignOff();
-                      
-                      // 💡 Set signed in flag in SharedPreferences
-                      final prefs = await SharedPreferences.getInstance();
-                      await prefs.setBool('is_signed_in', true);
-                      await prefs.setBool('device_registered', true);
-                      await prefs.setString('device_user_id', nationalId);
-
-                      // Set sign-in flags in SecureStorage
-                      await _secureStorage.write(key: 'device_registered', value: 'true');
-                      await _secureStorage.write(key: 'device_user_id', value: nationalId);
                       
                       // Log data from both storage types
                       print('\n=== CHECKING ALL STORAGE LOCATIONS ===');
                       
                       // 1. Check SharedPreferences
+                      final prefs = await SharedPreferences.getInstance();
                       final regDataStr = prefs.getString('registration_data');
                       print('1. SharedPreferences:');
                       print('- Key: registration_data');

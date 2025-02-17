@@ -7,6 +7,9 @@ import 'mpin_setup_screen.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../utils/constants.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../providers/session_provider.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class PasswordSetupScreen extends StatefulWidget {
   final String nationalId;
@@ -368,7 +371,27 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
         addressData: addressData['data'],
       );
 
-      // 💡 4. Navigate to MPIN setup
+      // 💡 4. Set session and storage flags
+      print('\n=== SETTING SESSION AND STORAGE FLAGS ===');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('is_signed_in', true);
+      await prefs.setBool('device_registered', true);
+      await prefs.setString('device_user_id', widget.nationalId);
+
+      // Set sign-in flags in SecureStorage
+      const secureStorage = FlutterSecureStorage();
+      await secureStorage.write(key: 'device_registered', value: 'true');
+      await secureStorage.write(key: 'device_user_id', value: widget.nationalId);
+
+      // Update session state
+      if (mounted) {
+        final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
+        sessionProvider.setSignedIn(true);
+        sessionProvider.resetManualSignOff();
+      }
+      print('=== SESSION AND STORAGE FLAGS SET ===\n');
+
+      // 💡 5. Navigate to MPIN setup
       if (mounted) {
         Navigator.pushReplacement(
           context,

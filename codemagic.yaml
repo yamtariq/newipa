@@ -1,6 +1,6 @@
 workflows:
   ios-workflow:
-    name: iOS Workflow 6
+    name: iOS Workflow final
     max_build_duration: 120
     instance_type: mac_mini_m2
     environment:
@@ -156,14 +156,11 @@ workflows:
 
       - name: Build iOS 💡
         script: |
-          flutter build ios --release --no-codesign
-          cd ios
-          xcodebuild -workspace Runner.xcworkspace -scheme Runner -sdk iphoneos -configuration Release archive -archivePath $HOME/export/Runner.xcarchive
-          xcodebuild -exportArchive -archivePath $HOME/export/Runner.xcarchive -exportOptionsPlist exportOptions.plist -exportPath $HOME/export
-          cd ..
+          flutter build ipa --release --no-codesign --export-options-plist=ios/exportOptions.plist
 
     artifacts:
-      - $HOME/export/Runner.ipa
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
       - ios/Pods/Manifest.lock
       - ios/Podfile.lock
 
