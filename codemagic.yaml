@@ -29,25 +29,34 @@ workflows:
           pod install --repo-update
           cd ..
           
-      - name: Prepare build
+      - name: Configure Xcode project
         script: |
-          # Ensure GeneratedPluginRegistrant is created
           cd ios
-          if [ ! -f Runner/GeneratedPluginRegistrant.h ] || [ ! -f Runner/GeneratedPluginRegistrant.m ]; then
-            echo "Regenerating plugin registrant..."
-            flutter pub get
-            rm -rf Runner/GeneratedPluginRegistrant.*
-            flutter clean
-            flutter pub get
-          fi
+          
+          # Disable Swift interface generation and update project settings
+          ruby << 'EOF'
+          require 'xcodeproj'
+          
+          project_path = 'Runner.xcodeproj'
+          project = Xcodeproj::Project.open(project_path)
+          
+          project.targets.each do |target|
+            if target.name == 'Runner'
+              target.build_configurations.each do |config|
+                config.build_settings['SWIFT_EMIT_MODULE_INTERFACE'] = 'NO'
+                config.build_settings['DEFINES_MODULE'] = 'NO'
+                config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
+                config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
+              end
+            end
+          end
+          
+          project.save
+          EOF
+          
           cd ..
           
-      - name: Build Flutter
-        script: |
-          # Build Flutter bundle
-          flutter build ios --release --no-codesign
-          
-      - name: Create unsigned IPA
+      - name: Build unsigned app
         script: |
           cd ios
           
@@ -66,7 +75,10 @@ workflows:
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
             COMPILER_INDEX_STORE_ENABLE=NO \
-            STRIP_INSTALLED_PRODUCT=NO
+            STRIP_INSTALLED_PRODUCT=NO \
+            SWIFT_EMIT_MODULE_INTERFACE=NO \
+            DEFINES_MODULE=NO \
+            SWIFT_COMPILATION_MODE=wholemodule
             
           # Find the built app
           APP_PATH=$(find build/DerivedData -name "Runner.app" | grep Release-iphoneos)
