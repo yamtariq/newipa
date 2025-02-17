@@ -1,6 +1,6 @@
 workflows:
   ios-workflow:
-    name: iOS Workflow final 2
+    name: iOS Workflow final 3
     max_build_duration: 120
     instance_type: mac_mini_m2
     environment:
@@ -14,6 +14,11 @@ workflows:
         XCODE_SCHEME: "Runner"
         PLATFORM: "ios"
         MIN_IOS_VERSION: "14.0"
+    app_store_connect:
+      api_key:
+        issuer_id: daded57c-c1f1-467b-a152-65f70fd5b0bc
+        key_identifier: MKW8C556XU
+        private_key: ${APP_STORE_CONNECT_PRIVATE_KEY}
     cache:
       cache_paths:
         - ~/.pub-cache
@@ -156,15 +161,11 @@ workflows:
 
       - name: Set up code signing settings 💡
         script: |
-          echo $CM_CERTIFICATE | base64 --decode > /tmp/certificate.p12
           keychain initialize
-          keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password $CM_CERTIFICATE_PASSWORD
           app-store-connect fetch-signing-files $(xcode-project detect-bundle-id) --type IOS_APP_STORE --create
-          keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password $CM_CERTIFICATE_PASSWORD
-          xcode-project use-profiles
       - name: Build iOS 💡
         script: |
-          flutter build ipa --release --export-options-plist ios/exportOptions.plist
+          flutter build ipa --release --export-options-plist ios/exportOptions.plist --obfuscate --split-debug-info=./build/app/outputs/symbols
 
     artifacts:
       - build/ios/ipa/*.ipa
