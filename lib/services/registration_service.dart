@@ -6,6 +6,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../utils/constants.dart';
 import 'dart:io';
+import 'package:provider/provider.dart';
+import '../providers/session_provider.dart';
+import 'package:flutter/material.dart';
+import '../services/navigation_service.dart';
 
 class RegistrationService {
   // Check if user exists and validate identity
@@ -743,6 +747,15 @@ class RegistrationService {
 
           if (response.statusCode == 200) {
             print('✅ Registration successful!');
+            
+            // 💡 Update session states in provider
+            final context = NavigationService.navigatorKey?.currentContext;
+            if (context != null) {
+              final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
+              sessionProvider.setSessionAfterRegistration();
+              print('✅ Session states updated after registration');
+            }
+            
             return true;
           }
           

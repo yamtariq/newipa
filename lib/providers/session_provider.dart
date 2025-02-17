@@ -10,6 +10,20 @@ class SessionProvider with ChangeNotifier {
   bool get isSignedIn => _isSignedIn;
   bool get hasActiveSession => _hasActiveSession;
 
+  // 💡 Set session state after successful registration
+  void setSessionAfterRegistration() {
+    print('\n=== SETTING SESSION AFTER REGISTRATION ===');
+    _isSignedIn = true;
+    _hasActiveSession = true;
+    _manualSignOff = false;
+    print('Session states updated:');
+    print('- isSignedIn: $_isSignedIn');
+    print('- hasActiveSession: $_hasActiveSession');
+    print('- manualSignOff: $_manualSignOff');
+    notifyListeners();
+    print('=== SESSION UPDATE COMPLETE ===\n');
+  }
+
   // Initialize the session state
   Future<void> initializeSession() async {
     try {
