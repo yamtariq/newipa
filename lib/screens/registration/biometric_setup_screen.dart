@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../../providers/session_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../utils/constants.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class BiometricSetupScreen extends StatefulWidget {
   final String nationalId;
@@ -175,13 +176,30 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
         'name': '${storedData['userData']['englishFirstName'] ?? ''} ${storedData['userData']['englishLastName'] ?? ''}',
         'name_ar': '${storedData['userData']['firstName'] ?? ''} ${storedData['userData']['familyName'] ?? ''}',
         'isSessionActive': true,
+        'id': storedData['userData']['id']?.toString(),
+        'id_expiry_date': storedData['userData']['idExpiryDate'],
+        'device_id': (await _authService.getDeviceInfo())['deviceId'],
+        'session_active': 'true',
+        'is_signed_in': true,
       };
       await _authService.storeUserData(userData);
 
       // 4. Store device registration
       await _authService.storeDeviceRegistration(widget.nationalId);
 
-      // 5. Start user session
+      // 5. Store additional session data in secure storage
+      final secureStorage = const FlutterSecureStorage();
+      await secureStorage.write(key: 'session_active', value: 'true');
+      await secureStorage.write(key: 'session_user_id', value: storedData['userData']['id']?.toString() ?? widget.nationalId);
+      await secureStorage.write(key: 'device_user_id', value: widget.nationalId);
+
+      // 6. Store session flags in SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('is_signed_in', true);
+      await prefs.setBool('session_active', true);
+      await prefs.setString('session_user_id', storedData['userData']['id']?.toString() ?? widget.nationalId);
+
+      // 7. Start user session
       await _authService.startSession(
         widget.nationalId,
         userId: storedData['userData']['id']?.toString(),
@@ -189,13 +207,13 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
 
       if (!mounted) return;
 
-      // 6. Initialize session in provider
+      // 8. Initialize session in provider
       final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
       sessionProvider.resetManualSignOff();
       sessionProvider.setSignedIn(true);
       await sessionProvider.initializeSession();
 
-      // 7. Show success dialog and navigate to main page
+      // 9. Show success dialog and navigate to main page
       await showDialog(
         context: context,
         barrierDismissible: false,
@@ -224,7 +242,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
         ),
       );
 
-      // 8. Notify parent about completion
+      // 10. Notify parent about completion
       widget.onSetupComplete(_isBiometricsEnabled);
     } catch (e) {
       if (mounted) {

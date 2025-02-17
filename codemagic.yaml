@@ -1,6 +1,6 @@
 workflows:
   ios-workflow:
-    name: iOS Workflow final 7
+    name: iOS Workflow final
     max_build_duration: 120
     instance_type: mac_mini_m2
     environment:
@@ -179,3 +179,56 @@ workflows:
         notify:
           success: true
           failure: true
+
+  ios-unsigned:
+    name: iOS Unsigned Build
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      vars:
+        BUNDLE_ID: "com.nayifat.nayifatApp"
+        XCODE_WORKSPACE: "Runner.xcworkspace"
+        XCODE_SCHEME: "Runner"
+    scripts:
+      - name: Set up environment
+        script: |
+          flutter doctor -v
+          
+      - name: Install dependencies
+        script: |
+          flutter clean
+          flutter pub get
+          
+      - name: Install pods
+        script: |
+          cd ios
+          pod install
+          
+      - name: Build unsigned IPA
+        script: |
+          cd ios
+          xcodebuild -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -sdk iphoneos \
+            -configuration Release \
+            -allowProvisioningUpdates \
+            -archivePath build/Runner.xcarchive \
+            archive
+          
+          xcodebuild -exportArchive \
+            -archivePath build/Runner.xcarchive \
+            -exportPath build/ios/ipa \
+            -exportOptionsPlist exportOptions.plist
+            
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+      - /tmp/xcodebuild_logs/*.log
+      
+    publishing:
+      email:
+        recipients:
+          -   yamtariq@gmail.com
