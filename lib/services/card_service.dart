@@ -125,7 +125,15 @@ class CardService {
       final storedUserDataStr = prefs.getString('user_data');
       
       if (storedUserDataStr == null) {
-        throw Exception('User data not found in storage');
+        return {
+          'status': 'error',
+          'error_type': 'DATA_NOT_FOUND',
+          'message': isArabic 
+              ? 'لم يتم العثور على بيانات المستخدم'
+              : 'User data not found',
+          'message_ar': 'لم يتم العثور على بيانات المستخدم',
+          'should_contact_support': false
+        };
       }
 
       final storedUserData = jsonDecode(storedUserDataStr);
@@ -285,7 +293,6 @@ class CardService {
         // Get card type for rejected application
         final cardTypeData = await _getCardTypeForAmount(requestedAmount.toDouble());
         final selectedCardType = cardTypeData['type'] ?? 'REWARDS';
-        final result = responseData['result'];
 
         // 💡 If createCustomer is rejected, insert a rejected application
         final cardData = {
@@ -298,7 +305,7 @@ class CardService {
           'status_date': DateTime.now().toIso8601String(),
           'remarks': 'Application rejected by bank',
           'noteUser': 'SYSTEM',
-          'note': responseData['errors']?.join(', ') ?? responseData['message'] ?? 'Unknown error occurred',
+          'note': errorMessage,
           'NameOnCard': storedUserData['nameOnCard'] ?? '',
         };
 
@@ -307,7 +314,7 @@ class CardService {
         return {
           'status': 'error',
           'error_type': 'GENERAL',
-          'message': responseData['errors']?.join(', ') ?? responseData['message'] ?? 'Unknown error occurred',
+          'message': errorMessage,
           'message_ar': 'حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى',
           'should_contact_support': false
         };
