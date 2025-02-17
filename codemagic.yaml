@@ -1,6 +1,6 @@
 workflows:
   ios-workflow:
-    name: iOS Workflow final 3
+    name: iOS Workflow
     max_build_duration: 120
     instance_type: mac_mini_m2
     environment:
@@ -36,59 +36,37 @@ workflows:
           /usr/libexec/PlistBuddy -c "Add :buildSettings:SWIFT_EMIT_MODULE_INTERFACE string NO" Runner.xcodeproj/project.pbxproj
           /usr/libexec/PlistBuddy -c "Add :buildSettings:SWIFT_OPTIMIZATION_LEVEL string -Onone" Runner.xcodeproj/project.pbxproj
           
-          # Create archive without signing
-          xcodebuild -workspace Runner.xcworkspace \
+          # Create build directories
+          mkdir -p build/unsigned
+          
+          # Build for release without signing
+          xcodebuild clean build \
+            -workspace Runner.xcworkspace \
             -scheme Runner \
-            -sdk iphoneos \
             -configuration Release \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
+            -sdk iphoneos \
             CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            EXPANDED_CODE_SIGN_IDENTITY="" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
             SWIFT_EMIT_MODULE_INTERFACE=NO \
             SWIFT_OPTIMIZATION_LEVEL="-Onone" \
-            -archivePath build/Runner.xcarchive \
-            clean archive
-          
-          # Prepare IPA directory
-          mkdir -p build/ios/ipa
-          
-          # Create a temporary exportOptions.plist
-          cat > exportOptionsTemp.plist << EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>method</key>
-              <string>development</string>
-              <key>compileBitcode</key>
-              <false/>
-              <key>uploadBitcode</key>
-              <false/>
-              <key>uploadSymbols</key>
-              <false/>
-              <key>signingStyle</key>
-              <string>manual</string>
-          </dict>
-          </plist>
-          EOF
-          
-          # Export IPA
-          xcodebuild -exportArchive \
-            -archivePath build/Runner.xcarchive \
-            -exportPath build/ios/ipa \
-            -exportOptionsPlist exportOptionsTemp.plist \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            BUILD_DIR=build/unsigned
             
-          # If export fails, try to create IPA manually
-          if [ ! -f build/ios/ipa/*.ipa ]; then
-            echo "Attempting manual IPA creation..."
-            cd build/Runner.xcarchive/Products/Applications
-            mkdir -p Payload
-            cp -r *.app Payload/
-            zip -r ../../ios/ipa/Runner.ipa Payload
+          # Create IPA structure
+          UNSIGNED_APP="build/unsigned/Release-iphoneos/Runner.app"
+          if [ -d "$UNSIGNED_APP" ]; then
+            echo "Creating IPA from unsigned app..."
+            mkdir -p build/ios/ipa/Payload
+            cp -r "$UNSIGNED_APP" build/ios/ipa/Payload/
+            cd build/ios/ipa
+            zip -qr Runner.ipa Payload
             rm -rf Payload
+            echo "Created unsigned IPA at build/ios/ipa/Runner.ipa"
+          else
+            echo "Error: Unsigned app not found at $UNSIGNED_APP"
+            exit 1
           fi
             
     artifacts:
