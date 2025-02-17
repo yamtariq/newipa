@@ -12,26 +12,23 @@ workflows:
         XCODE_WORKSPACE: "Runner.xcworkspace"
         XCODE_SCHEME: "Runner"
     scripts:
-      - name: Set up environment
+      - name: Clean everything
         script: |
-          flutter doctor -v
-          flutter precache --ios
-          
-      - name: Clean build
-        script: |
-          # Clean everything
+          # Thorough cleaning
           flutter clean
           cd ios
           rm -rf Pods Podfile.lock
           rm -rf .symlinks/
           rm -rf build/
-          rm -f Runner/GeneratedPluginRegistrant.*
+          rm -rf ~/Library/Developer/Xcode/DerivedData
           cd ..
           
-      - name: Get dependencies
+      - name: Install dependencies
         script: |
           flutter pub get
           cd ios
+          pod deintegrate
+          pod cache clean --all
           pod install --repo-update
           cd ..
           
@@ -42,8 +39,11 @@ workflows:
           # Create build directory
           mkdir -p build/unsigned
           
-          # Build unsigned app
-          xcodebuild \
+          # Force rebuild all targets
+          xcodebuild clean -workspace Runner.xcworkspace -scheme Runner
+          
+          # Build with aggressive settings
+          xcodebuild build \
             -workspace Runner.xcworkspace \
             -scheme Runner \
             -configuration Release \
@@ -54,12 +54,20 @@ workflows:
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
             COMPILER_INDEX_STORE_ENABLE=NO \
-            STRIP_INSTALLED_PRODUCT=NO \
-            SWIFT_OPTIMIZATION_LEVEL="-Onone" \
-            SWIFT_COMPILATION_MODE="singlefile" \
-            GCC_OPTIMIZATION_LEVEL="0" \
+            SWIFT_EMIT_MODULE_INTERFACE=NO \
+            DEFINES_MODULE=NO \
+            APPLICATION_EXTENSION_API_ONLY=NO \
+            SWIFT_INSTALL_OBJC_HEADER=NO \
+            CLANG_ENABLE_MODULES=NO \
+            SWIFT_COMPILATION_MODE=wholemodule \
+            SWIFT_OPTIMIZATION_LEVEL="-O" \
+            STRIP_SWIFT_SYMBOLS=YES \
+            DEAD_CODE_STRIPPING=YES \
+            ENABLE_BITCODE=NO \
+            MACH_O_TYPE=staticlib \
+            BUILD_LIBRARY_FOR_DISTRIBUTION=NO \
             ONLY_ACTIVE_ARCH=NO \
-            BUILD_LIBRARY_FOR_DISTRIBUTION=NO
+            DEBUG_INFORMATION_FORMAT=dwarf
             
           # Find the built app
           APP_PATH=$(find build/DerivedData -name "Runner.app" | grep Release-iphoneos)
