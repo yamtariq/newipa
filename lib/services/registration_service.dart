@@ -6,10 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../utils/constants.dart';
 import 'dart:io';
-import 'package:provider/provider.dart';
-import '../providers/session_provider.dart';
-import 'package:flutter/material.dart';
-import '../services/navigation_service.dart';
 
 class RegistrationService {
   // Check if user exists and validate identity
@@ -530,16 +526,16 @@ class RegistrationService {
   // Store registration data locally
   Future<void> storeRegistrationData({
     required String nationalId,
-    String? password,
     required String email,
     required String phone,
     required Map<String, dynamic> userData,
     Map<String, dynamic>? addressData,
+    String? password,
     Map<String, dynamic>? nafathData,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final secureStorage = const FlutterSecureStorage();
-
+    
     final secureData = {
       'national_id': nationalId,
       'full_name': '${userData['englishFirstName']} ${userData['englishLastName']}',
@@ -555,7 +551,7 @@ class RegistrationService {
       'updated_at': DateTime.now().toIso8601String(),
       if (nafathData != null) 'nafath_data': nafathData,
     };
-     
+    
     print('🔒 Initial Registration - Storing in Secure Storage: ${json.encode(secureData)}');
     await secureStorage.write(key: 'user_data', value: json.encode(secureData));
 
@@ -571,25 +567,6 @@ class RegistrationService {
     };
     print('📝 Initial Registration - Storing in SharedPreferences: ${json.encode(registrationData)}');
     await prefs.setString('registration_data', json.encode(registrationData));
-
-    // 💡 Set the same session flags as sign-in
-    await prefs.setBool('is_signed_in', true);
-    await prefs.setBool('device_registered', true);
-    await prefs.setString('device_user_id', nationalId);
-    
-    // 💡 Add session-specific data
-    await prefs.setBool('session_active', true);
-    await prefs.setString('session_user_id', nationalId);
-    await prefs.setString('national_id', nationalId);
-    
-    // 💡 Set session flags in SecureStorage
-    await secureStorage.write(key: 'device_registered', value: 'true');
-    await secureStorage.write(key: 'device_user_id', value: nationalId);
-    await secureStorage.write(key: 'session_active', value: 'true');
-    await secureStorage.write(key: 'session_user_id', value: nationalId);
-    await secureStorage.write(key: 'national_id', value: nationalId);
-    
-    print('✅ Session flags set for registration');
   }
 
   // Get stored registration data
@@ -747,15 +724,6 @@ class RegistrationService {
 
           if (response.statusCode == 200) {
             print('✅ Registration successful!');
-            
-            // 💡 Update session states in provider
-            final context = NavigationService.navigatorKey?.currentContext;
-            if (context != null) {
-              final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
-              sessionProvider.setSessionAfterRegistration();
-              print('✅ Session states updated after registration');
-            }
-            
             return true;
           }
           

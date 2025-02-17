@@ -1,6 +1,6 @@
 workflows:
   ios-workflow:
-    name: iOS Workflow final 6
+    name: iOS Workflow final 7
     max_build_duration: 120
     instance_type: mac_mini_m2
     environment:
@@ -23,8 +23,8 @@ workflows:
         script: |
           echo $CM_CERTIFICATE | base64 --decode > /tmp/certificate.p12
           keychain initialize
-          keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password $CM_CERTIFICATE_PASSWORD
-          app-store-connect fetch-signing-files $BUNDLE_ID --type IOS_APP_STORE --create
+          keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CM_CERTIFICATE_PASSWORD"
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" --private-key "$APP_STORE_CONNECT_PRIVATE_KEY"
       - name: Set up environment 💡
         script: |
           flutter doctor -v
