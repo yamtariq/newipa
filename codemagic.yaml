@@ -15,21 +15,24 @@ workflows:
       - name: Set up environment
         script: |
           flutter doctor -v
-          flutter --version
-          xcodebuild -version
           
       - name: Install dependencies
         script: |
           flutter clean
           flutter pub get
           
-      - name: Install pods
+      - name: Set up iOS project
         script: |
           cd ios
-          pod install
+          pod deintegrate
+          rm -rf Pods Podfile.lock
+          pod install --repo-update
           
       - name: Build unsigned IPA
         script: |
+          # First build Flutter
+          flutter build ios --release --no-codesign
+          
           cd ios
           
           # Update build settings
@@ -52,7 +55,9 @@ workflows:
             COMPILER_INDEX_STORE_ENABLE=NO \
             SWIFT_EMIT_MODULE_INTERFACE=NO \
             SWIFT_OPTIMIZATION_LEVEL="-Onone" \
-            BUILD_DIR=build/unsigned
+            BUILD_DIR=build/unsigned \
+            FLUTTER_SUPPRESS_ANALYTICS=true \
+            DISABLE_MANUAL_TARGET_ORDER_BUILD_WARNING=1
             
           # Create IPA structure
           UNSIGNED_APP="build/unsigned/Release-iphoneos/Runner.app"
@@ -66,6 +71,7 @@ workflows:
             echo "Created unsigned IPA at build/ios/ipa/Runner.ipa"
           else
             echo "Error: Unsigned app not found at $UNSIGNED_APP"
+            ls -la build/unsigned/Release-iphoneos/
             exit 1
           fi
             

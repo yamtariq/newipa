@@ -40,179 +40,179 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
     try {
       print('\n=== CARD APPLICATION DETAILS - DATA FETCH START ===');
       
-      // 💡 First try secure storage for user data
+      // 💡 Initialize data containers
+      Map<String, dynamic> mergedData = {};
+      Map<String, String> dataSource = {}; // Track where each field came from for debugging
+      
+      // 1. Read from FlutterSecureStorage
       final userDataStr = await _secureStorage.read(key: 'user_data');
+      final registrationDataStr = await _secureStorage.read(key: 'registration_data');
+      final selectedSalaryStr = await _secureStorage.read(key: 'selected_salary_data');
+      final dakhliSalaryStr = await _secureStorage.read(key: 'dakhli_salary_data');
+      
       print('1. Secure Storage - user_data: $userDataStr');
-      
-      // 💡 Get salary data from secure storage
-      String? selectedSalaryStr = await _secureStorage.read(key: 'selected_salary_data');
-      print('2. Secure Storage - selected_salary_data: $selectedSalaryStr');
-      
-      String? dakhliSalaryStr = await _secureStorage.read(key: 'dakhli_salary_data');
-      print('3. Secure Storage - dakhli_salary_data: $dakhliSalaryStr');
-      
-      // 💡 Get registration data from SharedPreferences with correct key
+      print('2. Secure Storage - registration_data: $registrationDataStr');
+      print('3. Secure Storage - selected_salary_data: $selectedSalaryStr');
+      print('4. Secure Storage - dakhli_salary_data: $dakhliSalaryStr');
+
+      // 2. Read from SharedPreferences
       final prefs = await SharedPreferences.getInstance();
-      final registrationDataStr = prefs.getString('registration_data');
-      int? dependentsCount;
+      final prefsUserDataStr = prefs.getString('user_data');
+      final prefsRegistrationDataStr = prefs.getString('registration_data');
       
-      if (registrationDataStr != null) {
-        try {
-          final registrationData = json.decode(registrationDataStr);
-          print('4. Registration data found: ${registrationData['userData']}');
-          if (registrationData['userData'] != null) {
-            dependentsCount = registrationData['userData']['totalNumberOfCurrentDependents'] as int?;
-            print('5. Found dependents count: $dependentsCount');
-          }
-        } catch (e) {
-          print('Error parsing registration data: $e');
+      print('5. SharedPreferences - user_data: $prefsUserDataStr');
+      print('6. SharedPreferences - registration_data: $prefsRegistrationDataStr');
+
+      // 3. Parse all available data
+      Map<String, dynamic>? secureUserData;
+      Map<String, dynamic>? secureRegistrationData;
+      Map<String, dynamic>? prefsUserData;
+      Map<String, dynamic>? prefsRegistrationData;
+      
+      try {
+        if (userDataStr != null) {
+          secureUserData = json.decode(userDataStr);
+          print('7. Parsed secure user data: $secureUserData');
         }
+      } catch (e) {
+        print('Error parsing secure user data: $e');
       }
       
-      Map<String, dynamic>? userData;
-      
-      // Try to get user data from secure storage first
-      if (userDataStr != null) {
-        final parsedData = json.decode(userDataStr);
-        print('6. Parsed Secure Storage user data: $parsedData');
-        
-        // 💡 Map the fields correctly and include dependents
-        userData = {
-          'name': parsedData['fullName'] ?? parsedData['full_name'] ?? '${parsedData['firstName'] ?? ''} ${parsedData['lastName'] ?? ''}'.trim(),
-          'arabic_name': parsedData['arabicName'] ?? parsedData['arabic_name'] ?? parsedData['fullName'] ?? '',
-          'national_id': parsedData['nationalId'] ?? parsedData['national_id'],
-          'email': parsedData['email'],
-          'dependents': dependentsCount?.toString() ?? '0',
-        };
+      try {
+        if (registrationDataStr != null) {
+          secureRegistrationData = json.decode(registrationDataStr);
+          print('8. Parsed secure registration data: $secureRegistrationData');
+        }
+      } catch (e) {
+        print('Error parsing secure registration data: $e');
       }
       
-      // If not found in secure storage, try SharedPreferences
-      if (userData == null || userData['name']?.toString().trim().isEmpty == true) {
-        print('\n7. No valid data in secure storage, checking SharedPreferences...');
-        final prefsUserDataStr = prefs.getString('user_data');
-        print('8. SharedPreferences - user_data: $prefsUserDataStr');
-        
+      try {
         if (prefsUserDataStr != null) {
-          final prefsData = json.decode(prefsUserDataStr);
-          print('9. Parsed SharedPreferences user data: $prefsData');
-          
-          // 💡 Map the fields correctly from SharedPreferences
-          userData = {
-            'name': '${prefsData['first_name_en'] ?? ''} ${prefsData['family_name_en'] ?? ''}'.trim(),
-            'arabic_name': '${prefsData['first_name_ar'] ?? ''} ${prefsData['family_name_ar'] ?? ''}'.trim(),
-            'national_id': prefsData['national_id'],
-            'email': prefsData['email'],
-            'phone': prefsData['phone'],
-            'date_of_birth': prefsData['date_of_birth'],
-            'dependents': prefsData['dependents'] ?? dependentsCount?.toString() ?? '0',
-          };
-          print('10. Mapped SharedPreferences user data: $userData');
+          prefsUserData = json.decode(prefsUserDataStr);
+          print('9. Parsed prefs user data: $prefsUserData');
         }
+      } catch (e) {
+        print('Error parsing prefs user data: $e');
+      }
+      
+      try {
+        if (prefsRegistrationDataStr != null) {
+          prefsRegistrationData = json.decode(prefsRegistrationDataStr);
+          print('10. Parsed prefs registration data: $prefsRegistrationData');
+        }
+      } catch (e) {
+        print('Error parsing prefs registration data: $e');
       }
 
-      // 💡 Handle salary data (preserving existing salary logic)
-      print('\n11. Processing salary data...');
+      // 4. Extract and merge data with priority
+      
+      // 4.1 Handle Names
+      if (secureUserData?['fullName']?.toString().isNotEmpty == true) {
+        mergedData['name'] = secureUserData!['fullName'];
+        mergedData['arabic_name'] = secureUserData['arabicName'] ?? secureUserData['fullName'];
+        dataSource['name'] = 'secure_user_data';
+      } else if (secureRegistrationData?['userData']?['firstName']?.toString().isNotEmpty == true) {
+        final userData = secureRegistrationData!['userData'];
+        mergedData['name'] = '${userData['englishFirstName'] ?? ''} ${userData['englishLastName'] ?? ''}'.trim();
+        mergedData['arabic_name'] = '${userData['firstName'] ?? ''} ${userData['familyName'] ?? ''}'.trim();
+        dataSource['name'] = 'secure_registration_data';
+      } else if (prefsRegistrationData?['userData']?['firstName']?.toString().isNotEmpty == true) {
+        final userData = prefsRegistrationData!['userData'];
+        mergedData['name'] = '${userData['englishFirstName'] ?? ''} ${userData['englishLastName'] ?? ''}'.trim();
+        mergedData['arabic_name'] = '${userData['firstName'] ?? ''} ${userData['familyName'] ?? ''}'.trim();
+        dataSource['name'] = 'prefs_registration_data';
+      } else if (prefsUserData?['first_name_en']?.toString().isNotEmpty == true) {
+        mergedData['name'] = '${prefsUserData!['first_name_en']} ${prefsUserData['family_name_en']}'.trim();
+        mergedData['arabic_name'] = '${prefsUserData['first_name_ar']} ${prefsUserData['family_name_ar']}'.trim();
+        dataSource['name'] = 'prefs_user_data';
+      }
+
+      // 4.2 Handle National ID
+      mergedData['national_id'] = secureUserData?['nationalId'] ?? 
+                                 secureUserData?['national_id'] ?? 
+                                 secureRegistrationData?['national_id'] ?? 
+                                 prefsRegistrationData?['national_id'] ?? 
+                                 prefsUserData?['national_id'];
+      dataSource['national_id'] = 'found_in: ${_findDataSource('national_id', secureUserData, secureRegistrationData, prefsUserData, prefsRegistrationData)}';
+
+      // 4.3 Handle Email
+      mergedData['email'] = secureUserData?['email'] ?? 
+                           secureRegistrationData?['email'] ?? 
+                           prefsRegistrationData?['email'] ?? 
+                           prefsUserData?['email'];
+      dataSource['email'] = 'found_in: ${_findDataSource('email', secureUserData, secureRegistrationData, prefsUserData, prefsRegistrationData)}';
+
+      // 4.4 Handle Dependents
+      final dependentsCount = secureRegistrationData?['userData']?['totalNumberOfCurrentDependents'] ?? 
+                            prefsRegistrationData?['userData']?['totalNumberOfCurrentDependents'] ?? 
+                            prefsUserData?['dependents'] ?? 
+                            '0';
+      mergedData['dependents'] = dependentsCount.toString();
+      dataSource['dependents'] = 'found_in: ${_findDataSource('dependents', secureUserData, secureRegistrationData, prefsUserData, prefsRegistrationData)}';
+
+      // 4.5 Handle ID Expiry Date (specific to card application)
+      mergedData['id_expiry_date'] = secureRegistrationData?['userData']?['idExpiryDate'] ??
+                                    secureRegistrationData?['userData']?['IdExpiryDate'] ??
+                                    prefsRegistrationData?['userData']?['idExpiryDate'] ??
+                                    prefsRegistrationData?['userData']?['IdExpiryDate'] ??
+                                    secureUserData?['id_expiry_date'] ??
+                                    prefsUserData?['id_expiry_date'];
+
+      // 4.6 Handle Salary Data
       if (selectedSalaryStr != null) {
         final selectedSalary = json.decode(selectedSalaryStr);
-        print('12. Selected salary data: $selectedSalary');
-        userData = userData ?? {};
-        userData['salary'] = selectedSalary['amount']?.toString() ?? userData['salary'];
-        userData['employer'] = selectedSalary['employer'];
-        // Only update name if it's empty
-        if (userData['name']?.toString().trim().isEmpty == true) {
-          userData['name'] = selectedSalary['fullName'];
-          // Try to set Arabic name if it's empty
-          if (userData['arabic_name']?.toString().trim().isEmpty == true) {
-            userData['arabic_name'] = selectedSalary['fullName'];
-          }
-        }
+        mergedData['salary'] = selectedSalary['amount']?.toString() ?? '0';
+        mergedData['employer'] = selectedSalary['employer'];
         _uploadedFiles['salary'] = 'Verified through Dakhli';
-        print('13. Updated user data with selected salary: $userData');
+        dataSource['salary'] = 'selected_salary_data';
       } else if (dakhliSalaryStr != null) {
         final dakhliData = json.decode(dakhliSalaryStr);
-        print('14. Dakhli salary data: $dakhliData');
         final salaries = List<Map<String, dynamic>>.from(dakhliData['salaries'] ?? []);
         if (salaries.isNotEmpty) {
-          userData = userData ?? {};
-          // Get the highest salary
           final highestSalary = salaries.reduce((a, b) => 
             double.parse(a['amount'].toString()) > double.parse(b['amount'].toString()) ? a : b);
-          userData['salary'] = highestSalary['amount']?.toString() ?? userData['salary'];
-          userData['employer'] = highestSalary['employer'];
-          // Only update name if it's empty
-          if (userData['name']?.toString().trim().isEmpty == true) {
-            userData['name'] = highestSalary['fullName'];
-            // Try to set Arabic name if it's empty
-            if (userData['arabic_name']?.toString().trim().isEmpty == true) {
-              userData['arabic_name'] = highestSalary['fullName'];
-            }
-          }
+          mergedData['salary'] = highestSalary['amount']?.toString() ?? '0';
+          mergedData['employer'] = highestSalary['employer'];
           _uploadedFiles['salary'] = 'Verified through Dakhli';
-          print('15. Updated user data with Dakhli salary: $userData');
+          dataSource['salary'] = 'dakhli_salary_data';
         }
       }
 
-      print('\n16. Final user data before setState: $userData');
-      if (userData != null) {
-        setState(() {
-          _userData = userData!;
-          _userData['salary'] ??= '0';
-          double salary = double.parse(_userData['salary'].toString());
-          _userData['food_expense'] = (salary * 0.08).round().toString();
-          _userData['transportation_expense'] = (salary * 0.05).round().toString();
-          _userData['other_liabilities'] ??= '';
+      // 4.7 Set default values and calculate expenses
+      mergedData['salary'] ??= '0';
+      double salary = double.parse(mergedData['salary']);
+      mergedData['food_expense'] = (salary * 0.08).round().toString();
+      mergedData['transportation_expense'] = (salary * 0.05).round().toString();
+      mergedData['other_liabilities'] ??= '';
 
-          // 💡 Prefill nameOnCard with English first and family names in capital letters
-          if (_userData['nameOnCard'] == null || _userData['nameOnCard'].toString().isEmpty) {
-            String nameOnCard = '';
-            // Get the English name from userData first
-            if (_userData['name']?.toString().trim().isNotEmpty == true) {
-              nameOnCard = _userData['name'].toString().trim().toUpperCase();
-            }
-            _userData['nameOnCard'] = nameOnCard;
-          }
-
-          _isLoading = false;
-          print('\n17. Final _userData after setState:');
-          print('- Name: ${_userData['name']}');
-          print('- Arabic Name: ${_userData['arabic_name']}');
-          print('- National ID: ${_userData['national_id']}');
-          print('- Email: ${_userData['email']}');
-          print('- Salary: ${_userData['salary']}');
-          print('- Dependents: ${_userData['dependents']}');
-          print('- Name on Card: ${_userData['nameOnCard']}');
-        });
-      } else {
-        print('\nERROR: No user data found in any storage location');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(isArabic 
-                ? 'لم يتم العثور على بيانات المستخدم' 
-                : 'User data not found'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      // 4.8 Handle Name on Card (specific to card application)
+      if (mergedData['nameOnCard'] == null || mergedData['nameOnCard'].toString().isEmpty) {
+        String nameOnCard = mergedData['name']?.toString().trim().toUpperCase() ?? '';
+        mergedData['nameOnCard'] = nameOnCard;
       }
 
-      // Ensure ID expiry date is available
-      if (userData != null && userData['id_expiry_date'] == null) {
-        print('ID expiry date not found in user_data, checking registration data');
-        final prefs = await SharedPreferences.getInstance();
-        final registrationDataStr = prefs.getString('registration_data');
-        if (registrationDataStr != null) {
-          final registrationData = json.decode(registrationDataStr);
-          if (registrationData['userData'] != null) {
-            userData['id_expiry_date'] = registrationData['userData']['idExpiryDate'] ??
-                                       registrationData['userData']['IdExpiryDate'] ??
-                                       registrationData['userData']['id_expiry_date'] ??
-                                       registrationData['userData']['id_expiry_date_hijri'];
-            // Update stored user data with ID expiry date
-            await _secureStorage.write(key: 'user_data', value: json.encode(userData));
-          }
-        }
+      print('\n=== MERGED DATA SOURCES ===');
+      dataSource.forEach((key, value) {
+        print('$key: $value');
+      });
+
+      // 5. Update state with merged data
+      setState(() {
+        _userData = mergedData;
+        _isLoading = false;
+      });
+
+      // 6. Sync back to secure storage if data came from SharedPreferences
+      if (userDataStr == null && mergedData.isNotEmpty) {
+        await _secureStorage.write(key: 'user_data', value: json.encode(mergedData));
+        print('\nSynced merged data back to secure storage');
       }
+
+      print('\n=== FINAL MERGED DATA ===');
+      print(_userData);
+      print('\n=== CARD APPLICATION DETAILS - DATA FETCH END ===\n');
+
     } catch (e) {
       print('\nERROR loading user data: $e');
       if (mounted) {
@@ -227,8 +227,18 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
       }
     } finally {
       setState(() => _isLoading = false);
-      print('\n=== CARD APPLICATION DETAILS - DATA FETCH END ===\n');
     }
+  }
+
+  String _findDataSource(String field, Map<String, dynamic>? secureUserData, 
+      Map<String, dynamic>? secureRegistrationData, 
+      Map<String, dynamic>? prefsUserData, 
+      Map<String, dynamic>? prefsRegistrationData) {
+    if (secureUserData?.containsKey(field) == true) return 'secure_user_data';
+    if (secureRegistrationData?.containsKey(field) == true) return 'secure_registration_data';
+    if (prefsUserData?.containsKey(field) == true) return 'prefs_user_data';
+    if (prefsRegistrationData?.containsKey(field) == true) return 'prefs_registration_data';
+    return 'default_value';
   }
 
   void _showError(String message) {
