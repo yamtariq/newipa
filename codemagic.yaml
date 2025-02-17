@@ -12,72 +12,82 @@ workflows:
         XCODE_WORKSPACE: "Runner.xcworkspace"
         XCODE_SCHEME: "Runner"
     scripts:
-      - name: Set up environment
+      - name: Clean build
         script: |
-          flutter doctor -v
-          
-      - name: Install dependencies
-        script: |
+          # Clean everything
           flutter clean
-          flutter pub get
-          
-      - name: Set up iOS project
-        script: |
           cd ios
-          pod deintegrate
           rm -rf Pods Podfile.lock
-          pod install --repo-update
+          rm -rf .symlinks/
+          rm -rf build/
+          cd ..
           
-      - name: Build unsigned IPA
+      - name: Get dependencies
         script: |
-          # First build Flutter
+          flutter pub get
+          cd ios
+          pod install --repo-update
+          cd ..
+          
+      - name: Prepare build
+        script: |
+          # Ensure GeneratedPluginRegistrant is created
+          cd ios
+          if [ ! -f Runner/GeneratedPluginRegistrant.h ] || [ ! -f Runner/GeneratedPluginRegistrant.m ]; then
+            echo "Regenerating plugin registrant..."
+            flutter pub get
+            rm -rf Runner/GeneratedPluginRegistrant.*
+            flutter clean
+            flutter pub get
+          fi
+          cd ..
+          
+      - name: Build Flutter
+        script: |
+          # Build Flutter bundle
           flutter build ios --release --no-codesign
           
+      - name: Create unsigned IPA
+        script: |
           cd ios
           
-          # Update build settings
-          /usr/libexec/PlistBuddy -c "Add :buildSettings:SWIFT_EMIT_MODULE_INTERFACE string NO" Runner.xcodeproj/project.pbxproj
-          /usr/libexec/PlistBuddy -c "Add :buildSettings:SWIFT_OPTIMIZATION_LEVEL string -Onone" Runner.xcodeproj/project.pbxproj
-          
-          # Create build directories
+          # Create build directory
           mkdir -p build/unsigned
           
-          # Build for release without signing
-          xcodebuild clean build \
+          # Build unsigned app
+          xcodebuild \
             -workspace Runner.xcworkspace \
             -scheme Runner \
             -configuration Release \
             -sdk iphoneos \
+            -derivedDataPath build/DerivedData \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            EXPANDED_CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
             COMPILER_INDEX_STORE_ENABLE=NO \
-            SWIFT_EMIT_MODULE_INTERFACE=NO \
-            SWIFT_OPTIMIZATION_LEVEL="-Onone" \
-            BUILD_DIR=build/unsigned \
-            FLUTTER_SUPPRESS_ANALYTICS=true \
-            DISABLE_MANUAL_TARGET_ORDER_BUILD_WARNING=1
+            STRIP_INSTALLED_PRODUCT=NO
             
-          # Create IPA structure
-          UNSIGNED_APP="build/unsigned/Release-iphoneos/Runner.app"
-          if [ -d "$UNSIGNED_APP" ]; then
-            echo "Creating IPA from unsigned app..."
-            mkdir -p build/ios/ipa/Payload
-            cp -r "$UNSIGNED_APP" build/ios/ipa/Payload/
-            cd build/ios/ipa
-            zip -qr Runner.ipa Payload
-            rm -rf Payload
-            echo "Created unsigned IPA at build/ios/ipa/Runner.ipa"
-          else
-            echo "Error: Unsigned app not found at $UNSIGNED_APP"
-            ls -la build/unsigned/Release-iphoneos/
+          # Find the built app
+          APP_PATH=$(find build/DerivedData -name "Runner.app" | grep Release-iphoneos)
+          
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: Could not find built app"
             exit 1
           fi
+          
+          # Create IPA
+          echo "Creating IPA from app at: $APP_PATH"
+          mkdir -p build/ios/ipa/Payload
+          cp -r "$APP_PATH" build/ios/ipa/Payload/
+          cd build/ios/ipa
+          zip -qr Runner.ipa Payload
+          rm -rf Payload
+          echo "Created unsigned IPA at build/ios/ipa/Runner.ipa"
             
     artifacts:
       - build/ios/ipa/*.ipa
-      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+      - ios/build/DerivedData/**/Build/**/*.app
       - /tmp/xcodebuild_logs/*.log
       
     publishing:

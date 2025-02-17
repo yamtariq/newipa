@@ -78,10 +78,35 @@ class _CardOfferScreenState extends State<CardOfferScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => AlertDialog(
+        title: Text(widget.isArabic ? 'خطأ' : 'Error'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.error_outline,
+              color: Color(Constants.errorColorValue),
+              size: 48,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: Text(widget.isArabic ? 'حسناً' : 'OK'),
+          ),
+        ],
       ),
     );
   }
@@ -149,7 +174,11 @@ class _CardOfferScreenState extends State<CardOfferScreen> {
         print('\nERROR: Card acceptance request failed');
         print('Error Details: ${response['message']}');
         print('=== CARD OFFER ACCEPTANCE FLOW - END (WITH ERROR) ===\n');
-        throw Exception(response['message'] ?? 'Failed to process card acceptance');
+        setState(() => _isLoading = false);
+        _showError(widget.isArabic 
+          ? 'حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى'
+          : response['message'] ?? 'Failed to process card acceptance');
+        return;
       }
 
       print('\n=== CARD OFFER ACCEPTANCE FLOW - END (SUCCESS) ===\n');
@@ -442,8 +471,7 @@ class _CardOfferScreenState extends State<CardOfferScreen> {
                                 Navigator.pop(context);
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.grey,
-                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                backgroundColor: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
                               ),
                               child: Text(widget.isArabic ? 'رجوع' : 'Go Back'),
                             ),
