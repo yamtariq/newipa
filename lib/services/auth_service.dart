@@ -946,7 +946,8 @@ class AuthService {
         'last_login',
         'dakhli_salary_data',
         'user_settings',
-        'user_preferences'
+        'user_preferences',
+        'registration_data'
       ];
       
       for (var key in spKeysToRemove) {

@@ -1,184 +1,61 @@
 workflows:
   ios-workflow:
-    name: iOS Workflow final
+    name: iOS Workflow final 1
     max_build_duration: 120
     instance_type: mac_mini_m2
     environment:
       flutter: stable
       xcode: latest
-      ruby: 3.2.2
-      cocoapods: 1.14.3
+      cocoapods: default
       vars:
         BUNDLE_ID: "com.nayifat.nayifatApp"
         XCODE_WORKSPACE: "Runner.xcworkspace"
         XCODE_SCHEME: "Runner"
-        PLATFORM: "ios"
-        MIN_IOS_VERSION: "14.0"
-    cache:
-      cache_paths:
-        - ~/.pub-cache
-        - vendor/bundle
     scripts:
-      - name: Set up code signing
-        script: |
-          echo $CM_CERTIFICATE | base64 --decode > /tmp/certificate.p12
-          keychain initialize
-          keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CM_CERTIFICATE_PASSWORD"
-          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" --private-key "$APP_STORE_CONNECT_PRIVATE_KEY"
-      - name: Set up environment 💡
+      - name: Set up environment
         script: |
           flutter doctor -v
           flutter --version
           xcodebuild -version
-          gem update --system
-          gem install bundler
-          gem uninstall cocoapods --all --ignore-dependencies
-          gem install cocoapods -v 1.14.3
-          pod setup
-          pod --version
-          ruby --version
-
-      - name: Clean and prepare 💡
+          
+      - name: Install dependencies
         script: |
-          echo "Current directory: $PWD"
-          rm -rf build
-          rm -rf ios/Pods
-          rm -rf ios/Podfile.lock
-          rm -rf ios/.symlinks
-          rm -rf ios/Flutter/Flutter.framework
-          rm -rf ios/Flutter/Flutter.podspec
           flutter clean
           flutter pub get
-
-      - name: Setup iOS project 💡
-        script: |
-          flutter create . --platforms=ios
-          cd ios
-          rm -f Podfile
-          rm -f Podfile.lock
-          # Ensure the bridging header exists with correct content.
-          if [ ! -f Runner/Runner-Bridging-Header.h ]; then
-            echo '#import "GeneratedPluginRegistrant.h"' > Runner/Runner-Bridging-Header.h
-          fi
-          mkdir -p Runner
-          # Create BackgroundTaskHandler.swift in Runner folder.
-          cat > Runner/BackgroundTaskHandler.swift << 'EOF'
-          import Foundation
-          import BackgroundTasks
-
-          class BackgroundTaskHandler {
-              static let shared = BackgroundTaskHandler()
-              
-              private init() { }
-              
-              func handleTask(_ task: BGAppRefreshTask) {
-                  task.setTaskCompleted(success: true)
-              }
-              
-              func scheduleTask() {
-                  let request = BGAppRefreshTaskRequest(identifier: "com.nayifat.app.notification_refresh")
-                  request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
-                  do {
-                      try BGTaskScheduler.shared.submit(request)
-                  } catch {
-                      print("Failed to schedule background task: \(error)")
-                  }
-              }
-          }
-          EOF
-          cd ..
-          flutter pub get
-
-      - name: Create Podfile 💡
+          
+      - name: Install pods
         script: |
           cd ios
-          cat > Podfile << 'EOF'
-          platform :ios, '14.0'
-
-          # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
-          ENV['COCOAPODS_DISABLE_STATS'] = 'true'
-
-          project 'Runner', {
-            'Debug' => :debug,
-            'Profile' => :release,
-            'Release' => :release,
-          }
-
-          def flutter_root
-            generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
-            unless File.exist?(generated_xcode_build_settings_path)
-              raise "\#{generated_xcode_build_settings_path} must exist. If you are running pod install manually, make sure flutter pub get is executed first"
-            end
-
-            File.foreach(generated_xcode_build_settings_path) do |line|
-              matches = line.match(/FLUTTER_ROOT\=(.*)/)
-              return matches[1].strip if matches
-            end
-            raise "FLUTTER_ROOT not found in \#{generated_xcode_build_settings_path}. Try deleting Generated.xcconfig, then run flutter pub get"
-          end
-
-          require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
-
-          flutter_ios_podfile_setup
-
-          target 'Runner' do
-            use_frameworks!
-            flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-            pod 'PhoneNumberKit', '~> 3.7'
-          end
-
-          post_install do |installer|
-            installer.pods_project.targets.each do |target|
-              flutter_additional_ios_build_settings(target)
-              target.build_configurations.each do |config|
-                config.build_settings['ENABLE_BITCODE'] = 'NO'
-                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
-                config.build_settings['SWIFT_VERSION'] = '5.0'
-                
-                if target.name == 'Runner'
-                  config.build_settings['DEFINES_MODULE'] = 'NO'
-                  config.build_settings['SWIFT_OBJC_BRIDGING_HEADER'] = '$(SRCROOT)/Runner/Runner-Bridging-Header.h'
-                  config.build_settings['SWIFT_EMIT_MODULE_INTERFACE'] = 'NO'
-                  config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
-                end
-              end
-            end
-          end
-          EOF
-          cd ..
-          flutter pub get
-
-      - name: Install CocoaPods dependencies 💡
+          pod install
+          
+      - name: Build unsigned IPA
         script: |
           cd ios
-          pod deintegrate
-          rm -rf Pods Podfile.lock
-          pod repo update
-          flutter pub get
-          rm -rf Flutter/GeneratedPluginRegistrant.*
-          flutter pub get
-          pod install --verbose --repo-update --clean-install
-          cd ..
-
-      - name: Build iOS 💡
-        script: |
-          flutter build ipa --release --export-options-plist ios/exportOptions.plist --build-number=$(($(app-store-connect get-latest-app-store-build-number "$BUNDLE_ID") + 1))
-
+          xcodebuild -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -sdk iphoneos \
+            -configuration Release \
+            -allowProvisioningUpdates \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            -archivePath build/Runner.xcarchive \
+            archive
+          
+          xcodebuild -exportArchive \
+            -archivePath build/Runner.xcarchive \
+            -exportPath build/ios/ipa \
+            -exportOptionsPlist exportOptions.plist
+            
     artifacts:
       - build/ios/ipa/*.ipa
-      - ios/build/Runner.build/Release-iphoneos/Runner.build/build-state.dat
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
       - /tmp/xcodebuild_logs/*.log
-      - ios/Pods/Manifest.lock
-      - ios/Podfile.lock
-
+      
     publishing:
       email:
         recipients:
           - yamtariq@gmail.com
-        notify:
-          success: true
-          failure: true
 
   ios-unsigned:
     name: iOS Unsigned Build
@@ -215,6 +92,9 @@ workflows:
             -sdk iphoneos \
             -configuration Release \
             -allowProvisioningUpdates \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
             -archivePath build/Runner.xcarchive \
             archive
           
@@ -231,4 +111,4 @@ workflows:
     publishing:
       email:
         recipients:
-          -   yamtariq@gmail.com
+          - yamtariq@gmail.com
