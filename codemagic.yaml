@@ -154,13 +154,17 @@ workflows:
           pod install --verbose --repo-update --clean-install
           cd ..
 
+      - name: Set up code signing settings 💡
+        script: |
+          echo $CM_CERTIFICATE | base64 --decode > /tmp/certificate.p12
+          keychain initialize
+          keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password $CM_CERTIFICATE_PASSWORD
+          app-store-connect fetch-signing-files $(xcode-project detect-bundle-id) --type IOS_APP_STORE --create
+          keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password $CM_CERTIFICATE_PASSWORD
+          xcode-project use-profiles
       - name: Build iOS 💡
         script: |
-          flutter build ios --release --no-codesign
-          cd ios
-          xcodebuild -workspace Runner.xcworkspace -scheme Runner -sdk iphoneos -configuration Release -archivePath build/Runner.xcarchive clean archive
-          xcodebuild -exportArchive -archivePath build/Runner.xcarchive -exportOptionsPlist exportOptions.plist -exportPath build/ios/ipa
-          cd ..
+          flutter build ipa --release --export-options-plist ios/exportOptions.plist
 
     artifacts:
       - build/ios/ipa/*.ipa
