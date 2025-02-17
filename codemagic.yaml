@@ -1,6 +1,6 @@
 workflows:
   ios-workflow:
-    name: iOS Workflow final 2
+    name: iOS Workflow final 3
     max_build_duration: 120
     instance_type: mac_mini_m2
     environment:
@@ -32,11 +32,11 @@ workflows:
         script: |
           cd ios
           
-          # Update build settings to fix Swift module interface issue
+          # Update build settings
           /usr/libexec/PlistBuddy -c "Add :buildSettings:SWIFT_EMIT_MODULE_INTERFACE string NO" Runner.xcodeproj/project.pbxproj
           /usr/libexec/PlistBuddy -c "Add :buildSettings:SWIFT_OPTIMIZATION_LEVEL string -Onone" Runner.xcodeproj/project.pbxproj
           
-          # Build archive without signing
+          # Create archive
           xcodebuild -workspace Runner.xcworkspace \
             -scheme Runner \
             -sdk iphoneos \
@@ -47,16 +47,45 @@ workflows:
             CODE_SIGNING_ALLOWED=NO \
             SWIFT_EMIT_MODULE_INTERFACE=NO \
             SWIFT_OPTIMIZATION_LEVEL="-Onone" \
+            DEVELOPMENT_TEAM="" \
             -archivePath build/Runner.xcarchive \
             clean archive
           
-          # Create IPA
+          # Create IPA using ad-hoc method
+          mkdir -p build/ios/ipa
+          
+          # Create a temporary exportOptions.plist for this specific export
+          cat > exportOptionsTemp.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>ad-hoc</string>
+              <key>compileBitcode</key>
+              <false/>
+              <key>uploadBitcode</key>
+              <false/>
+              <key>uploadSymbols</key>
+              <false/>
+              <key>signingStyle</key>
+              <string>automatic</string>
+              <key>stripSwiftSymbols</key>
+              <false/>
+              <key>teamID</key>
+              <string></string>
+          </dict>
+          </plist>
+          EOF
+          
           xcodebuild -exportArchive \
             -archivePath build/Runner.xcarchive \
             -exportPath build/ios/ipa \
-            -exportOptionsPlist exportOptions.plist \
+            -exportOptionsPlist exportOptionsTemp.plist \
+            CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM=""
             
     artifacts:
       - build/ios/ipa/*.ipa
