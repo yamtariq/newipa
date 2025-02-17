@@ -10,6 +10,7 @@ import '../../utils/constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/session_provider.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'dart:convert';
 
 class PasswordSetupScreen extends StatefulWidget {
   final String nationalId;
@@ -367,22 +368,34 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
         password: _passwordController.text,
         email: widget.email,
         phone: widget.phone,
+        is_signed_in: true,
         userData: governmentData['data'],
         addressData: addressData['data'],
       );
 
       // 💡 4. Set session and storage flags
       print('\n=== SETTING SESSION AND STORAGE FLAGS ===');
+      
+      // Set flags in SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('is_signed_in', true);
       await prefs.setBool('device_registered', true);
       await prefs.setString('device_user_id', widget.nationalId);
-
-      // Set sign-in flags in SecureStorage
+      
+      // Set flags in SecureStorage
       const secureStorage = FlutterSecureStorage();
+      await secureStorage.write(key: 'is_signed_in', value: 'true');
       await secureStorage.write(key: 'device_registered', value: 'true');
       await secureStorage.write(key: 'device_user_id', value: widget.nationalId);
-
+      
+      // Store user data in secure storage
+      final userData = {
+        'id': widget.nationalId,
+        'device_id': await _authService.getDeviceId(),
+        'is_signed_in': true,
+      };
+      await secureStorage.write(key: 'user_data', value: jsonEncode(userData));
+      
       // Update session state
       if (mounted) {
         final sessionProvider = Provider.of<SessionProvider>(context, listen: false);

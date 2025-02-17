@@ -56,12 +56,13 @@ post_install do |installer|
       if target.name == 'Runner'
         config.build_settings['BUILD_LIBRARIES_FOR_DISTRIBUTION'] = 'NO'
         config.build_settings['DEFINES_MODULE'] = 'NO'
-        config.build_settings['CLANG_ENABLE_MODULES'] = 'NO'
+        config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
         config.build_settings['SWIFT_VERSION'] = '5.0'
         config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'YES'
         config.build_settings['SWIFT_EMIT_MODULE_INTERFACE'] = 'NO'
         config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
         config.build_settings['SWIFT_OBJC_BRIDGING_HEADER'] = '$(SRCROOT)/Runner/Runner-Bridging-Header.h'
+        config.build_settings['SWIFT_OBJC_INTERFACE_HEADER_NAME'] = ''
       end
     end
   end
