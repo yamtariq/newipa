@@ -42,7 +42,7 @@ workflows:
           # Force rebuild all targets
           xcodebuild clean -workspace Runner.xcworkspace -scheme Runner
           
-          # Build with aggressive settings
+          # Build with proper module settings
           xcodebuild build \
             -workspace Runner.xcworkspace \
             -scheme Runner \
@@ -54,18 +54,9 @@ workflows:
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
             COMPILER_INDEX_STORE_ENABLE=NO \
-            SWIFT_EMIT_MODULE_INTERFACE=NO \
-            DEFINES_MODULE=NO \
-            APPLICATION_EXTENSION_API_ONLY=NO \
-            SWIFT_INSTALL_OBJC_HEADER=NO \
-            CLANG_ENABLE_MODULES=NO \
+            DEFINES_MODULE=YES \
             SWIFT_COMPILATION_MODE=wholemodule \
-            SWIFT_OPTIMIZATION_LEVEL="-O" \
-            STRIP_SWIFT_SYMBOLS=YES \
-            DEAD_CODE_STRIPPING=YES \
             ENABLE_BITCODE=NO \
-            MACH_O_TYPE=staticlib \
-            BUILD_LIBRARY_FOR_DISTRIBUTION=NO \
             ONLY_ACTIVE_ARCH=NO \
             DEBUG_INFORMATION_FORMAT=dwarf
             
