@@ -31,6 +31,12 @@ workflows:
       - name: Build unsigned IPA
         script: |
           cd ios
+          
+          # Update build settings to fix Swift module interface issue
+          /usr/libexec/PlistBuddy -c "Add :buildSettings:SWIFT_EMIT_MODULE_INTERFACE string NO" Runner.xcodeproj/project.pbxproj
+          /usr/libexec/PlistBuddy -c "Add :buildSettings:SWIFT_OPTIMIZATION_LEVEL string -Onone" Runner.xcodeproj/project.pbxproj
+          
+          # Build archive without signing
           xcodebuild -workspace Runner.xcworkspace \
             -scheme Runner \
             -sdk iphoneos \
@@ -39,13 +45,18 @@ workflows:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
+            SWIFT_EMIT_MODULE_INTERFACE=NO \
+            SWIFT_OPTIMIZATION_LEVEL="-Onone" \
             -archivePath build/Runner.xcarchive \
-            archive
+            clean archive
           
+          # Create IPA
           xcodebuild -exportArchive \
             -archivePath build/Runner.xcarchive \
             -exportPath build/ios/ipa \
-            -exportOptionsPlist exportOptions.plist
+            -exportOptionsPlist exportOptions.plist \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
             
     artifacts:
       - build/ios/ipa/*.ipa

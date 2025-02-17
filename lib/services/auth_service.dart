@@ -927,6 +927,10 @@ class AuthService {
       
       final prefs = await SharedPreferences.getInstance();
       
+      // Log registration data before clearing
+      final regData = prefs.getString('registration_data');
+      print('Registration data before clearing: $regData');
+      
       // 💡 Clear specific data from SharedPreferences
       print('2. Clearing SharedPreferences data:');
       final spKeysToRemove = [
@@ -954,6 +958,10 @@ class AuthService {
         await prefs.remove(key);
         print('   - Removed SP: $key');
       }
+      
+      // Verify registration data is cleared
+      final regDataAfter = prefs.getString('registration_data');
+      print('Registration data after clearing: $regDataAfter');
       
       // 💡 Clear specific data from SecureStorage
       print('3. Clearing SecureStorage data:');

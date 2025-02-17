@@ -679,32 +679,33 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     // Define fixed order for social media links
     final orderedSocialKeys = ['linkedin', 'instagram', 'twitter', 'facebook'];
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      textDirection:
-          TextDirection.ltr, // Always keep LTR order for social icons
-      children: orderedSocialKeys
-          .map((key) {
-            final url = _contactDetails!.socialLinks[key] ?? '';
-            if (url.isEmpty) return const SizedBox.shrink();
+    return Directionality(
+      textDirection: TextDirection.ltr, // 💡 Always LTR for social icons
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: orderedSocialKeys
+            .map((key) {
+              final url = _contactDetails!.socialLinks[key] ?? '';
+              if (url.isEmpty) return const SizedBox.shrink();
 
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: IconButton(
-                icon: FaIcon(socialIcons[key] ?? FontAwesomeIcons.link),
-                onPressed: () => _launchSocialLink(url),
-                color: themeColor,
-                iconSize: 20,
-                padding: const EdgeInsets.all(4),
-                constraints: const BoxConstraints(
-                  minWidth: 32,
-                  minHeight: 32,
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: IconButton(
+                  icon: FaIcon(socialIcons[key] ?? FontAwesomeIcons.link),
+                  onPressed: () => _launchSocialLink(url),
+                  color: themeColor,
+                  iconSize: 20,
+                  padding: const EdgeInsets.all(4),
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
                 ),
-              ),
-            );
-          })
-          .where((widget) => widget is! SizedBox)
-          .toList(),
+              );
+            })
+            .where((widget) => widget is! SizedBox)
+            .toList(),
+      ),
     );
   }
 
@@ -1791,11 +1792,11 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
         ? Constants.darkLabelTextColor 
         : Constants.lightLabelTextColor);
 
-    // 💡 Determine if this is a phone or email item
     bool isPhone = icon == Icons.phone;
     bool isEmail = icon == Icons.email;
 
     Widget content = Row(
+      textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr, // 💡 Respect RTL
       children: [
         Icon(
           icon,
@@ -1812,12 +1813,13 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
               decoration: isLink ? TextDecoration.underline : null,
             ),
             overflow: TextOverflow.ellipsis,
+            textDirection: isPhone || isEmail ? TextDirection.ltr : (widget.isArabic ? TextDirection.rtl : TextDirection.ltr), // 💡 Phone/Email always LTR
+            textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
           ),
         ),
       ],
     );
 
-    // 💡 Wrap with GestureDetector for phone and email
     if (isPhone || isEmail) {
       return GestureDetector(
         onTap: () {
