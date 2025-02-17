@@ -65,16 +65,18 @@ class _SplashScreenState extends State<SplashScreen> {
         _startAnimations = true;
       });
 
-      // 💡 Initialize content service in background without waiting
+      // 💡 Initialize content service and load initial content in background
       final contentService = Provider.of<ContentUpdateService>(context, listen: false);
+      
+      // Start content initialization in the background
       Future.microtask(() async {
         await contentService.initializeContent();
         // After content is loaded, start background update
         contentService.checkAndUpdateContent(force: false, isInitialLoad: false, isResumed: true);
       });
 
-      // Wait for minimum animation time (increased to match animation duration)
-      await Future.delayed(const Duration(milliseconds: 6000));
+      // Wait for minimum animation time
+      await Future.delayed(const Duration(milliseconds: 2000));
 
       if (mounted) {
         // Navigate to main page without waiting for content

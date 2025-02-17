@@ -1,6 +1,6 @@
 workflows:
   ios-workflow:
-    name: iOS Workflow 4
+    name: iOS Workflow 5
     max_build_duration: 120
     instance_type: mac_mini_m2
     environment:
@@ -50,12 +50,11 @@ workflows:
           cd ios
           rm -f Podfile
           rm -f Podfile.lock
-          # Remove any existing bridging header file.
-          rm -f Runner/Runner-Bridging-Header.h
-          # (Optionally create an empty file so that any residual references compile.)
-          echo "" > Runner/Runner-Bridging-Header.h
+          # Ensure the bridging header exists with correct content.
+          if [ ! -f Runner/Runner-Bridging-Header.h ]; then
+            echo '#import "GeneratedPluginRegistrant.h"' > Runner/Runner-Bridging-Header.h
+          fi
           mkdir -p Runner
-          
           # Create BackgroundTaskHandler.swift in Runner folder.
           cat > Runner/BackgroundTaskHandler.swift << 'EOF'
           import Foundation
@@ -147,10 +146,10 @@ workflows:
                   config.build_settings['SWIFT_VERSION'] = '5.0'
                   config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'YES'
                   config.build_settings['SWIFT_EMIT_MODULE_INTERFACE'] = 'NO'
-                  # Use incremental compilation mode instead of wholemodule.
+                  # Use incremental compilation to avoid generating module interfaces.
                   config.build_settings['SWIFT_COMPILATION_MODE'] = 'incremental'
-                  # Clear bridging header setting to disable it.
-                  config.build_settings['SWIFT_OBJC_BRIDGING_HEADER'] = ''
+                  # Set the bridging header path so Swift finds the Objective-C declarations.
+                  config.build_settings['SWIFT_OBJC_BRIDGING_HEADER'] = '$(SRCROOT)/Runner/Runner-Bridging-Header.h'
                 end
               end
             end
@@ -169,8 +168,6 @@ workflows:
           rm -rf Flutter/GeneratedPluginRegistrant.*
           flutter pub get
           pod install --verbose --repo-update --clean-install
-          # Remove any bridging header references from the Xcode project.
-          sed -i '' '/SWIFT_OBJC_BRIDGING_HEADER/d' Runner.xcodeproj/project.pbxproj
           cd ..
 
       - name: Build iOS 💡
