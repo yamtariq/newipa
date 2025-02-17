@@ -9,6 +9,7 @@ class Constants {
   
   // 💡 Testing Flags
   static const bool bypassNafathForTesting = true; // Temporary flag to bypass Nafath verification
+  static const bool bypassOtpForTesting = true;    // Temporary flag to bypass OTP verification - REMOVE IN PRODUCTION
   
   static String get apiBaseUrl => useNewApi
       ? 'https://tmappuat.nayifat.com/api'  //'https://172.22.160.20:5264/api'

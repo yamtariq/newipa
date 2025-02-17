@@ -1701,8 +1701,23 @@ class AuthService {
     HttpClient? client;
     try {
       print('T_ResetPass_A1: Starting OTP generation in AuthService');
+
+      // 💡 Check if OTP bypass is enabled
+      if (Constants.bypassOtpForTesting) {
+        print('⚠️ OTP BYPASS ENABLED - Returning mock success response');
+        return {
+          'success': true,
+          'status': 'success',
+          'result': {
+            'verified': true,
+            'nationalId': nationalId,
+            'status': 'VERIFIED'
+          },
+          'message': 'OTP verified successfully (TESTING MODE)',
+          'message_ar': 'تم التحقق من رمز التحقق بنجاح'
+        };
+      }
       
-      // 💡 First get user data from backend for password reset
       print('T_ResetPass_A2: Getting user data from backend');
       
       // Get device info first
@@ -1811,6 +1826,22 @@ class AuthService {
     print('\n=== VERIFY OTP ===');
     print('📤 National ID: $nationalId');
     print('📤 OTP: $otp');
+
+    // 💡 Check if OTP bypass is enabled
+    if (Constants.bypassOtpForTesting) {
+      print('⚠️ OTP BYPASS ENABLED - Returning mock success response');
+      return {
+        'success': true,
+        'status': 'success',
+        'result': {
+          'verified': true,
+          'nationalId': nationalId,
+          'status': 'VERIFIED'
+        },
+        'message': 'OTP verified successfully (TESTING MODE)',
+        'message_ar': 'تم التحقق من رمز التحقق بنجاح'
+      };
+    }
 
     try {
       // 💡 Create a custom HttpClient that accepts self-signed certificates

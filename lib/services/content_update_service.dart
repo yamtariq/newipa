@@ -147,9 +147,7 @@ class ContentUpdateService extends ChangeNotifier {
             // Check for updates in background without blocking UI
             bool hasUpdates = await _hasContentUpdates();
             if (hasUpdates) {
-              _isUpdating = true;
-              notifyListeners();
-              
+              // Don't set _isUpdating for background updates
               final tempCache = Map<String, dynamic>.from(_memoryCache);
               final success = await _updateAllContent(tempCache);
 
@@ -159,28 +157,20 @@ class ContentUpdateService extends ChangeNotifier {
                 
                 if (await _verifySavedContent()) {
                   _hasCachedContent = true;
+                  notifyListeners(); // Only notify after successful update
                 }
               }
-              
-              _isUpdating = false;
-              notifyListeners();
             }
           } catch (e) {
             _log('TTT_Error in background update: $e');
-            _isUpdating = false;
-            notifyListeners();
           }
         });
         return;
       }
 
-      // For initial load, run synchronously
-      // Check for updates without blocking
+      // For initial load, run synchronously but still don't show loading
       bool hasUpdates = await _hasContentUpdates();
       if (hasUpdates) {
-        _isUpdating = true;
-        notifyListeners();
-        
         final tempCache = Map<String, dynamic>.from(_memoryCache);
         final success = await _updateAllContent(tempCache);
 
@@ -190,16 +180,12 @@ class ContentUpdateService extends ChangeNotifier {
           
           if (await _verifySavedContent()) {
             _hasCachedContent = true;
+            notifyListeners();
           }
         }
-        
-        _isUpdating = false;
-        notifyListeners();
       }
     } catch (e) {
       _log('TTT_Error in content update: $e');
-      _isUpdating = false;
-      notifyListeners();
     }
   }
 
@@ -709,7 +695,16 @@ class ContentUpdateService extends ChangeNotifier {
       }).toList();
     }
     
-    return [];
+    // If no slides found in memory cache, return static slides
+    _log('TTT_No slides found in memory cache, returning static slides');
+    return Constants.staticSlides.map((slide) => Slide(
+      id: int.parse(slide['id'] ?? '0'),
+      imageUrl: slide['imageUrl'] ?? '',
+      link: slide['link'] ?? '',
+      leftTitle: isArabic ? (slide['leftTitleAr'] ?? '') : (slide['leftTitleEn'] ?? ''),
+      rightTitle: isArabic ? (slide['rightTitleAr'] ?? '') : (slide['rightTitleEn'] ?? ''),
+      imageBytes: null,
+    )).toList();
   }
 
   ContactDetails? getContactDetails({bool isArabic = false}) {
@@ -717,7 +712,9 @@ class ContentUpdateService extends ChangeNotifier {
     if (contactData != null && contactData is Map<String, dynamic>) {
       return ContactDetails.fromJson(contactData);
     }
-    return null;
+    
+    // If no contact details found in memory cache, return static contact details
+    return ContactDetails.fromJson(Constants.staticContactDetails);
   }
 
   Map<String, dynamic>? getLoanAd({bool isArabic = false}) {
@@ -787,6 +784,27 @@ class ContentUpdateService extends ChangeNotifier {
         return true;
       }
 
+      // If no cached content, initialize with static content
+      _memoryCache['slideshow_content'] = Constants.staticSlides.map((slide) => {
+        'slide_id': int.parse(slide['id'] ?? '0'),
+        'image_url': slide['imageUrl'],
+        'link': slide['link'],
+        'leftTitle': slide['leftTitleEn'],
+        'rightTitle': slide['rightTitleEn'],
+      }).toList();
+
+      _memoryCache['slideshow_content_ar'] = Constants.staticSlides.map((slide) => {
+        'slide_id': int.parse(slide['id'] ?? '0'),
+        'image_url': slide['imageUrl'],
+        'link': slide['link'],
+        'leftTitle': slide['leftTitleAr'],
+        'rightTitle': slide['rightTitleAr'],
+      }).toList();
+
+      // Add contact details
+      _memoryCache['contact_details'] = Constants.staticContactDetails;
+      _memoryCache['contact_details_ar'] = Constants.staticContactDetails;
+
       // Initialize default ad images if no cached content
       if (_memoryCache['default_loan_ad'] != null) {
         try {
@@ -840,13 +858,8 @@ class ContentUpdateService extends ChangeNotifier {
   // 💡 Modified background update method
   Future<void> _checkForUpdatesInBackground() async {
     try {
-      if (_isUpdating) return; // Prevent multiple simultaneous updates
-      
       final hasUpdates = await _hasContentUpdates();
       if (hasUpdates) {
-        _isUpdating = true;
-        notifyListeners();
-        
         final tempCache = Map<String, dynamic>.from(_memoryCache);
         final success = await _updateAllContent(tempCache);
 
@@ -856,14 +869,51 @@ class ContentUpdateService extends ChangeNotifier {
           
           if (await _verifySavedContent()) {
             _hasCachedContent = true;
+            notifyListeners();
           }
         }
       }
     } catch (e) {
       _log('TTT_Error in background update: $e');
-    } finally {
-      _isUpdating = false;
-      notifyListeners();
+    }
+  }
+
+  // 💡 Add method to preload static image assets
+  Future<void> preloadStaticAssets(BuildContext context) async {
+    _log('\nTTT_=== Preloading Static Assets ===');
+    try {
+      for (var slide in Constants.staticSlides) {
+        final imageUrl = slide['imageUrl'];
+        if (imageUrl != null) {
+          try {
+            await precacheImage(AssetImage(imageUrl), context);
+            _log('TTT_Preloaded image: $imageUrl');
+          } catch (e) {
+            _log('TTT_Error preloading image $imageUrl: $e');
+          }
+        }
+      }
+      
+      // Preload ad images
+      final loanAdEn = Constants.loanAd['en']?['image_url'];
+      final loanAdAr = Constants.loanAd['ar']?['image_url'];
+      final cardAdEn = Constants.cardAd['en']?['image_url'];
+      final cardAdAr = Constants.cardAd['ar']?['image_url'];
+      
+      for (var imageUrl in [loanAdEn, loanAdAr, cardAdEn, cardAdAr]) {
+        if (imageUrl != null) {
+          try {
+            await precacheImage(AssetImage(imageUrl), context);
+            _log('TTT_Preloaded ad image: $imageUrl');
+          } catch (e) {
+            _log('TTT_Error preloading ad image $imageUrl: $e');
+          }
+        }
+      }
+      
+      _log('TTT_Static asset preloading complete');
+    } catch (e) {
+      _log('TTT_Error during static asset preloading: $e');
     }
   }
 }

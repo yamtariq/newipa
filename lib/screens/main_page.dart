@@ -76,7 +76,6 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
   final ApiService _apiService = ApiService();
   final List<Future<void>> _mediaPreloadFutures = [];
   Timer? _notificationTimer;
-  bool _isLoading = true;
   bool _isOffline = false;
   List<Slide> _slides = [];
   ContactDetails? _contactDetails;
@@ -99,7 +98,13 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     // Initialize all required data
     _initializeUserData();  // Move this first
     _initializeApp();
-    _loadData();
+    
+    // 💡 Load cached content immediately
+    _loadCachedContent();
+    
+    // 💡 Preload static assets
+    _contentUpdateService.preloadStaticAssets(context);
+    
     _checkDeviceRegistration();
     
     // Initialize notifications and start periodic checks
@@ -133,83 +138,45 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     }
   }
 
-  // Add content update listener callback
+  // 💡 Add new method to load cached content
+  Future<void> _loadCachedContent() async {
+    try {
+      // Get slides and contact details from cached content
+      _slides = _contentUpdateService.getSlides(isArabic: widget.isArabic);
+      _contactDetails = _contentUpdateService.getContactDetails(isArabic: widget.isArabic);
+      
+      if (mounted) {
+        setState(() {
+          _isOffline = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading cached content: $e');
+      if (mounted) {
+        setState(() {
+          _isOffline = true;
+        });
+      }
+    }
+  }
+
+  // 💡 Add new method to update content in background
+  Future<void> _updateContentInBackground() async {
+    try {
+      // Start content update in background
+      await _contentUpdateService.checkAndUpdateContent(
+        isInitialLoad: false,
+        isResumed: false
+      );
+    } catch (e) {
+      print('Error updating content in background: $e');
+    }
+  }
+
+  // 💡 Modify content update listener
   void _onContentUpdated() {
     if (mounted) {
-      _loadData();
-    }
-  }
-
-  Future<void> _initializeNotifications() async {
-    try {
-      debugPrint('\n=== Initializing Notifications ===');
-      
-      // First check if notifications are allowed
-      final isAllowed = await AwesomeNotifications().isNotificationAllowed();
-      debugPrint('Notification permissions status: ${isAllowed ? 'GRANTED' : 'NOT GRANTED'}');
-      
-      if (!isAllowed) {
-        debugPrint('Requesting notification permissions...');
-        final userAllowed = await AwesomeNotifications().requestPermissionToSendNotifications();
-        debugPrint('User ${userAllowed ? 'GRANTED' : 'DENIED'} notification permissions');
-        
-        if (!userAllowed) {
-          debugPrint('Notification permissions denied');
-          return;
-        }
-      }
-
-      // Check for notifications immediately
-      await _checkForNotifications();
-      
-      // Set up periodic checks every 5 minutes
-      _notificationTimer = Timer.periodic(const Duration(minutes: 5), (timer) async {
-        await _checkForNotifications();
-      });
-      
-      debugPrint('=== Notification Initialization Complete ===\n');
-    } catch (e) {
-      debugPrint('Error initializing notifications: $e');
-    }
-  }
-
-  Future<void> _checkForNotifications() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final nationalId = prefs.getString('national_id');
-      if (nationalId != null) {
-        debugPrint('Checking notifications for ID: $nationalId');
-        final notifications = await _notificationService.fetchNotifications(nationalId);
-        
-        if (notifications.isNotEmpty) {
-          for (final notification in notifications) {
-            String title;
-            String body;
-            
-            if (widget.isArabic) {
-              title = notification['title_ar'] ?? notification['title'] ?? 'إشعار من النايفات';
-              body = notification['body_ar'] ?? notification['body'] ?? '';
-            } else {
-              title = notification['title_en'] ?? notification['title'] ?? 'Nayifat Notification';
-              body = notification['body_en'] ?? notification['body'] ?? '';
-            }
-
-            await _notificationService.showNotification(
-              title: title,
-              body: body,
-              payload: jsonEncode({
-                'route': notification['route'],
-                'data': {
-                  'isArabic': widget.isArabic,
-                  ...notification['additionalData'] ?? {},
-                },
-              }),
-            );
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Error checking notifications: $e');
+      _loadCachedContent();
     }
   }
 
@@ -566,35 +533,6 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     await Future.wait(_mediaPreloadFutures);
   }
 
-  Future<void> _loadData() async {
-    if (!mounted) return;
-    
-    try {
-      setState(() {
-        _isLoading = true;
-      });
-
-      // Get slides and contact details from content service
-      _slides = _contentUpdateService.getSlides(isArabic: widget.isArabic);
-      _contactDetails = _contentUpdateService.getContactDetails(isArabic: widget.isArabic);
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _isOffline = false;
-        });
-      }
-    } catch (e) {
-      print('Error loading data: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _isOffline = true;
-        });
-      }
-    }
-  }
-
   Future<void> _launchUrl(String url) async {
     if (!await launchUrl(Uri.parse(url))) {
       throw Exception('Could not launch $url');
@@ -851,9 +789,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     final content = Scaffold(
       extendBody: true,
       backgroundColor: backgroundColor,
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: primaryColor))
-          : SafeArea(
+      body: SafeArea(
               child: Stack(
                 children: [
                   SingleChildScrollView(
@@ -1641,7 +1577,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                             ? Constants.darkFormBackgroundColor 
                             : Constants.lightFormBackgroundColor),
                         child: InkWell(
-                          onTap: _loadData,
+                          onTap: () => _contentUpdateService.checkAndUpdateContent(force: true),
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                             child: Row(
@@ -1694,17 +1630,13 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
           ),
           boxShadow: [
             BoxShadow(
-              color: Color(isDarkMode 
-                  ? Constants.darkNavbarShadowPrimary
-                  : Constants.lightNavbarShadowPrimary),
+              color: shadowColor,
               offset: const Offset(0, -2),
               blurRadius: 6,
               spreadRadius: 2,
             ),
             BoxShadow(
-              color: Color(isDarkMode 
-                  ? Constants.darkNavbarShadowSecondary
-                  : Constants.lightNavbarShadowSecondary),
+              color: navShadowColor,
               offset: const Offset(0, -1),
               blurRadius: 4,
               spreadRadius: 0,
@@ -2100,8 +2032,6 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
   // 💡 Add new function to handle application start
   Future<void> _handleApplicationStart({required bool isLoanApplication}) async {
     try {
-      setState(() => _isLoading = true);
-      
       // Simply navigate to appropriate screen
       Navigator.push(
         context,
@@ -2114,8 +2044,6 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     } catch (e) {
       print('DEBUG: Application Start Error: $e');
       _showErrorDialog(e);
-    } finally {
-      setState(() => _isLoading = false);
     }
   }
 
@@ -2150,5 +2078,79 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
         ],
       ),
     );
+  }
+
+  // 💡 Add back notification initialization
+  Future<void> _initializeNotifications() async {
+    try {
+      debugPrint('\n=== Initializing Notifications ===');
+      
+      // First check if notifications are allowed
+      final isAllowed = await AwesomeNotifications().isNotificationAllowed();
+      debugPrint('Notification permissions status: ${isAllowed ? 'GRANTED' : 'NOT GRANTED'}');
+      
+      if (!isAllowed) {
+        debugPrint('Requesting notification permissions...');
+        final userAllowed = await AwesomeNotifications().requestPermissionToSendNotifications();
+        debugPrint('User ${userAllowed ? 'GRANTED' : 'DENIED'} notification permissions');
+        
+        if (!userAllowed) {
+          debugPrint('Notification permissions denied');
+          return;
+        }
+      }
+
+      // Check for notifications immediately
+      await _checkForNotifications();
+      
+      // Set up periodic checks every 5 minutes
+      _notificationTimer = Timer.periodic(const Duration(minutes: 5), (timer) async {
+        await _checkForNotifications();
+      });
+      
+      debugPrint('=== Notification Initialization Complete ===\n');
+    } catch (e) {
+      debugPrint('Error initializing notifications: $e');
+    }
+  }
+
+  Future<void> _checkForNotifications() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final nationalId = prefs.getString('national_id');
+      if (nationalId != null) {
+        debugPrint('Checking notifications for ID: $nationalId');
+        final notifications = await _notificationService.fetchNotifications(nationalId);
+        
+        if (notifications.isNotEmpty) {
+          for (final notification in notifications) {
+            String title;
+            String body;
+            
+            if (widget.isArabic) {
+              title = notification['title_ar'] ?? notification['title'] ?? 'إشعار من النايفات';
+              body = notification['body_ar'] ?? notification['body'] ?? '';
+            } else {
+              title = notification['title_en'] ?? notification['title'] ?? 'Nayifat Notification';
+              body = notification['body_en'] ?? notification['body'] ?? '';
+            }
+
+            await _notificationService.showNotification(
+              title: title,
+              body: body,
+              payload: jsonEncode({
+                'route': notification['route'],
+                'data': {
+                  'isArabic': widget.isArabic,
+                  ...notification['additionalData'] ?? {},
+                },
+              }),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking notifications: $e');
+    }
   }
 }
