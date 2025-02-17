@@ -1,6 +1,6 @@
 workflows:
   ios-workflow:
-    name: iOS Workflow final 5
+    name: iOS Workflow final 6
     max_build_duration: 120
     instance_type: mac_mini_m2
     environment:
@@ -9,7 +9,7 @@ workflows:
       ruby: 3.2.2
       cocoapods: 1.14.3
       vars:
-        BUNDLE_ID: "com.nayifat.app2025"
+        BUNDLE_ID: "com.nayifat.nayifatApp"
         XCODE_WORKSPACE: "Runner.xcworkspace"
         XCODE_SCHEME: "Runner"
         PLATFORM: "ios"
@@ -19,6 +19,12 @@ workflows:
         - ~/.pub-cache
         - vendor/bundle
     scripts:
+      - name: Set up code signing
+        script: |
+          echo $CM_CERTIFICATE | base64 --decode > /tmp/certificate.p12
+          keychain initialize
+          keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password $CM_CERTIFICATE_PASSWORD
+          app-store-connect fetch-signing-files $BUNDLE_ID --type IOS_APP_STORE --create
       - name: Set up environment 💡
         script: |
           flutter doctor -v
@@ -156,7 +162,7 @@ workflows:
 
       - name: Build iOS 💡
         script: |
-          flutter build ipa --release --export-options-plist ios/exportOptions.plist
+          flutter build ipa --release --export-options-plist ios/exportOptions.plist --build-number=$(($(app-store-connect get-latest-app-store-build-number "$BUNDLE_ID") + 1))
 
     artifacts:
       - build/ios/ipa/*.ipa

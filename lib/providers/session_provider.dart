@@ -1,8 +1,11 @@
 import 'package:flutter/foundation.dart';
 import '../services/auth_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class SessionProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   bool _isSignedIn = false;
   bool _manualSignOff = false;  // Track if user manually signed off
   bool _hasActiveSession = false;  // Track active session state
@@ -11,16 +14,41 @@ class SessionProvider with ChangeNotifier {
   bool get hasActiveSession => _hasActiveSession;
 
   // 💡 Set session state after successful registration
-  void setSessionAfterRegistration() {
+  Future<void> setSessionAfterRegistration() async {
     print('\n=== SETTING SESSION AFTER REGISTRATION ===');
-    _isSignedIn = true;
-    _hasActiveSession = true;
-    _manualSignOff = false;
-    print('Session states updated:');
-    print('- isSignedIn: $_isSignedIn');
-    print('- hasActiveSession: $_hasActiveSession');
-    print('- manualSignOff: $_manualSignOff');
-    notifyListeners();
+    
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Update memory state
+      _isSignedIn = true;
+      _hasActiveSession = true;
+      _manualSignOff = false;
+      
+      // 💡 Update SharedPreferences
+      await prefs.setBool('is_signed_in', true);
+      await prefs.setBool('session_active', true);
+      await prefs.setBool('manual_sign_off', false);
+      
+      // 💡 Update SecureStorage
+      await _secureStorage.write(key: 'session_active', value: 'true');
+      await _secureStorage.write(key: 'is_signed_in', value: 'true');
+
+      print('Session states updated in memory and storage:');
+      print('- isSignedIn: $_isSignedIn');
+      print('- hasActiveSession: $_hasActiveSession');
+      print('- manualSignOff: $_manualSignOff');
+      
+      notifyListeners();
+      print('✅ Session states successfully stored in both storages');
+    } catch (e) {
+      print('❌ Error storing session states: $e');
+      // Revert memory state if storage fails
+      _isSignedIn = false;
+      _hasActiveSession = false;
+      notifyListeners();
+    }
+    
     print('=== SESSION UPDATE COMPLETE ===\n');
   }
 
