@@ -37,7 +37,8 @@ class SessionProvider with ChangeNotifier {
       print('   - Has Valid User Data: $hasValidUserData');
 
       _hasActiveSession = sessionFromAuth;
-      _isSignedIn = sessionFromAuth && hasValidUserData;
+      // 💡 Keep signed in if we have valid user data, regardless of session state
+      _isSignedIn = hasValidUserData;
       print('5. New states:');
       print('   - isSignedIn: $_isSignedIn');
       print('   - hasActiveSession: $_hasActiveSession');
@@ -66,7 +67,7 @@ class SessionProvider with ChangeNotifier {
       print('   - hasActiveSession: $_hasActiveSession');
 
       if (_manualSignOff) {
-        print('2. Manual sign off is true, skipping check');
+        print('2. Manual sign off is true, keeping current isSignedIn state');
         return;
       }
 
@@ -83,7 +84,8 @@ class SessionProvider with ChangeNotifier {
       print('   - Has Valid User Data: $hasValidUserData');
 
       final newHasActiveSession = sessionFromAuth;
-      final newSignedInState = sessionFromAuth && hasValidUserData;
+      // 💡 Keep signed in if we have valid user data, regardless of session state
+      final newSignedInState = hasValidUserData;
       
       if (newHasActiveSession != _hasActiveSession || newSignedInState != _isSignedIn) {
         print('5. State change detected');

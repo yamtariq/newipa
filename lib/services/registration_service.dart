@@ -68,6 +68,20 @@ class RegistrationService {
   Future<Map<String, dynamic>> generateOTP(String nationalId, {String? mobileNo}) async {
     HttpClient? client;
     try {
+      // 💡 Check if OTP bypass is enabled
+      if (Constants.bypassOtpForTesting) {
+        print('⚠️ REGISTRATION OTP BYPASS ENABLED - Returning mock success response');
+        return {
+          'status': 'success',
+          'message': 'OTP sent successfully (TESTING MODE)',
+          'message_ar': 'تم إرسال رمز التحقق بنجاح',
+          'data': {
+            'otp_reference': 'TEST-REG-OTP-REF',
+            'expires_in': 300
+          }
+        };
+      }
+
       // 💡 Create a custom HttpClient that accepts self-signed certificates
       client = HttpClient()
         ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
@@ -150,6 +164,21 @@ class RegistrationService {
   Future<Map<String, dynamic>> verifyOTP(String nationalId, String otp) async {
     HttpClient? client;
     try {
+      // 💡 Check if OTP bypass is enabled
+      if (Constants.bypassOtpForTesting) {
+        print('⚠️ REGISTRATION OTP BYPASS ENABLED - Returning mock success response');
+        return {
+          'status': 'success',
+          'message': 'OTP verified successfully (TESTING MODE)',
+          'message_ar': 'تم التحقق من رمز التحقق بنجاح',
+          'data': {
+            'verified': true,
+            'nationalId': nationalId,
+            'status': 'VERIFIED'
+          }
+        };
+      }
+
       // 💡 Create a custom HttpClient that accepts self-signed certificates
       client = HttpClient()
         ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
