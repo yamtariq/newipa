@@ -665,6 +665,24 @@ class RegistrationService {
         }
       };
 
+      // 💡 Add address data if available
+      if (storedData['addressData'] != null) {
+        final addressList = storedData['addressData']['citizenaddresslists'] as List<dynamic>;
+        if (addressList.isNotEmpty) {
+          final primaryAddress = addressList.firstWhere(
+            (addr) => addr['isPrimaryAddress'] == true,
+            orElse: () => addressList.first
+          );
+          
+          registrationRequest['BuildingNo'] = primaryAddress['buildingNumber']?.toString() ?? '';
+          registrationRequest['Street'] = primaryAddress['streetName']?.toString() ?? '';
+          registrationRequest['District'] = primaryAddress['district']?.toString() ?? '';
+          registrationRequest['City'] = primaryAddress['city']?.toString() ?? '';
+          registrationRequest['Zipcode'] = primaryAddress['postCode']?.toString() ?? '';
+          registrationRequest['AddNo'] = primaryAddress['additionalNumber']?.toString() ?? '';
+        }
+      }
+
       print('📝 Preparing registration request...');
       print('📤 Request Body: ${json.encode(registrationRequest)}');
 
@@ -886,12 +904,18 @@ class RegistrationService {
     final prefs = await SharedPreferences.getInstance();
     final secureStorage = const FlutterSecureStorage();
     
+    // 💡 Ensure date of birth is consistently formatted
+    final dateOfBirth = userData['dateOfBirth']?.toString() ?? 
+                       userData['date_of_birth']?.toString() ?? 
+                       userData['dob']?.toString();
+    
     final secureData = {
       'national_id': nationalId,
       'full_name': '${userData['englishFirstName']} ${userData['englishLastName']}',
       'arabic_name': '${userData['firstName']} ${userData['familyName']}',
       'email': email,
-      'dob': userData['dateOfBirth'],
+      'dob': dateOfBirth,
+      'date_of_birth': dateOfBirth, // 💡 Store with consistent key
       'id_expiry_date': userData['idExpiryDate'],
       'salary': userData['salary'],
       'employment_status': userData['employmentStatus'],
@@ -905,11 +929,15 @@ class RegistrationService {
     print('🔒 Storing in Secure Storage: ${json.encode(secureData)}');
     await secureStorage.write(key: 'user_data', value: json.encode(secureData));
 
+    // 💡 Ensure userData has consistent date of birth key
+    final updatedUserData = Map<String, dynamic>.from(userData);
+    updatedUserData['dateOfBirth'] = dateOfBirth;
+    
     final registrationData = {
       'national_id': nationalId,
       'email': email,
       'phone': '966' + phone,
-      'userData': userData,
+      'userData': updatedUserData,
       if (addressData != null) 'addressData': addressData,
       if (password != null) 'password': password,
       if (nafathData != null) 'nafath_data': nafathData,

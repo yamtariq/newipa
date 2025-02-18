@@ -1,13 +1,13 @@
 package com.example.nayifat_app_2025_new
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import androidx.work.WorkManager
 import android.os.Bundle
 import android.util.Log
 
-class MainActivity: FlutterActivity() {
+class MainActivity: FlutterFragmentActivity() {
     private val CHANNEL = "com.nayifat.app/background_service"
     
     override fun onCreate(savedInstanceState: Bundle?) {

@@ -256,7 +256,7 @@ namespace NayifatAPI.Controllers
                         }
                     }),
                     CreatedAt = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Arab Standard Time")),
-                    ExpiryAt = request.ExpiryAt ?? TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Arab Standard Time")).AddDays(30)
+                    ExpiryAt = request.ExpiryAt ?? TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Arab Standard Time")).AddDays(1)
                 };
 
                 // 💡 Log template values before saving
