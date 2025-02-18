@@ -1,91 +1,4 @@
 workflows:
-  ios-workflow:
-    name: iOS Workflow
-    max_build_duration: 120
-    instance_type: mac_mini_m2
-    environment:
-      flutter: stable
-      xcode: latest
-      cocoapods: default
-      vars:
-        BUNDLE_ID: "com.nayifat.nayifatApp"
-        XCODE_WORKSPACE: "Runner.xcworkspace"
-        XCODE_SCHEME: "Runner"
-    scripts:
-      - name: Clean everything
-        script: |
-          # Thorough cleaning
-          flutter clean
-          cd ios
-          rm -rf Pods Podfile.lock
-          rm -rf .symlinks/
-          rm -rf build/
-          rm -rf ~/Library/Developer/Xcode/DerivedData
-          cd ..
-          
-      - name: Install dependencies
-        script: |
-          flutter clean
-          flutter pub get
-          cd ios
-          rm -rf Pods Podfile.lock
-          pod deintegrate
-          pod cache clean --all
-          pod repo update
-          pod install --repo-update
-          cd ..
-          
-      - name: Build unsigned app
-        script: |
-          cd ios
-          
-          # Create build directory
-          mkdir -p build/unsigned
-          
-          # Clean derived data
-          rm -rf ~/Library/Developer/Xcode/DerivedData
-          
-          # Build unsigned IPA
-          xcodebuild clean archive \
-            -workspace Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -sdk iphoneos \
-            -archivePath build/Runner.xcarchive \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM="" \
-            COMPILER_INDEX_STORE_ENABLE=NO \
-            SWIFT_OPTIMIZATION_LEVEL="-Onone" \
-            SWIFT_COMPILATION_MODE="singlefile" \
-            ONLY_ACTIVE_ARCH=NO \
-            DEBUG_INFORMATION_FORMAT=dwarf
-            
-          # Verify archive exists
-          if [ ! -d "build/Runner.xcarchive" ]; then
-            echo "Error: Archive not created"
-            exit 1
-          fi
-          
-          # Create IPA
-          mkdir -p build/ios/ipa/Payload
-          cp -r build/Runner.xcarchive/Products/Applications/Runner.app build/ios/ipa/Payload/
-          cd build/ios/ipa
-          zip -qr Runner.ipa Payload
-          rm -rf Payload
-          echo "Created unsigned IPA at build/ios/ipa/Runner.ipa"
-            
-    artifacts:
-      - build/ios/ipa/*.ipa
-      - ios/build/DerivedData/**/Build/**/*.app
-      - /tmp/xcodebuild_logs/*.log
-      
-    publishing:
-      email:
-        recipients:
-          - yamtariq@gmail.com
-
   ios-unsigned:
     name: iOS Unsigned Build
     max_build_duration: 120
@@ -96,46 +9,50 @@ workflows:
       cocoapods: default
       vars:
         BUNDLE_ID: "com.nayifat.nayifatApp"
-        XCODE_WORKSPACE: "Runner.xcworkspace"
-        XCODE_SCHEME: "Runner"
     scripts:
-      - name: Set up environment
-        script: |
-          flutter doctor -v
-          
-      - name: Install dependencies
+      - name: Set up
         script: |
           flutter clean
+          flutter pub get
+          
+      - name: Remove existing iOS directory
+        script: |
+          rm -rf ios
+          
+      - name: Create fresh iOS build
+        script: |
+          flutter create --platforms ios .
           flutter pub get
           
       - name: Install pods
         script: |
           cd ios
           pod install
+          cd ..
           
       - name: Build unsigned IPA
         script: |
           cd ios
-          xcodebuild -workspace Runner.xcworkspace \
+          xcodebuild clean archive \
+            -workspace Runner.xcworkspace \
             -scheme Runner \
-            -sdk iphoneos \
             -configuration Release \
-            -allowProvisioningUpdates \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
+            -sdk iphoneos \
+            -archivePath build/Runner.xcarchive \
             CODE_SIGNING_ALLOWED=NO \
-            -archivePath build/Runner.xcarchive \
-            archive
-          
-          xcodebuild -exportArchive \
-            -archivePath build/Runner.xcarchive \
-            -exportPath build/ios/ipa \
-            -exportOptionsPlist exportOptions.plist
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM=""
             
+          mkdir -p build/ios/ipa/Payload
+          cp -r build/Runner.xcarchive/Products/Applications/Runner.app build/ios/ipa/Payload/
+          cd build/ios/ipa
+          zip -qr Runner.ipa Payload
+          rm -rf Payload
+          
     artifacts:
       - build/ios/ipa/*.ipa
-      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
-      - /tmp/xcodebuild_logs/*.log
+      - ios/build/**/*.app
       
     publishing:
       email:
