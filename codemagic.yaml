@@ -25,10 +25,13 @@ workflows:
           
       - name: Install dependencies
         script: |
+          flutter clean
           flutter pub get
           cd ios
+          rm -rf Pods Podfile.lock
           pod deintegrate
           pod cache clean --all
+          pod repo update
           pod install --repo-update
           cd ..
           
@@ -39,44 +42,25 @@ workflows:
           # Create build directory
           mkdir -p build/unsigned
           
-          # Force rebuild all targets
-          xcodebuild clean -workspace Runner.xcworkspace -scheme Runner
+          # Clean derived data
+          rm -rf ~/Library/Developer/Xcode/DerivedData
           
-          # Build with proper module and optimization settings
-          xcodebuild build \
+          # Build unsigned IPA
+          xcodebuild clean archive \
             -workspace Runner.xcworkspace \
             -scheme Runner \
             -configuration Release \
             -sdk iphoneos \
-            -derivedDataPath build/DerivedData \
+            -archivePath build/Runner.xcarchive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
-            COMPILER_INDEX_STORE_ENABLE=NO \
-            DEFINES_MODULE=YES \
-            SWIFT_COMPILATION_MODE=wholemodule \
-            SWIFT_OPTIMIZATION_LEVEL="-Onone" \
-            ENABLE_BITCODE=NO \
-            ONLY_ACTIVE_ARCH=NO \
-            DEBUG_INFORMATION_FORMAT=dwarf \
-            GCC_OPTIMIZATION_LEVEL=0 \
-            SWIFT_TREAT_WARNINGS_AS_ERRORS=NO \
-            ENABLE_PREVIEWS=NO \
-            ENABLE_TESTABILITY=YES
+            COMPILER_INDEX_STORE_ENABLE=NO
             
-          # Find the built app
-          APP_PATH=$(find build/DerivedData -name "Runner.app" | grep Release-iphoneos)
-          
-          if [ -z "$APP_PATH" ]; then
-            echo "Error: Could not find built app"
-            exit 1
-          fi
-          
           # Create IPA
-          echo "Creating IPA from app at: $APP_PATH"
           mkdir -p build/ios/ipa/Payload
-          cp -r "$APP_PATH" build/ios/ipa/Payload/
+          cp -r build/Runner.xcarchive/Products/Applications/Runner.app build/ios/ipa/Payload/
           cd build/ios/ipa
           zip -qr Runner.ipa Payload
           rm -rf Payload
