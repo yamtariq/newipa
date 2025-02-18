@@ -1243,20 +1243,35 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
 
       setState(() => _isLoading = false);
 
+      // 💡 Handle null response
+      if (response == null) {
+        _showError(isArabic 
+          ? 'حدث خطأ أثناء إنشاء طلب البطاقة'
+          : 'Error creating card request: No response received');
+        return;
+      }
+
+      // 💡 Handle error response
       if (response['status'] == 'error') {
         print('\nError in response:');
         print('Status: ${response['status']}');
         print('Message: ${response['message']}');
         print('=== CARD APPLICATION REQUEST END (WITH ERROR) ===\n');
         
-        // If it's a NOT_ELIGIBLE error, navigate to card offer screen with error details
-        if (response['error_type'] == 'NOT_ELIGIBLE' || response['should_contact_support']) {
+        // If it's a server error or requires support contact, navigate to card offer screen with error details
+        if (response['error_type'] == 'SERVER_ERROR' || 
+            response['error_type'] == 'NOT_ELIGIBLE' || 
+            response['should_contact_support'] == true) {
           if (!mounted) return;
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => CardOfferScreen(
-                userData: response,  // Pass the error response directly
+                userData: {
+                  ...response,
+                  'national_id': _userData['national_id'],
+                  'nameOnCard': _userData['nameOnCard'],
+                },
                 isArabic: isArabic,
                 maxCreditLimit: 0,
                 minCreditLimit: 0,

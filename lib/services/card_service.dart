@@ -238,165 +238,33 @@ class CardService {
         print('$name: $values');
       });
       print('\nResponse Body:');
-      if (responseBody.isNotEmpty) {
-        try {
-          print(const JsonEncoder.withIndent('  ').convert(json.decode(responseBody)));
-        } catch (e) {
-          print('Raw response: $responseBody');
-          print('(Could not parse as JSON: $e)');
-        }
-      } else {
-        print('(Empty response body)');
-      }
-      print('=== END CREATE CUSTOMER DETAILS ===\n');
-
-      // Handle empty response
+      
+      // 💡 Handle empty response
       if (responseBody.isEmpty) {
-        throw Exception('Empty response received from server');
-      }
-
-      if (response.statusCode != 200) {
-        throw Exception('Failed to create customer: ${response.statusCode}');
-      }
-
-      // Parse JSON response
-      Map<String, dynamic> responseData;
-      try {
-        responseData = jsonDecode(responseBody);
-      } catch (e) {
-        throw Exception('Invalid response format from server: $e');
-      }
-
-      if (!responseData['success']) {
-        // 💡 Special handling for NOT ELIGIBLE error
-        final errorMessage = responseData['errors']?.join(', ') ?? responseData['message'] ?? 'Unknown error occurred';
-        if (errorMessage.toUpperCase().contains('NOT ELIGIBLE')) {
-          return {
-            'status': 'error',
-            'error_type': 'NOT_ELIGIBLE',
-            'message': isArabic 
-              ? 'عذراً، أنت غير مؤهل للحصول على البطاقة في الوقت الحالي'
-              : 'Sorry, you are not eligible for a card at this time',
-            'message_ar': 'عذراً، أنت غير مؤهل للحصول على البطاقة في الوقت الحالي',
-            'should_contact_support': true
-          };
-        }
-
-        // Get card type for rejected application
-        final cardTypeData = await _getCardTypeForAmount(requestedAmount.toDouble());
-        final selectedCardType = cardTypeData['type'] ?? 'REWARDS';
-        final result = responseData['result'];
-
-        // 💡 If createCustomer is rejected, insert a rejected application
-        final cardData = {
-          'national_id': storedUserData['national_id'],
-          'application_no': DateTime.now().millisecondsSinceEpoch,
-          'customerDecision': 'PENDING',
-          'card_type': selectedCardType,
-          'card_limit': 0,
-          'status': 'rejected',
-          'status_date': DateTime.now().toIso8601String(),
-          'remarks': 'Application rejected by bank',
-          'noteUser': 'SYSTEM',
-          'note': responseData['errors']?.join(', ') ?? responseData['message'] ?? 'Unknown error occurred',
-          'NameOnCard': storedUserData['nameOnCard'] ?? '',
-        };
-
-        await insertCardApplication(cardData);
-
+        print('(Empty response body)');
         return {
           'status': 'error',
-          'error_type': 'GENERAL',
-          'message': responseData['errors']?.join(', ') ?? responseData['message'] ?? 'Unknown error occurred',
-          'message_ar': 'حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى',
-          'should_contact_support': false
+          'message': 'Empty response received from server',
+          'message_ar': 'لم يتم استلام رد من الخادم',
+          'error_type': 'SERVER_ERROR',
+          'should_contact_support': true
         };
       }
 
-      final result = responseData['result'];
-      print('\nDEBUG - Credit Limit Parsing:');
-      print('Raw eligibleAmount: ${result['eligibleAmount']}');
-      print('Type of eligibleAmount: ${result['eligibleAmount']?.runtimeType}');
-      
-      // 💡 1. Get and save the eligible amount from createCustomer response
-      final eligibleAmount = double.tryParse(result['eligibleAmount'] ?? '0') ?? 0;
-      print('Parsed Eligible Amount: $eligibleAmount');
-
-      // 💡 2. Get all card type limits from constants
-      final constantsResponse = await http.get(
-        Uri.parse('${Constants.apiBaseUrl}/constants'),
-        headers: Constants.defaultHeaders,
-      );
-
-      if (constantsResponse.statusCode != 200) {
-        throw Exception('Failed to fetch constants');
+      try {
+        final jsonResponse = json.decode(responseBody);
+        print(const JsonEncoder.withIndent('  ').convert(jsonResponse));
+        return jsonResponse;
+      } catch (e) {
+        print('Error parsing response: $e');
+        return {
+          'status': 'error',
+          'message': 'Invalid response format from server',
+          'message_ar': 'تنسيق الرد غير صالح من الخادم',
+          'error_type': 'SERVER_ERROR',
+          'should_contact_support': true
+        };
       }
-
-      final constantsData = json.decode(constantsResponse.body);
-      if (!constantsData['success']) {
-        throw Exception('Failed to get constants from response');
-      }
-
-      // 💡 3. Save all limits with their card types
-      final constants = constantsData['data'] as List;
-      final cardLimits = <Map<String, dynamic>>[];
-      
-      for (final constant in constants) {
-        if (constant['name'].toString().endsWith('_Limit')) {
-          final cardType = constant['name'].toString().replaceAll('_Limit', '');
-          final limitRange = constant['value'].toString().split(' - ');
-          
-          if (limitRange.length == 2) {
-            cardLimits.add({
-              'cardType': cardType,
-              'minLimit': double.tryParse(limitRange[0]) ?? 0,
-              'maxLimit': double.tryParse(limitRange[1]) ?? double.infinity,
-            });
-          }
-        }
-      }
-
-      print('\nCard Limits:');
-      print(const JsonEncoder.withIndent('  ').convert(cardLimits));
-
-      // 💡 4. Determine card type based on eligible amount
-      var selectedCardType = 'REWARDS'; // Default type
-      for (final limit in cardLimits) {
-        if (eligibleAmount >= limit['minLimit'] && eligibleAmount <= limit['maxLimit']) {
-          selectedCardType = limit['cardType'];
-          print('\nSelected Card Type: $selectedCardType');
-          print('Eligible Amount: $eligibleAmount falls in range:');
-          print('Min: ${limit['minLimit']}, Max: ${limit['maxLimit']}');
-          break;
-        }
-      }
-
-      // Get Arabic name for selected card type
-      final selectedTypeData = constants.firstWhere(
-        (c) => c['name'] == 'CardType' && c['value'] == selectedCardType,
-        orElse: () => {'valueAr': 'المكافآت'},
-      );
-
-      final mappedResponse = {
-        'status': 'success',
-        'decision': result['applicationStatus'] == 'APPROVED' ? 'approved' : 'rejected',
-        'credit_limit': eligibleAmount.round(),
-        'application_number': result['applicationId'],
-        'request_id': result['requestId'],
-        'customer_id': result['customerId'],
-        'card_type': selectedCardType,
-        'card_type_ar': selectedTypeData['valueAr'],
-      };
-
-      // Save response for later use
-      await _secureStorage.write(
-        key: 'card_offer_data',
-        value: jsonEncode(responseData),
-      );
-
-      print('\n=== CREATE CUSTOMER CARD REQUEST - END ===\n');
-      return mappedResponse;
-
     } catch (e) {
       print('\nERROR in createCustomerCardRequest:');
       print('Error Type: ${e.runtimeType}');
