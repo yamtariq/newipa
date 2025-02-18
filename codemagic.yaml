@@ -60,6 +60,9 @@ workflows:
             use_modular_headers!
             
             flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+            
+            # Explicitly add PhoneNumberKit
+            pod 'PhoneNumberKit', '~> 3.7'
           end
           
           post_install do |installer|
@@ -70,6 +73,17 @@ workflows:
                 config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
                 config.build_settings['SWIFT_VERSION'] = '5.0'
                 config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
+                
+                # Enable modules for all pods
+                config.build_settings['DEFINES_MODULE'] = 'YES'
+                config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
+                config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+                
+                # Handle any architectures
+                config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
+                if config.build_settings['PLATFORM_NAME'] == 'iphonesimulator'
+                  config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
+                end
               end
             end
           end" > Podfile
@@ -77,15 +91,15 @@ workflows:
       - name: Install Pods
         script: |
           cd ios
-          pod install
+          rm -rf Pods Podfile.lock
+          pod repo update
+          pod install --repo-update
           cd ..
           
       - name: Build unsigned IPA
         script: |
           # Build IPA using Flutter
-          flutter build ipa --release --no-codesign
-          
-          # The IPA will be in build/ios/ipa/
+          flutter build ipa --release --no-codesign --no-tree-shake-icons
             
     artifacts:
       - build/ios/ipa/*.ipa

@@ -1343,7 +1343,7 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> w
                                                         final now = HijriCalendar.now();
                                                         return CustomHijriPicker(
                                                           isArabic: widget.isArabic,
-                                                          minYear: now.hYear - 90,
+                                                          minYear: now.hYear - 95,
                                                           maxYear: now.hYear,
                                                           initialYear: now.hYear - 18,
                                                           primaryColor: primaryColor,
@@ -1530,7 +1530,7 @@ class _InitialRegistrationScreenState extends State<InitialRegistrationScreen> w
                                                         return CustomHijriPicker(
                                                           isArabic: widget.isArabic,
                                                           minYear: now.hYear,
-                                                          maxYear: now.hYear + 10,
+                                                          maxYear: now.hYear + 100,
                                                           initialYear: now.hYear,
                                                           primaryColor: primaryColor,
                                                           isDarkMode: themeProvider.isDarkMode,
