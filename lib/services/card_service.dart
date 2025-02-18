@@ -141,7 +141,12 @@ class CardService {
         if (inputDate == null) return '1444/01/01';
         final parts = inputDate.split('-');
         if (parts.length == 3) {
-          return '${parts[2]}/${parts[1]}/${parts[0]}';
+          // 💡 Ensure each part is padded with leading zeros
+          final day = parts[0].padLeft(2, '0');
+          final month = parts[1].padLeft(2, '0');
+          final year = parts[2].padLeft(4, '0');
+          // Return in yyyy/mm/dd format
+          return '$year/$month/$day';
         }
         return inputDate;
       }
