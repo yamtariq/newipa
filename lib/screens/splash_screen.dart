@@ -75,8 +75,8 @@ class _SplashScreenState extends State<SplashScreen> {
         contentService.checkAndUpdateContent(force: false, isInitialLoad: false, isResumed: true);
       });
 
-      // Wait for minimum animation time
-      await Future.delayed(const Duration(milliseconds: 2000));
+      // 💡 Wait for minimum animation time - increased to match total animation duration
+      await Future.delayed(const Duration(milliseconds: 6000));
 
       if (mounted) {
         // Navigate to main page without waiting for content

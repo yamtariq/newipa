@@ -1,17 +1,20 @@
 flutter_native_splash:
-  color: "#ffffff"
+  color: "#FFFFFF"
+  color_dark: "#000000"
   #background_image: "assets/background.png"
   
-  image: assets/images/splash_logo.png
+  image: assets/images/nayifatlogocircle-nobg.png
   branding: assets/images/nayifatlogowords-nobg.png
   
-  image_dark: assets/images/splash_logo.png
+  image_dark: assets/images/nayifatlogocircle-nobg.png
   branding_dark: assets/images/nayifatlogowords-nobg.png
 
   android_12:
-    image: assets/images/splash_logo.png
+    color: "#FFFFFF"
+    color_dark: "#000000"
+    image: assets/images/nayifatlogocircle-nobg.png
+    image_dark: assets/images/nayifatlogocircle-nobg.png
     icon_background_color: "#ffffff"
-    image_dark: assets/images/splash_logo.png
     
   android: true
   ios: true

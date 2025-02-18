@@ -48,13 +48,13 @@ dependencies:
   dio: ^5.4.0
   path: ^1.8.3
   synchronized: ^3.1.0
+  flutter_native_splash: ^2.4.4
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
   flutter_launcher_icons: ^0.13.1
-  flutter_native_splash: ^2.4.4  # Updated
   mockito: ^5.4.4
   build_runner: ^2.4.11  # Updated
   test: ^1.24.0

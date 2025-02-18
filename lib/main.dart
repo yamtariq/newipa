@@ -21,11 +21,14 @@ import '../services/theme_service.dart';
 import 'services/content_update_service.dart';
 import 'screens/loading_screen.dart';
 import 'providers/theme_provider.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  // 💡 Preserve native splash screen until initialization is complete
+  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
   
   // Initialize Services
   NavigationService().setNavigatorKey(navigatorKey);
@@ -43,27 +46,30 @@ void main() async {
     // Continue app initialization even if notifications fail
   }
   
-  SystemChrome.setPreferredOrientations([
+  await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
-  ]).then((_) {
-    runApp(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider(
-            create: (_) => SessionProvider()..initializeSession(),
-          ),
-          ChangeNotifierProvider(
-            create: (_) => ContentUpdateService(),
-          ),
-          ChangeNotifierProvider(
-            create: (_) => ThemeProvider(),
-          ),
-        ],
-        child: MyApp(initialIsArabic: isArabic),
-      ),
-    );
-  });
+  ]);
+
+  // 💡 Remove native splash screen once initialization is complete
+  FlutterNativeSplash.remove();
+
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) => SessionProvider()..initializeSession(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => ContentUpdateService(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => ThemeProvider(),
+        ),
+      ],
+      child: MyApp(initialIsArabic: isArabic),
+    ),
+  );
 }
 
 class MyApp extends StatefulWidget {
