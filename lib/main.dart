@@ -21,14 +21,17 @@ import '../services/theme_service.dart';
 import 'services/content_update_service.dart';
 import 'screens/loading_screen.dart';
 import 'providers/theme_provider.dart';
-import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
-  // 💡 Preserve native splash screen until initialization is complete
-  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
-  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // 💡 Set system UI overlay style to transparent to avoid any flash
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    systemNavigationBarColor: Colors.transparent,
+  ));
   
   // Initialize Services
   NavigationService().setNavigatorKey(navigatorKey);
@@ -37,22 +40,20 @@ void main() async {
   // Load saved language preference
   final isArabic = await MainPage.loadSavedLanguage();
   
-  // Initialize notifications
-  try {
-    await NotificationService().initialize();
-    debugPrint('Notifications initialized successfully');
-  } catch (e) {
-    debugPrint('Failed to initialize notifications: $e');
-    // Continue app initialization even if notifications fail
-  }
+  // Initialize notifications in background
+  Future.microtask(() async {
+    try {
+      await NotificationService().initialize();
+      debugPrint('Notifications initialized successfully');
+    } catch (e) {
+      debugPrint('Failed to initialize notifications: $e');
+    }
+  });
   
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-
-  // 💡 Remove native splash screen once initialization is complete
-  FlutterNativeSplash.remove();
 
   runApp(
     MultiProvider(

@@ -164,7 +164,7 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
         final selectedSalary = json.decode(selectedSalaryStr);
         mergedData['salary'] = selectedSalary['amount']?.toString() ?? '0';
         mergedData['employer'] = selectedSalary['employer'];
-        _uploadedFiles['salary'] = 'Verified through Dakhli';
+        _uploadedFiles['salary'] = 'Verified Digitally';
         dataSource['salary'] = 'selected_salary_data';
       } else if (dakhliSalaryStr != null) {
         final dakhliData = json.decode(dakhliSalaryStr);
@@ -174,7 +174,7 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
             double.parse(a['amount'].toString()) > double.parse(b['amount'].toString()) ? a : b);
           mergedData['salary'] = highestSalary['amount']?.toString() ?? '0';
           mergedData['employer'] = highestSalary['employer'];
-          _uploadedFiles['salary'] = 'Verified through Dakhli';
+          _uploadedFiles['salary'] = 'Verified Digitally';
           dataSource['salary'] = 'dakhli_salary_data';
         }
       }
