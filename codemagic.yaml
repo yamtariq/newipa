@@ -42,7 +42,7 @@ workflows:
           # Force rebuild all targets
           xcodebuild clean -workspace Runner.xcworkspace -scheme Runner
           
-          # Build with proper module settings
+          # Build with proper module and optimization settings
           xcodebuild build \
             -workspace Runner.xcworkspace \
             -scheme Runner \
@@ -56,9 +56,14 @@ workflows:
             COMPILER_INDEX_STORE_ENABLE=NO \
             DEFINES_MODULE=YES \
             SWIFT_COMPILATION_MODE=wholemodule \
+            SWIFT_OPTIMIZATION_LEVEL="-Onone" \
             ENABLE_BITCODE=NO \
             ONLY_ACTIVE_ARCH=NO \
-            DEBUG_INFORMATION_FORMAT=dwarf
+            DEBUG_INFORMATION_FORMAT=dwarf \
+            GCC_OPTIMIZATION_LEVEL=0 \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=NO \
+            ENABLE_PREVIEWS=NO \
+            ENABLE_TESTABILITY=YES
             
           # Find the built app
           APP_PATH=$(find build/DerivedData -name "Runner.app" | grep Release-iphoneos)
