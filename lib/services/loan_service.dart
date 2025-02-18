@@ -221,21 +221,45 @@ class LoanService {
       
       // 💡 Create a custom HttpClient that accepts self-signed certificates
       final client = HttpClient()
-        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true)
+        ..connectionTimeout = const Duration(seconds: 60); // Increased timeout
 
-      final request = await client.postUrl(Uri.parse(Constants.endpointCreateCustomer));
+      // 💡 Prepare proxy request with structured format
+      final targetUrl = Uri.parse(Constants.endpointCreateCustomer).toString();
+      print('\nTarget URL before encoding: $targetUrl');
       
-      // 💡 Combine both proxy and bank headers
+      final proxyRequest = {
+        'TargetUrl': targetUrl,
+        'Method': 'POST',
+        'InternalHeaders': {
+          ...Constants.bankApiHeaders,
+          'Content-Type': 'application/json',
+        },
+        'Body': requestData
+      };
+
+      final proxyUrl = Uri.parse('${Constants.apiBaseUrl}/proxy/forward');
+      print('\nProxy URL: $proxyUrl');
+      
+      final request = await client.postUrl(proxyUrl);
+      
+      // Add proxy headers
       final headers = {
-        ...Constants.defaultHeaders,  // Proxy headers with api-key
-        'bank-headers': base64.encode(utf8.encode(json.encode(Constants.bankApiHeaders))),  // Bank headers encoded for proxy
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'x-api-key': Constants.apiKey,
       };
       
-      print('\n2. Request Headers:');
-      print('Headers: ${headers.map((key, value) => MapEntry(key, key.toLowerCase() == 'authorization' || key.toLowerCase() == 'bank-headers' ? '[REDACTED]' : value))}');
-
-      print('\n3. REQUEST BODY DETAILS:');
-      print('   National ID: ${requestData['nationnalID']}');
+      // Log request details
+      print('\n=== CREATE CUSTOMER REQUEST DETAILS ===');
+      print('Proxy Endpoint: ${Constants.apiBaseUrl}/proxy/forward');
+      print('Target URL: ${Constants.endpointCreateCustomer}');
+      print('Headers:');
+      headers.forEach((key, value) {
+        print('$key: ${key.toLowerCase() == 'authorization' ? '[REDACTED]' : value}');
+      });
+      print('\nProxy Request Body:');
+      print(const JsonEncoder.withIndent('  ').convert(proxyRequest));
 
       // Add headers
       headers.forEach((key, value) {
@@ -243,7 +267,7 @@ class LoanService {
       });
       
       // Add body
-      request.write(jsonEncode(requestData));
+      request.write(jsonEncode(proxyRequest));
       
       final response = await request.close();
       final responseBody = await response.transform(utf8.decoder).join();

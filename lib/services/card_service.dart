@@ -139,13 +139,20 @@ class CardService {
       // 💡 Format dates to match API requirements (yyyy/mm/dd)
       String formatHijriDate(String? inputDate) {
         if (inputDate == null) return '1444/01/01';
+        
+        // If already in yyyy-mm-dd format, just replace - with /
+        if (RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(inputDate)) {
+          return inputDate.replaceAll('-', '/');
+        }
+        
         final parts = inputDate.split('-');
         if (parts.length == 3) {
-          // 💡 Ensure each part is padded with leading zeros
-          final day = parts[0].padLeft(2, '0');
-          final month = parts[1].padLeft(2, '0');
-          final year = parts[2].padLeft(4, '0');
-          // Return in yyyy/mm/dd format
+          // Input is in dd-mm-yyyy format
+          final day = parts[0];
+          final month = parts[1];
+          final year = parts[2];
+          
+          // Return in yyyy/mm/dd format without padding year
           return '$year/$month/$day';
         }
         return inputDate;
@@ -205,31 +212,51 @@ class CardService {
 
       // Create a custom HttpClient that accepts self-signed certificates
       final client = HttpClient()
-        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true)
+        ..connectionTimeout = const Duration(seconds: 60); // Increased timeout
 
-      final request = await client.postUrl(Uri.parse(Constants.endpointCreateCustomer));
+      // 💡 Prepare proxy request with structured format
+      final targetUrl = Uri.parse(Constants.endpointCreateCustomer).toString();
+      print('\nTarget URL before encoding: $targetUrl');
       
-      // 💡 Combine both proxy and bank headers
+      final proxyRequest = {
+        'TargetUrl': targetUrl,
+        'Method': 'POST',
+        'InternalHeaders': {
+          ...Constants.bankApiHeaders,
+          'Content-Type': 'application/json',
+        },
+        'Body': requestData
+      };
+
+      final proxyUrl = Uri.parse('${Constants.apiBaseUrl}/proxy/forward');
+      print('\nProxy URL: $proxyUrl');
+      
+      final request = await client.postUrl(proxyUrl);
+      
+      // 💡 Add proxy headers
       final headers = {
-        ...Constants.defaultHeaders,  // Proxy headers with api-key
-        'bank-headers': base64.encode(utf8.encode(json.encode(Constants.bankApiHeaders))),  // Bank headers encoded for proxy
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'x-api-key': Constants.apiKey,
       };
       
       // 💡 Log complete request details
       print('\n=== CREATE CUSTOMER REQUEST DETAILS ===');
-      print('Endpoint: ${Constants.endpointCreateCustomer}');
+      print('Proxy Endpoint: ${Constants.apiBaseUrl}/proxy/forward');
+      print('Target URL: ${Constants.endpointCreateCustomer}');
       print('Headers:');
       headers.forEach((key, value) {
-        print('$key: ${key.toLowerCase() == 'authorization' || key.toLowerCase() == 'bank-headers' ? '[REDACTED]' : value}');
+        print('$key: ${key.toLowerCase() == 'authorization' ? '[REDACTED]' : value}');
       });
-      print('\nRequest Body:');
-      print(const JsonEncoder.withIndent('  ').convert(requestData));
+      print('\nProxy Request Body:');
+      print(const JsonEncoder.withIndent('  ').convert(proxyRequest));
 
       // Set headers and send request
       headers.forEach((key, value) {
         request.headers.set(key, value);
       });
-      request.write(jsonEncode(requestData));
+      request.write(jsonEncode(proxyRequest));
       
       // Get response
       final response = await request.close();

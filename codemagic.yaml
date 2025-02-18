@@ -24,6 +24,12 @@ workflows:
           flutter create --platforms ios .
           flutter pub get
           
+      - name: Set iOS deployment target
+        script: |
+          cd ios
+          LC_ALL=C find . -type f -name "*.pbxproj" -exec sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 12.0/IPHONEOS_DEPLOYMENT_TARGET = 14.0/g' {} +
+          cd ..
+          
       - name: Install CocoaPods
         script: |
           cd ios
@@ -31,16 +37,6 @@ workflows:
           rm -rf Pods Podfile.lock
           pod cache clean --all
           pod install --repo-update
-          cd ..
-          
-      - name: Update build settings
-        script: |
-          cd ios
-          /usr/libexec/PlistBuddy -c "Set :SWIFT_VERSION 5.0" Runner/Info.plist
-          
-          # Update project.pbxproj settings
-          sed -i '' 's/SWIFT_OPTIMIZATION_LEVEL = "-Onone";/SWIFT_OPTIMIZATION_LEVEL = "-O";/g' Runner.xcodeproj/project.pbxproj
-          sed -i '' 's/SWIFT_COMPILATION_MODE = "singlefile";/SWIFT_COMPILATION_MODE = "wholemodule";/g' Runner.xcodeproj/project.pbxproj
           cd ..
           
       - name: Build unsigned IPA

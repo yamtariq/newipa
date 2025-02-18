@@ -227,10 +227,10 @@ class Constants {
   
   // 💡 Bank API Endpoints
   static String endpointCreateCustomer = 
-      '$apiBaseUrl/proxy/forward?url=https://172.22.226.203:9443/api/Bank/CreateCustomer';
+      'https://172.22.226.203:9443/api/Bank/CreateCustomer';
 
   static String endpointFinnoneUpdateAmount = 
-      '$apiBaseUrl/proxy/forward?url=http://172.22.226.189:100/api/v1/Finnone/UpdateAmount';
+      'http://172.22.226.189:100/api/v1/Finnone/UpdateAmount';
 
 //   static String endpointCreateCustomer = 
 //       '$apiBaseUrl/proxy/forward?url=https://icreditdept.com/api/Bank/test_local_CreateCustomer.php';
@@ -245,7 +245,7 @@ class Constants {
 
   // 💡 Bank Customer Update Endpoint
   static String endpointUpdateCustomer = 
-      '$apiBaseUrl/proxy/forward?url=https://172.22.226.203:9443/api/Bank/UpdateCustomer';
+      'https://172.22.226.203:9443/api/Bank/UpdateCustomer';
 
 // static String endpointUpdateCustomer = 
 //       '$apiBaseUrl/proxy/forward?url=https://icreditdept.com/api/Bank/test_local_UpdateCustomer.php';

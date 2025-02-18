@@ -41,39 +41,52 @@ class _CardOfferScreenState extends State<CardOfferScreen> {
   String? _cardTypeAr;
   bool _shouldContactSupport = false;
 
-  // 💡 Add new variables for slider
-  late int _originalCreditLimit;
-  late int _minCreditLimit;
-  late int _maxCreditLimit;
-
   @override
   void initState() {
     super.initState();
-    _creditLimit = widget.maxCreditLimit;
-    _originalCreditLimit = widget.maxCreditLimit;
-    _minCreditLimit = math.max(2000, widget.minCreditLimit);
-    _maxCreditLimit = widget.maxCreditLimit;
+    
+    // 💡 First check for errors in the response
+    if (widget.userData['success'] == false) {
+      _error = widget.isArabic 
+        ? 'عذراً، لا يمكن المتابعة'
+        : 'Sorry, cannot proceed';
+      
+      // Check if there are any errors in the response
+      if (widget.userData['errors'] != null && widget.userData['errors'] is List && widget.userData['errors'].isNotEmpty) {
+        final error = widget.userData['errors'][0];
+        if (error['errorCode'] == '2-201') {
+          // This is a case where card request is already in process
+          _error = widget.isArabic 
+            ? 'طلب البطاقة قيد المعالجة بالفعل. يرجى التواصل مع خدمة العملاء لمزيد من المعلومات.'
+            : 'Card request is already in process. Please contact customer support for more information.';
+          _shouldContactSupport = true;
+        } else {
+          // Handle other error cases
+          _error = widget.isArabic 
+            ? (error['errorDesc'] ?? 'حدث خطأ غير متوقع')
+            : (error['errorDesc'] ?? 'An unexpected error occurred');
+        }
+      }
+      return;
+    }
+    
+    // 💡 If no errors, proceed with normal initialization
+    _creditLimit = widget.userData['eligibleAmount'] != null 
+      ? int.tryParse(widget.userData['eligibleAmount'].toString()) ?? widget.maxCreditLimit
+      : widget.maxCreditLimit;
+    
+    // 💡 Ensure credit limit is within bounds
+    if (_creditLimit < 2000) _creditLimit = 2000;
+    if (_creditLimit > 50000) _creditLimit = 50000;
+    
     _cardType = widget.userData['card_type']; // Get card type from userData
     _cardTypeAr = widget.userData['card_type_ar']; // Get Arabic card type from userData
     _applicationNumber = widget.userData['application_number'];
-    
-    // Check if this is an error response and set appropriate state
-    if (widget.userData['status'] == 'error') {
-      _error = widget.isArabic 
-        ? (widget.userData['message_ar'] ?? widget.userData['message'])
-        : widget.userData['message'];
-      _shouldContactSupport = widget.userData['should_contact_support'] ?? false;
-    }
   }
 
-  // 💡 Update credit limit method to respect new minimum
   void _updateCreditLimit(double value) {
     setState(() {
-      // Round to nearest thousand and ensure minimum of 2000
-      _creditLimit = math.max(2000, (value ~/ 1000) * 1000);
-      print('DEBUG - Credit Limit Update:');
-      print('Requested Amount: $value');
-      print('Final Amount: $_creditLimit');
+      _creditLimit = value.round();
     });
   }
 
@@ -191,8 +204,8 @@ class _CardOfferScreenState extends State<CardOfferScreen> {
               const SizedBox(height: 16),
               Text(
                 widget.isArabic 
-                  ? 'حد البطاقة: ${_creditLimit.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} ريال'
-                  : 'Card Limit: SAR ${_creditLimit.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                  ? 'حد الائتمان المقدم: ${_creditLimit.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} ريال'
+                  : 'Offered Credit Limit: SAR ${_creditLimit.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
                 textDirection: TextDirection.ltr,
               ),
             ],
@@ -496,7 +509,7 @@ class _CardOfferScreenState extends State<CardOfferScreen> {
                                       const SizedBox(height: 16),
                                       // Card Limit
                                       Text(
-                                        widget.isArabic ? 'حد البطاقة' : 'Card Limit',
+                                        widget.isArabic ? 'حد الائتمان المقدم' : 'Offered Credit Limit',
                                         style: Theme.of(context).textTheme.titleLarge,
                                       ),
                                       const SizedBox(height: 8),
@@ -514,16 +527,19 @@ class _CardOfferScreenState extends State<CardOfferScreen> {
                                               widget.isArabic ? 'ريال ' : 'SAR ',
                                               textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
                                               style: const TextStyle(
-                                                fontSize: 18,
+                                                fontSize: 24,
                                                 fontWeight: FontWeight.bold,
                                                 color: Color(0xFF00A650),
                                               ),
                                             ),
                                             Text(
-                                              ' ' + _creditLimit.toString(),
+                                              _creditLimit.toString().replaceAllMapped(
+                                                RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                                                (Match m) => '${m[1]},'
+                                              ),
                                               textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
                                               style: const TextStyle(
-                                                fontSize: 18,
+                                                fontSize: 24,
                                                 fontWeight: FontWeight.bold,
                                                 color: Color(0xFF00A650),
                                               ),
@@ -531,30 +547,57 @@ class _CardOfferScreenState extends State<CardOfferScreen> {
                                           ],
                                         ),
                                       ),
-                                      const SizedBox(height: 4),
+                                      const SizedBox(height: 16),
                                       // 💡 Add Credit Limit Slider
                                       Directionality(
                                         textDirection: TextDirection.ltr,
                                         child: SliderTheme(
                                           data: SliderThemeData(
-                                            activeTrackColor: Color(0xFF008040),
-                                            inactiveTrackColor: Color(0xFF008040).withOpacity(0.1),
-                                            thumbColor: Color(0xFF008040),
-                                            overlayColor: Color(0xFF008040).withOpacity(0.2),
+                                            activeTrackColor: const Color(0xFF00A650),
+                                            inactiveTrackColor: const Color(0xFF00A650).withOpacity(0.1),
+                                            thumbColor: const Color(0xFF00A650),
+                                            overlayColor: const Color(0xFF00A650).withOpacity(0.2),
+                                            trackHeight: 4.0,
+                                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8.0),
+                                            overlayShape: const RoundSliderOverlayShape(overlayRadius: 16.0),
                                           ),
-                                          child: Slider(
-                                            value: _creditLimit.toDouble(),
-                                            min: _minCreditLimit.toDouble(),
-                                            max: _maxCreditLimit.toDouble(),
-                                            onChanged: _updateCreditLimit,
-                                            divisions: ((_maxCreditLimit - _minCreditLimit) / 1000).round(),
-                                            label: widget.isArabic 
-                                              ? '${_creditLimit.toString()} ريال'
-                                              : 'SAR ${_creditLimit.toString()}',
+                                          child: Column(
+                                            children: [
+                                              Slider(
+                                                value: _creditLimit.toDouble(),
+                                                min: 2000,
+                                                max: 50000,
+                                                onChanged: _updateCreditLimit,
+                                                divisions: 48, // (50000 - 2000) / 1000
+                                              ),
+                                              // 💡 Add min/max labels
+                                              Padding(
+                                                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                                child: Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Text(
+                                                      widget.isArabic ? '2,000 ريال' : 'SAR 2,000',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      widget.isArabic ? '50,000 ريال' : 'SAR 50,000',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(height: 16),
+                                      const SizedBox(height: 24),
                                     ],
                                   ),
                                 ),

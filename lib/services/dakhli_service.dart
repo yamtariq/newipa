@@ -8,19 +8,38 @@ import 'package:shared_preferences/shared_preferences.dart';
 class DakhliService {
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
-  // 💡 Helper method to format date from Hijri (dd-MM-yyyy) to Gregorian (yyyy-MM-dd)
+  // 💡 Helper method to format date from any format to API format (yyyy-mm-dd)
   String _formatDateForApi(String hijriDate) {
     try {
-      // Split the Hijri date
-      final parts = hijriDate.split('-');
-      if (parts.length != 3) throw Exception('Invalid date format');
+      // If already in yyyy-mm-dd format, return as is
+      if (RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(hijriDate)) {
+        return hijriDate;
+      }
       
-      // Ensure each part is padded with leading zeros if needed
-      final day = parts[0].padLeft(2, '0');
-      final month = parts[1].padLeft(2, '0');
-      final year = parts[2].padLeft(4, '0');
+      String day, month, year;
       
-      // Return in yyyy-MM-dd format
+      if (hijriDate.contains('/')) {
+        // Handle date in yyyy/mm/dd format
+        final parts = hijriDate.split('/');
+        if (parts.length != 3) throw Exception('Invalid date format');
+        year = parts[0];
+        month = parts[1];
+        day = parts[2];
+      } else {
+        // Handle date in dd-mm-yyyy format
+        final parts = hijriDate.split('-');
+        if (parts.length != 3) throw Exception('Invalid date format');
+        day = parts[0];
+        month = parts[1];
+        year = parts[2];
+      }
+      
+      // Ensure proper formatting
+      year = year.padLeft(4, '0');
+      month = month.padLeft(2, '0');
+      day = day.padLeft(2, '0');
+      
+      // Return in yyyy-mm-dd format
       return '$year-$month-$day';
     } catch (e) {
       print('❌ Error formatting date: $e');
