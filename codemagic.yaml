@@ -10,21 +10,71 @@ workflows:
       vars:
         BUNDLE_ID: "com.nayifat.nayifatApp"
     scripts:
-      - name: Set up
+      - name: Clean and Setup
         script: |
           flutter clean
           flutter pub get
           
-      - name: Remove existing iOS directory
+      - name: Remove iOS directory
         script: |
           rm -rf ios
           
-      - name: Create fresh iOS build
+      - name: Create fresh iOS project
         script: |
           flutter create --platforms ios .
           flutter pub get
           
-      - name: Install pods
+      - name: Update Podfile
+        script: |
+          cd ios
+          echo "platform :ios, '14.0'
+          
+          # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
+          ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+          
+          project 'Runner', {
+            'Debug' => :debug,
+            'Profile' => :release,
+            'Release' => :release,
+          }
+          
+          def flutter_root
+            generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+            unless File.exist?(generated_xcode_build_settings_path)
+              raise \"#{generated_xcode_build_settings_path} must exist. If you are running pod install manually, make sure flutter pub get is executed first\"
+            end
+          
+            File.foreach(generated_xcode_build_settings_path) do |line|
+              matches = line.match(/FLUTTER_ROOT\=(.*)/)
+              return matches[1].strip if matches
+            end
+            raise \"FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}\"
+          end
+          
+          require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+          
+          flutter_ios_podfile_setup
+          
+          target 'Runner' do
+            use_frameworks!
+            use_modular_headers!
+            
+            flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+          end
+          
+          post_install do |installer|
+            installer.pods_project.targets.each do |target|
+              flutter_additional_ios_build_settings(target)
+              target.build_configurations.each do |config|
+                config.build_settings['ENABLE_BITCODE'] = 'NO'
+                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+                config.build_settings['SWIFT_VERSION'] = '5.0'
+                config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
+              end
+            end
+          end" > Podfile
+          
+      - name: Install Pods
         script: |
           cd ios
           pod install
@@ -32,27 +82,13 @@ workflows:
           
       - name: Build unsigned IPA
         script: |
-          cd ios
-          xcodebuild clean archive \
-            -workspace Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -sdk iphoneos \
-            -archivePath build/Runner.xcarchive \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM=""
-            
-          mkdir -p build/ios/ipa/Payload
-          cp -r build/Runner.xcarchive/Products/Applications/Runner.app build/ios/ipa/Payload/
-          cd build/ios/ipa
-          zip -qr Runner.ipa Payload
-          rm -rf Payload
+          # Build IPA using Flutter
+          flutter build ipa --release --no-codesign
           
+          # The IPA will be in build/ios/ipa/
+            
     artifacts:
       - build/ios/ipa/*.ipa
-      - ios/build/**/*.app
       
     publishing:
       email:
