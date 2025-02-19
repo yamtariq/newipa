@@ -331,11 +331,11 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
 
       // 💡 First call the UpdateAmount API
       final updateAmountData = {
-        'AgreementId': widget.userData['application_number']?.toString() ?? '',
-        'Amount': financeAmount,
+        'AgreementId': widget.userData['result']?['applicationId']?.toString() ?? '',
+        'Amount': double.parse(financeAmount.toStringAsFixed(2)),
         'Tenure': tenure,
-        'FinEmi': emi,
-        'RateEliGible': _flatRate * 100
+        'FinEmi': double.parse(emi.toStringAsFixed(2)),
+        'RateEliGible': _flatRate < 0 ? 1 : double.parse((_flatRate * 100).toStringAsFixed(2))
       };
 
       print('DEBUG - Calling UpdateAmount API:');
@@ -421,7 +421,7 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
         'noteUser': 'CUSTOMER',
         'loan_emi': double.parse(emi.toStringAsFixed(2)),
         'national_id': userData['national_id'],  // 💡 Use national ID from secure storage
-        'application_no': int.tryParse(widget.userData['application_number']?.toString() ?? '') ?? 0,
+        'application_no': widget.userData['result']?['applicationId']?.toString() ?? '0', // 💡 Use applicationId from result
         'consent_status': 'True',
         'nafath_status': 'True',
         'loan_amount': double.parse(financeAmount.toStringAsFixed(2)),

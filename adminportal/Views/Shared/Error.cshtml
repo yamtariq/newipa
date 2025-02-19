@@ -1,0 +1,29 @@
+@using AdminPortal.Models
+@model ErrorViewModel
+@{
+    ViewData["Title"] = "Error";
+}
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h1 class="text-danger mb-4">Error</h1>
+                    <h2 class="mb-4">An error occurred while processing your request.</h2>
+
+                    @if (Model.ShowRequestId)
+                    {
+                        <p class="text-muted">
+                            <strong>Request ID:</strong> <code>@Model.RequestId</code>
+                        </p>
+                    }
+
+                    <a href="/" class="btn btn-primary">
+                        <i class="bi bi-house"></i> Back to Home
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'dart:math';  // 💡 Added for max function
 import 'package:file_picker/file_picker.dart';
 import '../../widgets/custom_button.dart';
 import 'loan_offer_screen.dart';
@@ -12,6 +13,7 @@ import '../../services/document_upload_service.dart';
 import '../../services/loan_service.dart';
 import 'package:lottie/lottie.dart';
 import 'loan_application_status_screen.dart';
+import '../../services/iban_verification_service.dart';
 
 class LoanApplicationDetailsScreen extends StatefulWidget {
   final bool isArabic;
@@ -30,6 +32,7 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
   bool _consentAccepted = false;
   bool get isArabic => widget.isArabic;
   late final AnimationController _rotationController;
+  bool _ibanVerificationEnabled = true; // �� Added for testing
 
   @override
   void initState() {
@@ -167,7 +170,7 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
         final selectedSalary = json.decode(selectedSalaryStr);
         mergedData['salary'] = selectedSalary['amount']?.toString() ?? '0';
         mergedData['employer'] = selectedSalary['employer'];
-        _uploadedFiles['salary'] = 'Verified Digitally';
+        _uploadedFiles['salary'] = isArabic ? 'تم التحقق رقمياً' : 'Verified Digitally';
         dataSource['salary'] = 'selected_salary_data';
       } else if (dakhliSalaryStr != null) {
         final dakhliData = json.decode(dakhliSalaryStr);
@@ -177,7 +180,7 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
             double.parse(a['amount'].toString()) > double.parse(b['amount'].toString()) ? a : b);
           mergedData['salary'] = highestSalary['amount']?.toString() ?? '0';
           mergedData['employer'] = highestSalary['employer'];
-          _uploadedFiles['salary'] = 'Verified Digitally';
+          _uploadedFiles['salary'] = isArabic ? 'تم التحقق رقمياً' : 'Verified Digitally';
           dataSource['salary'] = 'dakhli_salary_data';
         }
       }
@@ -280,6 +283,13 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
       print('Field $field is being updated from "$currentValue" to "$newValue"');
       setState(() {
         if (field == 'ibanNo') {
+          // 💡 Handle IBAN verification based on toggle state
+          if (!_ibanVerificationEnabled) {
+            print('IBAN verification disabled, using dummy number');
+            _userData['ibanNo'] = 'SA1111111111111111111111';
+            _uploadedFiles['ibanNo'] = isArabic ? 'تم التحقق رقمياً' : 'Verified Digitally';
+            return;
+          }
           // Ensure IBAN starts with SA and handle null safety
           String formattedIban = newValue.startsWith('SA') ? newValue : 'SA$newValue';
           print('Formatted IBAN: $formattedIban');
@@ -494,10 +504,73 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
 
   Widget _buildUpdateDialog(String field, String currentValue) {
     final controller = TextEditingController(text: currentValue);
-    final bool requiresDocument = field == 'salary' || field == 'ibanNo';
+    final bool requiresDocument = field == 'salary';
     String? fileName = _uploadedFiles[field];
     bool showDocumentUpload = field != 'salary';
     String? validationError;
+    Map<String, dynamic>? verificationData;
+    bool isVerifying = false;
+
+    void setError(String? error) {
+      validationError = error;
+    }
+
+    void setVerificationData(Map<String, dynamic>? data) {
+      verificationData = data;
+      isVerifying = false;
+    }
+
+    // 💡 Add function to show result popup
+    void showResultPopup(BuildContext context, bool success, String message) {
+      final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+      final primaryColor = Color(themeProvider.isDarkMode 
+          ? Constants.darkPrimaryColor 
+          : Constants.lightPrimaryColor);
+      final surfaceColor = Color(themeProvider.isDarkMode 
+          ? Constants.darkSurfaceColor 
+          : Constants.lightSurfaceColor);
+      final textColor = Color(themeProvider.isDarkMode 
+          ? Constants.darkLabelTextColor 
+          : Constants.lightLabelTextColor);
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: surfaceColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          title: Row(
+            children: [
+              Icon(
+                success ? Icons.check_circle : Icons.error,
+                color: success ? Colors.green : Colors.red,
+                size: 24,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                success 
+                  ? (isArabic ? 'تم التحقق بنجاح' : 'Verification Successful')
+                  : (isArabic ? 'فشل التحقق' : 'Verification Failed'),
+                style: TextStyle(
+                  color: textColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            message,
+            style: TextStyle(color: textColor),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              style: TextButton.styleFrom(foregroundColor: primaryColor),
+              child: Text(isArabic ? 'حسناً' : 'OK'),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Directionality(
       textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
@@ -544,7 +617,7 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
-                if (field == 'ibanNo')
+                if (field == 'ibanNo') ...[
                   Container(
                     decoration: BoxDecoration(
                       border: Border.all(color: borderColor),
@@ -578,7 +651,7 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                             textDirection: TextDirection.ltr,
                             style: TextStyle(color: textColor),
                             decoration: InputDecoration(
-                              hintText: isArabic ? 'أدخل ٢٢ رقم' : 'Enter 22 digits',
+                              hintText: isArabic ? 'أدخل رقم الآيبان' : 'Enter IBAN number',
                               hintStyle: TextStyle(color: hintColor),
                               errorText: validationError,
                               errorStyle: TextStyle(
@@ -588,36 +661,76 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                               border: InputBorder.none,
                               contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                             ),
-                            keyboardType: TextInputType.number,
+                            keyboardType: TextInputType.text,
                             onChanged: (value) {
-                              String cleanValue = value.replaceAll(RegExp(r'\D'), '');
-                              if (cleanValue != value) {
+                              // 💡 Clean input: remove spaces and SA prefix if present
+                              String cleanValue = value.replaceAll(RegExp(r'\s+'), '');
+                              if (cleanValue.toUpperCase().startsWith('SA')) {
+                                cleanValue = cleanValue.substring(2);
+                              }
+                              
+                              // Remove non-numeric characters
+                              cleanValue = cleanValue.replaceAll(RegExp(r'\D'), '');
+                              
+                              // Only update if the clean value is different
+                              if (cleanValue != controller.text) {
+                                // Keep cursor position relative to the number of removed characters
+                                final cursorPosition = controller.selection.baseOffset;
+                                final lengthDiff = value.length - cleanValue.length;
                                 controller.text = cleanValue;
-                                controller.selection = TextSelection.fromPosition(
-                                  TextPosition(offset: cleanValue.length)
-                                );
+                                if (cursorPosition > 0) {
+                                  controller.selection = TextSelection.fromPosition(
+                                    TextPosition(offset: max(0, cursorPosition - lengthDiff))
+                                  );
+                                }
                               }
                               
                               setDialogState(() {
                                 if (cleanValue.isEmpty) {
                                   validationError = isArabic ? 'رقم الآيبان مطلوب' : 'IBAN is required';
-                                } else if (cleanValue.length != 22) {
+                                } else if (cleanValue.length > 22) {
                                   validationError = isArabic 
-                                    ? 'يجب أن يكون ٢٢ رقم (${cleanValue.length}/22)'
-                                    : 'Must be 22 digits (${cleanValue.length}/22)';
+                                    ? 'يجب أن لا يزيد عن ٢٢ رقم'
+                                    : 'Must not exceed 22 digits';
+                                } else if (cleanValue.length < 22) {
+                                  validationError = isArabic 
+                                    ? 'يجب إدخال ٢٢ رقم (${cleanValue.length}/22)'
+                                    : 'Must enter 22 digits (${cleanValue.length}/22)';
                                 } else {
                                   validationError = null;
                                 }
                               });
                             },
-                            maxLength: 22,
-                            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                           ),
                         ),
                       ],
                     ),
-                  )
-                else
+                  ),
+                  if (isVerifying)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            isArabic ? 'جاري التحقق...' : 'Verifying...',
+                            style: TextStyle(
+                              color: textColor,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ] else
                   TextField(
                     controller: controller,
                     textAlign: isArabic ? TextAlign.right : TextAlign.left,
@@ -822,14 +935,7 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
             ),
             actions: [
               TextButton(
-                onPressed: () {
-                  if (field == 'ibanNo' && fileName != null && fileName != _uploadedFiles['ibanNo']) {
-                    setState(() {
-                      _uploadedFiles.remove('ibanNo');
-                    });
-                  }
-                  Navigator.pop(context);
-                },
+                onPressed: () => Navigator.pop(context),
                 style: TextButton.styleFrom(
                   foregroundColor: hintColor,
                 ),
@@ -838,26 +944,77 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
               TextButton(
                 onPressed: validationError != null
                     ? null
-                    : () {
-                        String finalValue = controller.text;
+                    : () async {
                         if (field == 'ibanNo') {
-                          finalValue = 'SA$finalValue';
-                          if (fileName != null) {
-                            setState(() {
-                              _uploadedFiles['ibanNo'] = fileName!;
-                            });
-                          }
-                        } else if (field == 'salary' && finalValue != currentValue) {
-                          if (fileName == null) {
+                          final cleanValue = controller.text;
+                          if (cleanValue.length != 22) {
                             setDialogState(() {
                               validationError = isArabic 
-                                ? 'يجب تحميل خطاب الراتب'
-                                : 'Salary letter is required';
+                                ? 'يجب أن يكون ٢٢ رقم'
+                                : 'Must be 22 digits';
                             });
                             return;
                           }
+
+                          // 💡 Handle IBAN verification based on toggle state
+                          if (!_ibanVerificationEnabled) {
+                            print('IBAN verification disabled, using dummy number');
+                            setState(() {
+                              _userData['ibanNo'] = 'SA1111111111111111111111';
+                              _uploadedFiles['ibanNo'] = isArabic ? 'تم التحقق رقمياً' : 'Verified Digitally';
+                            });
+                            Navigator.pop(context, 'SA1111111111111111111111');
+                            showResultPopup(
+                              context, 
+                              true, 
+                              isArabic
+                                ? 'تم التحقق من الايبان بنجاح (وضع الاختبار)'
+                                : 'IBAN verified successfully (Test Mode)'
+                            );
+                            return;
+                          }
+
+                          setDialogState(() => isVerifying = true);
+                          print('\n=== IBAN VERIFICATION START ===');
+                          print('IBAN to verify: SA$cleanValue');
+                          
+                          final ibanService = IbanVerificationService();
+                          final result = await ibanService.verifyIban('SA$cleanValue');
+                          print('Verification result: $result');
+                          
+                          setDialogState(() => isVerifying = false);
+
+                          if (!result['success']) {
+                            print('Verification failed: ${result['error']} (${result['errorType']})');
+                            showResultPopup(context, false, isArabic ? result['error_ar'] : result['error']);
+                            return;
+                          }
+
+                          print('Verification successful: ${result['data']}');
+                          final verificationData = result['data'];
+                          
+                          // Update the IBAN and mark as verified
+                          setState(() {
+                            _userData['ibanNo'] = 'SA$cleanValue';
+                            _uploadedFiles['ibanNo'] = isArabic ? 'تم التحقق رقمياً' : 'Verified Digitally';
+                          });
+
+                          // First close the update dialog
+                          Navigator.pop(context, 'SA$cleanValue');
+
+                          // Then show the success popup
+                          showResultPopup(
+                            context, 
+                            true, 
+                            isArabic
+                              ? 'تم التحقق من الايبان بنجاح'
+                              : 'IBAN verified successfully'
+                          );
+
+                          print('=== IBAN VERIFICATION END ===\n');
+                        } else {
+                          Navigator.pop(context, controller.text);
                         }
-                        Navigator.pop(context, finalValue);
                       },
                 style: TextButton.styleFrom(
                   foregroundColor: primaryColor,
@@ -956,12 +1113,42 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '${isArabic ? arabicLabel : label}${isRequired ? ' *' : ''}',
-            style: TextStyle(
-              fontSize: 14,
-              color: hintColor,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${isArabic ? arabicLabel : label}${isRequired ? ' *' : ''}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: hintColor,
+                  ),
+                ),
+              ),
+              // 💡 Add toggle button for IBAN field
+              if (label == 'IBAN')
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      isArabic ? 'تفعيل التحقق' : 'Enable Verification',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: hintColor,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Switch(
+                      value: _ibanVerificationEnabled,
+                      onChanged: (value) {
+                        setState(() {
+                          _ibanVerificationEnabled = value;
+                        });
+                      },
+                      activeColor: primaryColor,
+                    ),
+                  ],
+                ),
+            ],
           ),
           const SizedBox(height: 4),
           Row(
@@ -1071,16 +1258,6 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
           },
           required: true,
         ),
-        // IBAN Certificate
-        _buildDocumentUpload(
-          'IBAN Certificate',
-          _uploadedFiles['ibanNo'],
-          () {
-            print('IBAN upload clicked');
-            _pickFile('ibanNo');
-          },
-          required: true,
-        ),
         // Salary Document (only if salary was changed)
         if (_salaryChanged || _uploadedFiles.containsKey('salary'))
           _buildDocumentUpload(
@@ -1170,8 +1347,6 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
     switch (englishLabel) {
       case 'National ID':
         return 'بطاقة الهوية';
-      case 'IBAN Certificate':
-        return 'شهادة الآيبان';
       case 'Salary Letter':
         return 'خطاب الراتب';
       default:
@@ -1193,11 +1368,9 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
 
     return Stack(
       children: [
-        // Semi-transparent background
         Container(
           color: Colors.black.withOpacity(0.5),
         ),
-        // Loading content
         Center(
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 32),
@@ -1216,7 +1389,6 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Top fading logo
                 SizedBox(
                   width: 150,
                   height: 150,
@@ -1251,7 +1423,6 @@ class _LoanApplicationDetailsScreenState extends State<LoanApplicationDetailsScr
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
-                // Bottom rotating logo
                 SizedBox(
                   width: 40,
                   height: 40,

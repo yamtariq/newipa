@@ -183,6 +183,12 @@ class AuthService {
       final prefsBiometricUserId = prefs.getString('biometric_user_id');
       final prefsDeviceUserId = prefs.getString('device_user_id');
       
+      // 💡 Also check for user-specific biometric flag
+      final nationalId = await _secureStorage.read(key: 'national_id') ?? 
+                        prefs.getString('national_id');
+      final userSpecificBiometricEnabled = nationalId != null ? 
+          prefs.getBool('biometrics_enabled_$nationalId') : false;
+      
       print('Biometric Status Check:');
       print('- Secure Storage:');
       print('  - Enabled Flag: $biometricEnabled');
@@ -192,12 +198,16 @@ class AuthService {
       print('  - Enabled Flag: $prefsBiometricEnabled');
       print('  - Biometric User ID: $prefsBiometricUserId');
       print('  - Device User ID: $prefsDeviceUserId');
+      print('  - User Specific Flag: $userSpecificBiometricEnabled');
       
       // If data exists in secure storage, sync it to SharedPreferences
       if (biometricEnabled == 'true' && biometricUserId != null && deviceUserId != null) {
         await prefs.setBool('biometrics_enabled', true);
         await prefs.setString('biometric_user_id', biometricUserId);
         await prefs.setString('device_user_id', deviceUserId);
+        if (nationalId != null) {
+          await prefs.setBool('biometrics_enabled_$nationalId', true);
+        }
       }
       // If data exists in SharedPreferences but not in secure storage, sync it back
       else if (prefsBiometricEnabled == true && prefsBiometricUserId != null && prefsDeviceUserId != null) {
@@ -206,9 +216,10 @@ class AuthService {
         await _secureStorage.write(key: 'device_user_id', value: prefsDeviceUserId);
       }
       
-      // Check if enabled in either storage
-      final isEnabled = (biometricEnabled == 'true' && biometricUserId != null && deviceUserId != null && biometricUserId == deviceUserId) ||
-                       (prefsBiometricEnabled == true && prefsBiometricUserId != null && prefsDeviceUserId != null && prefsBiometricUserId == prefsDeviceUserId);
+      // 💡 Check if enabled in either storage or user-specific flag
+      final isEnabled = ((biometricEnabled == 'true' && biometricUserId != null && deviceUserId != null && biometricUserId == deviceUserId) ||
+                       (prefsBiometricEnabled == true && prefsBiometricUserId != null && prefsDeviceUserId != null && prefsBiometricUserId == prefsDeviceUserId)) ||
+                       userSpecificBiometricEnabled;
       
       print('Biometrics enabled: $isEnabled');
       print('=== BIOMETRIC STATUS CHECK END ===\n');

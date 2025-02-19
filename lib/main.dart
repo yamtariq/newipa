@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'services/notification_service.dart';
 import 'services/navigation_service.dart';
 import 'screens/splash_screen.dart';
@@ -25,7 +26,8 @@ import 'providers/theme_provider.dart';
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
   
   // 💡 Set system UI overlay style to transparent to avoid any flash
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -55,6 +57,12 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
+  // Load theme preference
+  final isDarkMode = await ThemeService.isDarkMode();
+
+  // Remove splash screen when initialization is complete
+  FlutterNativeSplash.remove();
+
   runApp(
     MultiProvider(
       providers: [
@@ -65,7 +73,7 @@ void main() async {
           create: (_) => ContentUpdateService(),
         ),
         ChangeNotifierProvider(
-          create: (_) => ThemeProvider(),
+          create: (_) => ThemeProvider()..setDarkMode(isDarkMode),
         ),
       ],
       child: MyApp(initialIsArabic: isArabic),
@@ -187,7 +195,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver, SingleTicker
           },
           home: SplashScreen(isDarkMode: themeProvider.isDarkMode),
           routes: {
-            '/loading': (context) => LoadingScreen(isArabic: isArabic),
             '/home': (context) {
               final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ?? {};
               return FutureBuilder<bool>(

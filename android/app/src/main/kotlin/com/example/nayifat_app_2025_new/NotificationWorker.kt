@@ -462,7 +462,7 @@ class NotificationWorker(
 
         // Build the notification
         val notification = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(R.drawable.notification_icon)  // Use our custom icon
+            .setSmallIcon(R.drawable.nayifatlogocircle_nobg)  // 💡 Use the Nayifat logo as notification icon
             .setContentTitle(title)
             .setContentText(body)
             .setAutoCancel(true)

@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../services/auth_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class SessionProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
@@ -24,27 +26,32 @@ class SessionProvider with ChangeNotifier {
         return;
       }
 
-      print('3. Fetching user data and session status');
-      final userData = await _authService.getUserData();
-      final deviceId = userData?['device_id'] ?? await _authService.getDeviceId();
-      final sessionFromAuth = await _authService.isSessionActive();
-      final hasValidUserData = userData != null && (deviceId != null || userData['device_id'] != null);
+      print('3. Checking session state in storage');
+      final prefs = await SharedPreferences.getInstance();
+      final secureStorage = const FlutterSecureStorage();
+      
+      // Check session state in both storages
+      final secureSessionActive = await secureStorage.read(key: 'session_active') == 'true';
+      final prefsSessionActive = prefs.getBool('session_active') ?? false;
+      
+      // If either storage indicates an active session, consider it active
+      final hasActiveSessionState = secureSessionActive || prefsSessionActive;
       
       print('4. Session status:');
-      print('   - User Data: $userData');
-      print('   - Device ID: $deviceId');
-      print('   - Session from Auth: $sessionFromAuth');
-      print('   - Has Valid User Data: $hasValidUserData');
+      print('   - Secure Storage Session: $secureSessionActive');
+      print('   - SharedPreferences Session: $prefsSessionActive');
+      print('   - Final Session State: $hasActiveSessionState');
 
-      _hasActiveSession = sessionFromAuth;
-      // 💡 Keep signed in if we have valid user data, regardless of session state
-      _isSignedIn = hasValidUserData;
-      print('5. New states:');
-      print('   - isSignedIn: $_isSignedIn');
-      print('   - hasActiveSession: $_hasActiveSession');
+      // Update state if needed
+      if (hasActiveSessionState != _hasActiveSession || hasActiveSessionState != _isSignedIn) {
+        _hasActiveSession = hasActiveSessionState;
+        _isSignedIn = hasActiveSessionState;
+        print('5. State updated:');
+        print('   - isSignedIn: $_isSignedIn');
+        print('   - hasActiveSession: $_hasActiveSession');
+        notifyListeners();
+      }
       
-      print('6. Notifying listeners');
-      notifyListeners();
       print('=== SESSION PROVIDER INITIALIZE END ===\n');
     } catch (e) {
       print('\n!!! ERROR IN SESSION PROVIDER INITIALIZE !!!');
@@ -67,39 +74,36 @@ class SessionProvider with ChangeNotifier {
       print('   - hasActiveSession: $_hasActiveSession');
 
       if (_manualSignOff) {
-        print('2. Manual sign off is true, keeping current isSignedIn state');
+        print('2. Manual sign off is true, keeping current state');
         return;
       }
 
-      print('3. Fetching user data and session status');
-      final userData = await _authService.getUserData();
-      final deviceId = await _authService.getDeviceId();
-      final sessionFromAuth = await _authService.isSessionActive();
-      final hasValidUserData = userData != null && deviceId != null;
+      print('3. Checking session state in storage');
+      final prefs = await SharedPreferences.getInstance();
+      final secureStorage = const FlutterSecureStorage();
+      
+      // Check session state in both storages
+      final secureSessionActive = await secureStorage.read(key: 'session_active') == 'true';
+      final prefsSessionActive = prefs.getBool('session_active') ?? false;
+      
+      // If either storage indicates an active session, consider it active
+      final hasActiveSessionState = secureSessionActive || prefsSessionActive;
       
       print('4. Session status:');
-      print('   - User Data: $userData');
-      print('   - Device ID: $deviceId');
-      print('   - Session from Auth: $sessionFromAuth');
-      print('   - Has Valid User Data: $hasValidUserData');
+      print('   - Secure Storage Session: $secureSessionActive');
+      print('   - SharedPreferences Session: $prefsSessionActive');
+      print('   - Final Session State: $hasActiveSessionState');
 
-      final newHasActiveSession = sessionFromAuth;
-      // 💡 Keep signed in if we have valid user data, regardless of session state
-      final newSignedInState = hasValidUserData;
-      
-      if (newHasActiveSession != _hasActiveSession || newSignedInState != _isSignedIn) {
-        print('5. State change detected');
-        print('   - Old isSignedIn: $_isSignedIn');
-        print('   - New isSignedIn: $newSignedInState');
-        print('   - Old hasActiveSession: $_hasActiveSession');
-        print('   - New hasActiveSession: $newHasActiveSession');
-        _isSignedIn = newSignedInState;
-        _hasActiveSession = newHasActiveSession;
+      // Update state if needed
+      if (hasActiveSessionState != _hasActiveSession || hasActiveSessionState != _isSignedIn) {
+        _hasActiveSession = hasActiveSessionState;
+        _isSignedIn = hasActiveSessionState;
+        print('5. State updated:');
+        print('   - isSignedIn: $_isSignedIn');
+        print('   - hasActiveSession: $_hasActiveSession');
         notifyListeners();
-        print('6. Listeners notified of state change');
-      } else {
-        print('5. No state change needed');
       }
+      
       print('=== SESSION PROVIDER CHECK END ===\n');
     } catch (e) {
       print('\n!!! ERROR IN SESSION PROVIDER CHECK !!!');
@@ -123,14 +127,23 @@ class SessionProvider with ChangeNotifier {
       print('   - manualSignOff: $_manualSignOff');
       print('   - hasActiveSession: $_hasActiveSession');
       
-      print('2. Calling AuthService.signOff()');
+      print('2. Clearing session state from storage');
+      final prefs = await SharedPreferences.getInstance();
+      final secureStorage = const FlutterSecureStorage();
+      
+      await secureStorage.delete(key: 'session_active');
+      await secureStorage.delete(key: 'session_user_id');
+      await prefs.remove('session_active');
+      await prefs.remove('session_user_id');
+      
+      print('3. Calling AuthService.signOff()');
       await _authService.signOff();
-      print('3. AuthService.signOff() completed');
       
       print('4. Updating provider state');
       _hasActiveSession = false;
+      _isSignedIn = false;
       _manualSignOff = true;
-      // Do not change _isSignedIn state
+      
       print('5. New states:');
       print('   - isSignedIn: $_isSignedIn');
       print('   - manualSignOff: $_manualSignOff');

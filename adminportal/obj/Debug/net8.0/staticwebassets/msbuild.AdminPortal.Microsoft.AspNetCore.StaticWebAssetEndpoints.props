@@ -1,0 +1,16 @@
+﻿<Project>
+  <ItemGroup>
+    <StaticWebAssetEndpoint Include="_content/AdminPortal/css/site.css">
+      <AssetFile>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\staticwebassets\css\site.css'))</AssetFile>
+      <Selectors><![CDATA[[]]]></Selectors>
+      <EndpointProperties><![CDATA[[{"Name":"integrity","Value":"sha256-HKG9FQbCIuJa7leKRzStohUfK8MxxxIszfUCbw7Mz\u002BQ="}]]]></EndpointProperties>
+      <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"no-cache"},{"Name":"Content-Length","Value":"778"},{"Name":"Content-Type","Value":"text/css"},{"Name":"ETag","Value":"\u0022HKG9FQbCIuJa7leKRzStohUfK8MxxxIszfUCbw7Mz\u002BQ=\u0022"},{"Name":"Last-Modified","Value":"Wed, 19 Feb 2025 08:23:43 GMT"}]]]></ResponseHeaders>
+    </StaticWebAssetEndpoint>
+    <StaticWebAssetEndpoint Include="_content/AdminPortal/css/site.g757f3r2pv.css">
+      <AssetFile>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\staticwebassets\css\site.css'))</AssetFile>
+      <Selectors><![CDATA[[]]]></Selectors>
+      <EndpointProperties><![CDATA[[{"Name":"fingerprint","Value":"g757f3r2pv"},{"Name":"integrity","Value":"sha256-HKG9FQbCIuJa7leKRzStohUfK8MxxxIszfUCbw7Mz\u002BQ="},{"Name":"label","Value":"_content/AdminPortal/css/site.css"}]]]></EndpointProperties>
+      <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"max-age=31536000, immutable"},{"Name":"Content-Length","Value":"778"},{"Name":"Content-Type","Value":"text/css"},{"Name":"ETag","Value":"\u0022HKG9FQbCIuJa7leKRzStohUfK8MxxxIszfUCbw7Mz\u002BQ=\u0022"},{"Name":"Last-Modified","Value":"Wed, 19 Feb 2025 08:23:43 GMT"}]]]></ResponseHeaders>
+    </StaticWebAssetEndpoint>
+  </ItemGroup>
+</Project>

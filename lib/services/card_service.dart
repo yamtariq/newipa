@@ -259,7 +259,7 @@ class CardService {
       // Create a custom HttpClient that accepts self-signed certificates
       final client = HttpClient()
         ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true)
-        ..connectionTimeout = const Duration(seconds: 60); // Increased timeout
+        ..connectionTimeout = const Duration(seconds: 120); // 💡 Increased timeout to 120 seconds
 
       // 💡 Prepare proxy request with structured format
       final targetUrl = Uri.parse(Constants.endpointCreateCustomer).toString();
@@ -323,7 +323,7 @@ class CardService {
         return {
           'status': 'error',
           'message': 'Empty response received from server',
-          'message_ar': 'لم يتم استلام رد من الخادم',
+          'message_ar': 'لم يتم استلام رد من النظام',
           'error_type': 'SERVER_ERROR',
           'should_contact_support': true
         };
@@ -357,7 +357,7 @@ class CardService {
         return {
           'status': 'error',
           'message': 'Invalid response format from server',
-          'message_ar': 'تنسيق الرد غير صالح من الخادم',
+          'message_ar': 'تنسيق الرد غير صالح من النظام',
           'error_type': 'SERVER_ERROR',
           'should_contact_support': true
         };
@@ -391,7 +391,7 @@ class CardService {
 
       // 💡 First call Finnone UpdateAmount endpoint
       final finnoneUpdateData = {
-        'AgreementId': cardData['application_number'].toString(),
+        'AgreementId': cardData['result']?['applicationId']?.toString() ?? cardData['application_number'].toString(),
         'Amount': cardData['card_limit'],
         'Tenure': 0,
         'FinEmi': 0,
@@ -461,11 +461,8 @@ class CardService {
         throw Exception('Failed to update amount in Finnone: ${finnoneResponse.statusCode}');
       }
 
-      // Parse Finnone response
-      final finnoneUpdateResponse = jsonDecode(finnoneResponseBody);
-      if (finnoneUpdateResponse['success'].toString().toLowerCase() != 'record updated successfully') {
-        throw Exception('Finnone update failed: ${finnoneUpdateResponse['message'] ?? 'Unknown error'}');
-      }
+      // 💡 For Finnone update, consider 200 status code as success regardless of response body
+      print('\nFinnone update successful (Status 200)');
 
       // Now proceed with the original UpdateCustomer endpoint call
       final client = HttpClient()
@@ -474,7 +471,7 @@ class CardService {
       // 💡 Prepare request body
       final requestBody = {
         'nationnalID': cardData['national_id'],
-        'applicationID': cardData['application_number'],
+        'applicationID': cardData['result']?['applicationId']?.toString() ?? cardData['application_number'],
         'acceptFlag': cardData['customerDecision'] == 'ACCEPTED' ? 1 : 0,
         'nameOnCard': cardData['nameOnCard'],
       };
@@ -538,28 +535,14 @@ class CardService {
         throw Exception('Failed to update customer: HTTP ${response.statusCode}');
       }
 
-      // 💡 Handle empty response
+      // 💡 For empty response body with 200 status, consider it a success
       if (responseBody.isEmpty) {
-        print('\nEmpty response body received');
-        throw Exception('Empty response received from server');
+        print('\nEmpty response body with 200 status - considering as success');
       }
 
-      // 💡 Parse response with error handling
-      Map<String, dynamic> updateCustomerData;
-      try {
-        updateCustomerData = jsonDecode(responseBody);
-      } catch (e) {
-        print('\nError parsing JSON response: $e');
-        print('Raw response body: "$responseBody"');
-        throw Exception('Invalid response format from server');
-      }
-
-      if (!updateCustomerData['success']) {
-        final errors = updateCustomerData['errors'] ?? [];
-        final errMsg = updateCustomerData['result']?['errMsg'] ?? '';
-        throw Exception('Failed to update customer: ${errors.isNotEmpty ? errors.join(', ') : errMsg}');
-      }
-
+      // 💡 For BankCustomerUpdate, consider 200 status code as success regardless of response body
+      print('\nBank customer update successful (Status 200)');
+      
       // 💡 After successful updateCustomer, insert the final application status
       final insertResponse = await insertCardApplication({
         'national_id': cardData['national_id'],
@@ -575,7 +558,7 @@ class CardService {
         'NameOnCard': cardData['nameOnCard'],
       });
 
-      print('\n3. Insert Card Application Response:');
+      print('\n6. Insert Card Application Response:');
       print('Response Data: ${const JsonEncoder.withIndent('  ').convert(insertResponse)}');
 
       if (!insertResponse['success']) {

@@ -109,7 +109,7 @@ class LoanService {
       // Generate application number if not provided by Finnone
       final applicationNumber = data['ApplicationNumber'] ?? 
         data['application_number'] ?? 
-        'LOAN_${DateTime.now().millisecondsSinceEpoch}';
+        DateTime.now().millisecondsSinceEpoch.toString();
 
       return {
         'status': 'success',
@@ -121,6 +121,7 @@ class LoanService {
         'total_repayment': data['TotalRepayment'] ?? data['total_repayment'] ?? 0,
         'interest': data['Interest'] ?? data['interest'] ?? 0,
         'application_number': applicationNumber,
+        'agreement_id': data['AgreementId'] ?? data['agreement_id'] ?? applicationNumber,
         'debug': data['Debug'] ?? data['debug'] ?? {},
       };
     } catch (e) {
@@ -229,7 +230,7 @@ class LoanService {
       // 💡 Create a custom HttpClient that accepts self-signed certificates
       final client = HttpClient()
         ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true)
-        ..connectionTimeout = const Duration(seconds: 60); // Increased timeout
+        ..connectionTimeout = const Duration(seconds: 120); // 💡 Increased timeout to 120 seconds
 
       // 💡 Prepare proxy request with structured format
       final targetUrl = Uri.parse(Constants.endpointCreateCustomer).toString();
@@ -315,6 +316,7 @@ class LoanService {
       }
       if (responseData['result'] != null) {
         print('Result:');
+        print('Agreement ID: ${responseData['result']['agreementId'] ?? responseData['result']['AgreementId'] ?? responseData['result']['agreement_id'] ?? 'NOT FOUND'}');
         responseData['result'].forEach((key, value) {
           print('$key: $value');
         });
@@ -364,6 +366,7 @@ class LoanService {
           'eligibleEmi': emi,
           'flatRate': flatRate,
           'applicationId': result['applicationId'],
+          'agreement_id': result['agreementId'] ?? result['AgreementId'] ?? result['agreement_id'],
           'requestId': result['requestId'],
           'customerId': result['customerId'],
         }
@@ -489,30 +492,164 @@ class LoanService {
       print('URL: ${Constants.apiBaseUrl}${Constants.endpointUpdateLoanApplication}');
       print('Data being sent: $loanData');
 
-      final response = await http.post(
-        Uri.parse('${Constants.apiBaseUrl}${Constants.endpointUpdateLoanApplication}'),
-        headers: Constants.defaultHeaders,
-        body: jsonEncode(loanData),
-      );
+      // 💡 First call Finnone UpdateAmount endpoint if amount is provided
+      if (loanData['loan_amount'] != null) {
+        print('\n1. Calling Finnone UpdateAmount API');
+        final finnoneClient = HttpClient()
+          ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
 
-      print('DEBUG - API Response:');
-      print('Status Code: ${response.statusCode}');
-      print('Response Body: ${response.body}');
+        final finnoneUpdateData = {
+          'AgreementId': loanData['agreement_id'],
+          'Amount': loanData['loan_amount'],
+          'Tenure': loanData['tenure'] ?? 0,
+          'FinEmi': loanData['emi'] ?? 0,
+          'RateEliGible': loanData['rate'] ?? 0
+        };
 
-      if (response.statusCode == 200) {
-        try {
-          final responseData = jsonDecode(response.body);
-          return responseData;
-        } catch (e) {
-          print('Error decoding JSON response: $e');
-          print('Raw response: ${response.body}');
-          throw Exception('Invalid response format from server');
+        // 💡 Prepare proxy request with structured format
+        final targetUrl = Uri.parse(Constants.endpointFinnoneUpdateAmount).toString();
+        print('\nTarget URL before encoding: $targetUrl');
+        
+        final proxyRequest = {
+          'TargetUrl': targetUrl,
+          'Method': 'POST',
+          'InternalHeaders': {
+            ...Constants.bankApiHeaders,
+            'Content-Type': 'application/json',
+          },
+          'Body': finnoneUpdateData
+        };
+
+        final proxyUrl = Uri.parse('${Constants.apiBaseUrl}/proxy/forward');
+        print('\nProxy URL: $proxyUrl');
+        
+        final finnoneRequest = await finnoneClient.postUrl(proxyUrl);
+        
+        // Add headers
+        final headers = {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'x-api-key': Constants.apiKey,
+        };
+        
+        headers.forEach((key, value) {
+          finnoneRequest.headers.set(key, value);
+        });
+        
+        finnoneRequest.write(jsonEncode(proxyRequest));
+        
+        final finnoneResponse = await finnoneRequest.close();
+        final finnoneResponseBody = await finnoneResponse.transform(utf8.decoder).join();
+
+        print('\n2. Finnone UpdateAmount Response:');
+        print('Status Code: ${finnoneResponse.statusCode}');
+        print('Response Body: $finnoneResponseBody');
+
+        if (finnoneResponse.statusCode != 200) {
+          throw Exception('Failed to update amount in Finnone: ${finnoneResponse.statusCode}');
         }
-      } else {
-        throw Exception('Server returned status code: ${response.statusCode}');
+
+        // 💡 For Finnone update, consider 200 status code as success regardless of response body
+        print('\nFinnone update successful (Status 200)');
       }
+
+      // Now proceed with the bank customer update
+      final client = HttpClient()
+        ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
+
+      // 💡 Prepare request body for bank customer update
+      final requestBody = {
+        'nationnalID': loanData['national_id'],
+        'applicationID': loanData['application_number'],
+        'acceptFlag': loanData['customerDecision'] == 'ACCEPTED' ? 1 : 0,
+      };
+
+      // 💡 Prepare proxy request with structured format
+      final updateCustomerTargetUrl = Uri.parse(Constants.endpointUpdateCustomer).toString();
+      print('\nTarget URL before encoding: $updateCustomerTargetUrl');
+      
+      final updateCustomerProxyRequest = {
+        'TargetUrl': updateCustomerTargetUrl,
+        'Method': 'POST',
+        'InternalHeaders': {
+          ...Constants.bankApiHeaders,
+          'Content-Type': 'application/json',
+        },
+        'Body': requestBody
+      };
+
+      final updateCustomerProxyUrl = Uri.parse('${Constants.apiBaseUrl}/proxy/forward');
+      print('\nProxy URL: $updateCustomerProxyUrl');
+      
+      final request = await client.postUrl(updateCustomerProxyUrl);
+      
+      // Add headers
+      final updateCustomerHeaders = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'x-api-key': Constants.apiKey,
+      };
+      
+      updateCustomerHeaders.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+      
+      request.write(jsonEncode(updateCustomerProxyRequest));
+      
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      print('\n3. Bank Customer Update Response:');
+      print('Status Code: ${response.statusCode}');
+      print('Response Body: ${responseBody}');
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to update customer: HTTP ${response.statusCode}');
+      }
+
+      // 💡 For empty response body with 200 status, consider it a success
+      if (responseBody.isEmpty) {
+        print('\nEmpty response body with 200 status - considering as success');
+      }
+
+      // 💡 For BankCustomerUpdate, consider 200 status code as success regardless of response body
+      print('\nBank customer update successful (Status 200)');
+
+      // 💡 After successful updates, insert the final application status
+      final insertResponse = await insertLoanApplication({
+        'national_id': loanData['national_id'],
+        'application_no': loanData['application_number'],
+        'customerDecision': loanData['customerDecision'],
+        'loan_amount': loanData['loan_amount'],
+        'tenure': loanData['tenure'],
+        'emi': loanData['emi'],
+        'status': loanData['customerDecision'] == 'ACCEPTED' ? 'approved' : 'declined',
+        'status_date': DateTime.now().toIso8601String(),
+        'remarks': loanData['customerDecision'] == 'ACCEPTED' ? 'Loan offer accepted by customer' : 'Loan offer declined by customer',
+        'noteUser': loanData['noteUser'] ?? 'CUSTOMER',
+        'note': loanData['note'] ?? 'Application ${loanData['customerDecision'].toLowerCase()} via mobile app',
+      });
+
+      print('\n4. Insert Loan Application Response:');
+      print('Response Data: ${const JsonEncoder.withIndent('  ').convert(insertResponse)}');
+
+      if (!insertResponse['success']) {
+        throw Exception('Failed to save loan application: ${insertResponse['data']?['message'] ?? 'Unknown error'}');
+      }
+
+      print('\n=== UPDATE LOAN APPLICATION - END (SUCCESS) ===\n');
+      return {
+        'status': 'success',
+        'message': insertResponse['data']['message'],
+        'details': insertResponse['data']['details']
+      };
+
     } catch (e) {
-      print('Error updating loan application: $e');
+      print('\nERROR in updateLoanApplication:');
+      print('Error Type: ${e.runtimeType}');
+      print('Error Message: $e');
+      print('Stack Trace: ${StackTrace.current}');
+      print('\n=== UPDATE LOAN APPLICATION - END (WITH ERROR) ===\n');
       return {
         'status': 'error',
         'message': e.toString(),

@@ -116,8 +116,8 @@ class NotificationService {
       });
 
       await AwesomeNotifications().initialize(
-        // 💡 Use platform-specific icon path
-        Platform.isIOS ? null : 'resource://drawable/notification_icon',
+        // 💡 Use colored logo for all icons
+        Platform.isAndroid ? 'resource://drawable/nayifatlogocircle_nobg' : null,
         [
           NotificationChannel(
             channelGroupKey: 'basic_channel_group',
@@ -285,11 +285,11 @@ class NotificationService {
       };
 
       // Handle big picture
-      String? bigPictureFilePath;
-      if (notification['bigPictureUrl'] != null) {
+      String? bigPictureUrl = notification['bigPictureUrl'];
+      if (bigPictureUrl != null) {
         try {
-          bigPictureFilePath = await _downloadAndSaveImage(
-            notification['bigPictureUrl'],
+          bigPictureUrl = await _downloadAndSaveImage(
+            bigPictureUrl,
             'notification_big_${notification['id']}'
           );
         } catch (e) {
@@ -298,11 +298,11 @@ class NotificationService {
       }
 
       // Handle large icon
-      String? largeIconFilePath;
-      if (notification['largeIconUrl'] != null) {
+      String? largeIconUrl = notification['largeIconUrl'];
+      if (largeIconUrl != null) {
         try {
-          largeIconFilePath = await _downloadAndSaveImage(
-            notification['largeIconUrl'],
+          largeIconUrl = await _downloadAndSaveImage(
+            largeIconUrl,
             'notification_icon_${notification['id']}'
           );
         } catch (e) {
@@ -318,13 +318,35 @@ class NotificationService {
           title: title,
           body: body,
           payload: notificationContent['payload'],
-          bigPicture: bigPictureFilePath,
-          largeIcon: largeIconFilePath,
-          notificationLayout: bigPictureFilePath != null ? 
+          // 💡 Use colored logo for all icons
+          icon: Platform.isAndroid ? 'resource://drawable/nayifatlogocircle_nobg' : null,
+          largeIcon: largeIconUrl ?? 
+              (Platform.isAndroid ? '@drawable/nayifatlogocircle_nobg' : null),
+          bigPicture: bigPictureUrl,
+          notificationLayout: bigPictureUrl != null ? 
             NotificationLayout.BigPicture : 
             NotificationLayout.Default,
+          displayOnForeground: true,
+          displayOnBackground: true,
+          wakeUpScreen: true,
+          fullScreenIntent: true,
+          criticalAlert: true,
+          category: NotificationCategory.Message,
+          // 💡 Enable auto dismiss when clicked
+          autoDismissible: true,
+          // 💡 iOS-specific settings
+          groupKey: Platform.isIOS ? 'basic_channel' : null,
+          summary: Platform.isIOS ? title : null,
+          // 💡 Hide large icon when expanded on Android only
+          hideLargeIconOnExpand: Platform.isAndroid && bigPictureUrl != null,
         ),
       );
+
+      // 💡 Add debug logging for image paths
+      debugPrint('Image Paths in Notification:');
+      debugPrint('Icon: ${Platform.isAndroid ? 'resource://drawable/nayifatlogocircle_nobg' : 'null'}');
+      debugPrint('Large Icon URL: ${largeIconUrl ?? (Platform.isAndroid ? '@drawable/nayifatlogocircle_nobg' : 'null')}');
+      debugPrint('Big Picture URL: $bigPictureUrl');
 
       // Cleanup old images
       await _cleanupOldImages();
@@ -441,7 +463,7 @@ class NotificationService {
         // 💡 Create HttpClient with custom timeout
         client = HttpClient()
           ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true)
-          ..connectionTimeout = const Duration(seconds: 30);
+          ..connectionTimeout = const Duration(seconds: 120);
 
         final uri = Uri.parse(url);
         final request = await client.postUrl(uri);
@@ -603,10 +625,15 @@ class NotificationService {
     debugPrint('Raw Payload: ${receivedAction.payload}');
     
     try {
-      // First, dismiss the notification if we have an ID
+      // 💡 Enhanced notification dismissal
       if (receivedAction.id != null) {
+        // Dismiss this specific notification
         await AwesomeNotifications().dismiss(receivedAction.id!);
         debugPrint('Step N1: Dismissed notification with ID: ${receivedAction.id}');
+        
+        // Also cancel the notification to prevent it from showing again
+        await AwesomeNotifications().cancel(receivedAction.id!);
+        debugPrint('Step N1.1: Cancelled notification with ID: ${receivedAction.id}');
       }
       
       if (receivedAction.payload != null && receivedAction.payload!['data'] != null) {
@@ -763,10 +790,15 @@ class NotificationService {
           criticalAlert: true,
           category: NotificationCategory.Message,
           autoDismissible: false,
-          // 💡 Platform-specific icon handling
-          icon: Platform.isAndroid ? 'resource://drawable/notification_icon' : null, // Monochrome icon for status bar
-          largeIcon: validatedLargeIconUrl ?? (Platform.isAndroid ? 'resource://mipmap/launcher_icon' : null), // Company logo as default
-          bigPicture: validatedBigPictureUrl,
+          // 💡 Platform-specific icon handling with debug logging
+          icon: Platform.isAndroid 
+              ? 'resource://drawable/nayifatlogocircle_nobg' 
+              : null,
+          largeIcon: validatedLargeIconUrl ?? 
+              (Platform.isAndroid 
+                ? '@drawable/nayifatlogocircle_nobg'  
+                : null),
+          bigPicture: validatedBigPictureUrl, // 💡 Use URL directly
           // 💡 iOS-specific settings
           groupKey: Platform.isIOS ? 'basic_channel' : null,
           summary: Platform.isIOS ? title : null,
@@ -774,6 +806,11 @@ class NotificationService {
           hideLargeIconOnExpand: Platform.isAndroid && validatedBigPictureUrl != null,
         ),
       );
+
+      // 💡 Add debug logging for image paths
+      debugPrint('Step S8.1: Icon path: ${Platform.isAndroid ? 'resource://drawable/nayifatlogocircle_nobg' : 'null'}');
+      debugPrint('Step S8.2: Large icon path: ${validatedLargeIconUrl ?? (Platform.isAndroid ? '@drawable/nayifatlogocircle_nobg' : 'null')}');
+      debugPrint('Step S8.3: Big picture URL: $validatedBigPictureUrl');
 
       debugPrint('Step S9: Local notification created successfully');
       return true;

@@ -467,93 +467,75 @@ class _CustomerServiceScreenState extends State<CustomerServiceScreen> {
           child: Directionality(
             textDirection: TextDirection.ltr,
             child: CircleNavBar(
-              activeIcons: (() {
-                final baseIcons = widget.isArabic ? [
-                  Icon(Icons.settings, color: Color(themeProvider.isDarkMode 
-                      ? Constants.darkNavbarActiveIcon 
-                      : Constants.lightNavbarActiveIcon)),
-                  Icon(Icons.account_balance, color: Color(themeProvider.isDarkMode 
-                      ? Constants.darkNavbarActiveIcon 
-                      : Constants.lightNavbarActiveIcon)),
-                  Icon(Icons.home, color: Color(themeProvider.isDarkMode 
-                      ? Constants.darkNavbarActiveIcon 
-                      : Constants.lightNavbarActiveIcon)),
-                  Icon(Icons.credit_card, color: Color(themeProvider.isDarkMode 
-                      ? Constants.darkNavbarActiveIcon 
-                      : Constants.lightNavbarActiveIcon)),
-                  Icon(Icons.headset_mic, color: Color(themeProvider.isDarkMode 
-                      ? Constants.darkNavbarActiveIcon 
-                      : Constants.lightNavbarActiveIcon)),
-                ] : [
-                  Icon(Icons.headset_mic, color: Color(themeProvider.isDarkMode 
-                      ? Constants.darkNavbarActiveIcon 
-                      : Constants.lightNavbarActiveIcon)),
-                  Icon(Icons.credit_card, color: Color(themeProvider.isDarkMode 
-                      ? Constants.darkNavbarActiveIcon 
-                      : Constants.lightNavbarActiveIcon)),
-                  Icon(Icons.home, color: Color(themeProvider.isDarkMode 
-                      ? Constants.darkNavbarActiveIcon 
-                      : Constants.lightNavbarActiveIcon)),
-                  Icon(Icons.account_balance, color: Color(themeProvider.isDarkMode 
-                      ? Constants.darkNavbarActiveIcon 
-                      : Constants.lightNavbarActiveIcon)),
-                  Icon(Icons.settings, color: Color(themeProvider.isDarkMode 
-                      ? Constants.darkNavbarActiveIcon 
-                      : Constants.lightNavbarActiveIcon)),
-                ];
-                
-                final deviceLocale = Localizations.localeOf(context);
-                final shouldReverse = deviceLocale.languageCode == 'ar' && !widget.isArabic;
-                return shouldReverse ? baseIcons.reversed.toList() : baseIcons;
-              })(),
-              inactiveIcons: (() {
-                final baseIcons = widget.isArabic ? [
-                  Icon(Icons.settings, color: Color(themeProvider.isDarkMode 
-                      ? Constants.darkNavbarInactiveIcon 
-                      : Constants.lightNavbarInactiveIcon)),
-                  Icon(Icons.account_balance, color: Color(themeProvider.isDarkMode 
-                      ? Constants.darkNavbarInactiveIcon 
-                      : Constants.lightNavbarInactiveIcon)),
-                  Icon(Icons.home, color: Color(themeProvider.isDarkMode 
-                      ? Constants.darkNavbarInactiveIcon 
-                      : Constants.lightNavbarInactiveIcon)),
-                  Icon(Icons.credit_card, color: Color(themeProvider.isDarkMode 
-                      ? Constants.darkNavbarInactiveIcon 
-                      : Constants.lightNavbarInactiveIcon)),
-                  Icon(Icons.headset_mic, color: Color(themeProvider.isDarkMode 
-                      ? Constants.darkNavbarInactiveIcon 
-                      : Constants.lightNavbarInactiveIcon)),
-                ] : [
-                  Icon(Icons.headset_mic, color: Color(themeProvider.isDarkMode 
-                      ? Constants.darkNavbarInactiveIcon 
-                      : Constants.lightNavbarInactiveIcon)),
-                  Icon(Icons.credit_card, color: Color(themeProvider.isDarkMode 
-                      ? Constants.darkNavbarInactiveIcon 
-                      : Constants.lightNavbarInactiveIcon)),
-                  Icon(Icons.home, color: Color(themeProvider.isDarkMode 
-                      ? Constants.darkNavbarInactiveIcon 
-                      : Constants.lightNavbarInactiveIcon)),
-                  Icon(Icons.account_balance, color: Color(themeProvider.isDarkMode 
-                      ? Constants.darkNavbarInactiveIcon 
-                      : Constants.lightNavbarInactiveIcon)),
-                  Icon(Icons.settings, color: Color(themeProvider.isDarkMode 
-                      ? Constants.darkNavbarInactiveIcon 
-                      : Constants.lightNavbarInactiveIcon)),
-                ];
-                
-                final deviceLocale = Localizations.localeOf(context);
-                final shouldReverse = deviceLocale.languageCode == 'ar' && !widget.isArabic;
-                return shouldReverse ? baseIcons.reversed.toList() : baseIcons;
-              })(),
-              levels: (() {
-                final baseLevels = widget.isArabic 
-                  ? const ["حسابي", "التمويل", "الرئيسية", "البطاقات", "الدعم"]
-                  : const ["Support", "Cards", "Home", "Loans", "Account"];
-                
-                final deviceLocale = Localizations.localeOf(context);
-                final shouldReverse = deviceLocale.languageCode == 'ar' && !widget.isArabic;
-                return shouldReverse ? baseLevels.reversed.toList() : baseLevels;
-              })(),
+              activeIcons: widget.isArabic ? [
+                Icon(Icons.settings, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarActiveIcon 
+                    : Constants.lightNavbarActiveIcon)),
+                Icon(Icons.account_balance, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarActiveIcon 
+                    : Constants.lightNavbarActiveIcon)),
+                Icon(Icons.home, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarActiveIcon 
+                    : Constants.lightNavbarActiveIcon)),
+                Icon(Icons.credit_card, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarActiveIcon 
+                    : Constants.lightNavbarActiveIcon)),
+                Icon(Icons.headset_mic, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarActiveIcon 
+                    : Constants.lightNavbarActiveIcon)),
+              ] : [
+                Icon(Icons.headset_mic, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarActiveIcon 
+                    : Constants.lightNavbarActiveIcon)),
+                Icon(Icons.credit_card, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarActiveIcon 
+                    : Constants.lightNavbarActiveIcon)),
+                Icon(Icons.home, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarActiveIcon 
+                    : Constants.lightNavbarActiveIcon)),
+                Icon(Icons.account_balance, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarActiveIcon 
+                    : Constants.lightNavbarActiveIcon)),
+                Icon(Icons.settings, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarActiveIcon 
+                    : Constants.lightNavbarActiveIcon)),
+              ],
+              inactiveIcons: widget.isArabic ? [
+                Icon(Icons.settings, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarInactiveIcon 
+                    : Constants.lightNavbarInactiveIcon)),
+                Icon(Icons.account_balance, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarInactiveIcon 
+                    : Constants.lightNavbarInactiveIcon)),
+                Icon(Icons.home, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarInactiveIcon 
+                    : Constants.lightNavbarInactiveIcon)),
+                Icon(Icons.credit_card, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarInactiveIcon 
+                    : Constants.lightNavbarInactiveIcon)),
+                Icon(Icons.headset_mic, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarInactiveIcon 
+                    : Constants.lightNavbarInactiveIcon)),
+              ] : [
+                Icon(Icons.headset_mic, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarInactiveIcon 
+                    : Constants.lightNavbarInactiveIcon)),
+                Icon(Icons.credit_card, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarInactiveIcon 
+                    : Constants.lightNavbarInactiveIcon)),
+                Icon(Icons.home, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarInactiveIcon 
+                    : Constants.lightNavbarInactiveIcon)),
+                Icon(Icons.account_balance, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarInactiveIcon 
+                    : Constants.lightNavbarInactiveIcon)),
+                Icon(Icons.settings, color: Color(themeProvider.isDarkMode 
+                    ? Constants.darkNavbarInactiveIcon 
+                    : Constants.lightNavbarInactiveIcon)),
+              ],
+              levels: widget.isArabic 
+                ? const ["حسابي", "التمويل", "الرئيسية", "البطاقات", "الدعم"]
+                : const ["Support", "Cards", "Home", "Loans", "Account"],
               activeLevelsStyle: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
@@ -574,21 +556,16 @@ class _CustomerServiceScreenState extends State<CustomerServiceScreen> {
               circleWidth: 60,
               activeIndex: widget.isArabic ? 4 : 0,
               onTap: (index) {
-                // 💡 Add index reversal for Arabic phone language when isArabic is false
-                final deviceLocale = Localizations.localeOf(context);
-                final shouldReverseIndex = deviceLocale.languageCode == 'ar' && !widget.isArabic;
-                final effectiveIndex = shouldReverseIndex ? 4 - index : index;
-
-                if ((widget.isArabic && effectiveIndex == 4) || (!widget.isArabic && effectiveIndex == 0)) {
+                if ((widget.isArabic && index == 4) || (!widget.isArabic && index == 0)) {
                   setState(() {
-                    _tabIndex = effectiveIndex;
+                    _tabIndex = index;
                   });
                   return;  // Don't navigate if we're already on support
                 }
 
                 Widget? page;
                 if (widget.isArabic) {
-                  switch (effectiveIndex) {
+                  switch (index) {
                     case 0:
                       page = const AccountPage(isArabic: true);
                       break;
@@ -614,7 +591,7 @@ class _CustomerServiceScreenState extends State<CustomerServiceScreen> {
                       break;
                   }
                 } else {
-                  switch (effectiveIndex) {
+                  switch (index) {
                     case 1:
                       page = const CardsPage();
                       break;

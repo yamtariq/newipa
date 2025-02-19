@@ -1,0 +1,125 @@
+{
+  "Version": 1,
+  "Hash": "cGlBVzWex9mwBxE622fP3btN4wMbyNL6QZ4KVLfUItE=",
+  "Source": "AdminPortal",
+  "BasePath": "_content/AdminPortal",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [
+    {
+      "Name": "AdminPortal\\wwwroot",
+      "Source": "AdminPortal",
+      "ContentRoot": "C:\\Users\\yamta\\StudioProjects\\nayifat_app_2025_new\\adminportal\\wwwroot\\",
+      "BasePath": "_content/AdminPortal",
+      "Pattern": "**"
+    }
+  ],
+  "Assets": [
+    {
+      "Identity": "C:\\Users\\yamta\\StudioProjects\\nayifat_app_2025_new\\adminportal\\wwwroot\\css\\site.css",
+      "SourceId": "AdminPortal",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\yamta\\StudioProjects\\nayifat_app_2025_new\\adminportal\\wwwroot\\",
+      "BasePath": "_content/AdminPortal",
+      "RelativePath": "css/site#[.{fingerprint}]?.css",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "Fingerprint": "g757f3r2pv",
+      "Integrity": "HKG9FQbCIuJa7leKRzStohUfK8MxxxIszfUCbw7Mz+Q=",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\css\\site.css"
+    }
+  ],
+  "Endpoints": [
+    {
+      "Route": "css/site.css",
+      "AssetFile": "C:\\Users\\yamta\\StudioProjects\\nayifat_app_2025_new\\adminportal\\wwwroot\\css\\site.css",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "778"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/css"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"HKG9FQbCIuJa7leKRzStohUfK8MxxxIszfUCbw7Mz+Q=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Wed, 19 Feb 2025 08:23:43 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "no-cache"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "integrity",
+          "Value": "sha256-HKG9FQbCIuJa7leKRzStohUfK8MxxxIszfUCbw7Mz+Q="
+        }
+      ]
+    },
+    {
+      "Route": "css/site.g757f3r2pv.css",
+      "AssetFile": "C:\\Users\\yamta\\StudioProjects\\nayifat_app_2025_new\\adminportal\\wwwroot\\css\\site.css",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "778"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/css"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"HKG9FQbCIuJa7leKRzStohUfK8MxxxIszfUCbw7Mz+Q=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Wed, 19 Feb 2025 08:23:43 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "max-age=31536000, immutable"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "fingerprint",
+          "Value": "g757f3r2pv"
+        },
+        {
+          "Name": "label",
+          "Value": "css/site.css"
+        },
+        {
+          "Name": "integrity",
+          "Value": "sha256-HKG9FQbCIuJa7leKRzStohUfK8MxxxIszfUCbw7Mz+Q="
+        }
+      ]
+    }
+  ]
+}

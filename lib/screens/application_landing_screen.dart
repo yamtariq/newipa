@@ -313,7 +313,7 @@ class _ApplicationLandingScreenState extends State<ApplicationLandingScreen> {
     }
     
     throw Exception(widget.isArabic 
-      ? 'فشل في الاتصال بالخادم. يرجى المحاولة مرة أخرى لاحقاً'
+      ? 'فشل في الاتصال بالنظام. يرجى المحاولة مرة أخرى لاحقاً'
       : 'Failed to connect to server. Please try again later');
   }
 

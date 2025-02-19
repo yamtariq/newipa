@@ -51,7 +51,7 @@ namespace NayifatAPI.Controllers
             };
 
             _sslIgnorantClient = new HttpClient(handler);
-            _sslIgnorantClient.Timeout = TimeSpan.FromSeconds(30);
+            _sslIgnorantClient.Timeout = TimeSpan.FromSeconds(120);
             
             // 💡 Disable SSL certificate validation globally for this controller
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;

@@ -59,28 +59,24 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _initializeApp() async {
     try {
-      // Start animations after a short delay
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Start animations immediately
       setState(() {
         _startAnimations = true;
       });
 
-      // 💡 Initialize content service and load initial content in background
-      final contentService = Provider.of<ContentUpdateService>(context, listen: false);
-      
-      // Start content initialization in the background
-      Future.microtask(() async {
-        await contentService.initializeContent();
-        // After content is loaded, start background update
-        contentService.checkAndUpdateContent(force: false, isInitialLoad: false, isResumed: true);
-      });
-
-      // 💡 Wait for minimum animation time - increased to match total animation duration
+      // Wait for minimum animation time to match total animation duration
       await Future.delayed(const Duration(milliseconds: 6000));
 
       if (mounted) {
-        // Navigate to main page without waiting for content
+        // Navigate to main page
         _navigateToMainPage(widget.isDarkMode);
+        
+        // Initialize content service after navigation
+        final contentService = Provider.of<ContentUpdateService>(context, listen: false);
+        Future.microtask(() async {
+          await contentService.initializeContent();
+          contentService.checkAndUpdateContent(force: false, isInitialLoad: false, isResumed: true);
+        });
       }
     } catch (e) {
       debugPrint('Error during app initialization: $e');
@@ -146,7 +142,7 @@ class _SplashScreenState extends State<SplashScreen> {
                           fit: BoxFit.contain,
                         ),
                       ).animate()
-                      .then(delay: 3000.ms)
+                      .then(delay: 2000.ms)
                       .moveX(
                         begin: 100,
                         end: -55,
@@ -164,7 +160,7 @@ class _SplashScreenState extends State<SplashScreen> {
                         color: backgroundColor,
                       ),
                     ).animate()
-                    .then(delay: 3000.ms)
+                    .then(delay: 2000.ms)
                     .moveX(
                       begin: 0,
                       end: 50,
@@ -182,13 +178,6 @@ class _SplashScreenState extends State<SplashScreen> {
                         fit: BoxFit.cover,
                       ),
                     ).animate()
-                    .fadeIn(duration: 800.ms)
-                    .scale(
-                      begin: const Offset(6.0, 6.0),
-                      end: const Offset(1.0, 1.0),
-                      duration: 1000.ms,
-                      curve: Curves.easeOutCubic,
-                    )
                     .then(delay: 2000.ms)
                     .rotate(
                       duration: 500.ms,
