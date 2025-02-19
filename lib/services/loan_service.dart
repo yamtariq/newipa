@@ -193,7 +193,7 @@ class LoanService {
         "tenure": 60,
         "propertyStatus": 1,
         "effRate": 1,
-        "ibanNo": storedUserData['iban'] ?? "SA9750000000000555551111",
+        "ibanNo": userData['ibanNo'] ?? storedUserData['ibanNo'] ?? "SA9750000000000555551111",  // 💡 Use actual IBAN from userData first
         "param1": "TEST001",           // string max 20
         "param2": "TEST002",           // string max 20
         "param3": "TEST003",           // string max 20

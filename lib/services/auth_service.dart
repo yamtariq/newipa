@@ -219,7 +219,7 @@ class AuthService {
       // 💡 Check if enabled in either storage or user-specific flag
       final isEnabled = ((biometricEnabled == 'true' && biometricUserId != null && deviceUserId != null && biometricUserId == deviceUserId) ||
                        (prefsBiometricEnabled == true && prefsBiometricUserId != null && prefsDeviceUserId != null && prefsBiometricUserId == prefsDeviceUserId)) ||
-                       userSpecificBiometricEnabled;
+                       (userSpecificBiometricEnabled == true);
       
       print('Biometrics enabled: $isEnabled');
       print('=== BIOMETRIC STATUS CHECK END ===\n');

@@ -682,7 +682,6 @@ class _SignInScreenState extends State<SignInScreen> {
     if (_isLoading) return;
 
     setState(() => _isLoading = true);
-    print('\n=== BIOMETRIC AUTHENTICATION START ===');
 
     try {
       final bool didAuthenticate = await _localAuth.authenticate(
@@ -695,57 +694,20 @@ class _SignInScreenState extends State<SignInScreen> {
         ),
       );
 
-      print('Biometric authentication result: $didAuthenticate');
-
       if (didAuthenticate) {
-        print('1. Getting user data from storage');
         // Get user data from local storage
         final prefs = await SharedPreferences.getInstance();
-        final secureStorage = const FlutterSecureStorage();
-        
-        final userDataString = await secureStorage.read(key: 'user_data') ?? 
-                             prefs.getString('user_data');
-                             
+        final userDataString = prefs.getString('user_data');
         if (userDataString == null) {
-          throw Exception('User data not found in storage');
+          throw Exception('User data not found');
         }
-        
         final userData = json.decode(userDataString);
-        print('2. User data retrieved successfully');
 
-        // Initialize session first
-        print('3. Initializing session state');
+        // Initialize session and reset manual sign off
         final sessionProvider = Provider.of<SessionProvider>(context, listen: false);
-        
-        // Reset any previous sign-off state
-        print('4. Resetting manual sign-off state');
         sessionProvider.resetManualSignOff();
-        
-        // Store session state in secure storage
-        print('5. Storing session state in secure storage');
-        await secureStorage.write(key: 'session_active', value: 'true');
-        await secureStorage.write(key: 'session_user_id', value: userData['national_id']);
-        
-        // Store in SharedPreferences for redundancy
-        print('6. Storing session state in SharedPreferences');
-        await prefs.setBool('session_active', true);
-        await prefs.setString('session_user_id', userData['national_id']);
-        
-        // Set session state in provider
-        print('7. Setting session state in provider');
-        sessionProvider.setSignedIn(true);
-        
-        // Verify session is active
-        print('8. Verifying session state');
-        final isActive = await secureStorage.read(key: 'session_active') == 'true' &&
-                        (prefs.getBool('session_active') ?? false);
-                        
-        if (!isActive) {
-          throw Exception('Failed to activate session');
-        }
+        await sessionProvider.initializeSession();
 
-        print('9. Session activated successfully, proceeding to navigation');
-        
         if (mounted) {
           Navigator.pushReplacement(
             context,
@@ -760,19 +722,15 @@ class _SignInScreenState extends State<SignInScreen> {
         }
       }
     } catch (e) {
-      print('❌ Biometric authentication error: $e');
-      if (mounted) {
-        _showErrorBanner(
-          widget.isArabic
-              ? 'فشل في مصادقة السمات الحيوية'
-              : 'Biometric authentication failed: ${e.toString()}',
-        );
-      }
+      _showErrorBanner(
+        widget.isArabic
+            ? 'فشل في مصادقة السمات الحيوية'
+            : 'Biometric authentication failed',
+      );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
-      print('=== BIOMETRIC AUTHENTICATION END ===\n');
     }
   }
 
@@ -1345,7 +1303,7 @@ class _SignInScreenState extends State<SignInScreen> {
     }
     
     throw Exception(widget.isArabic 
-      ? 'فشل في الاتصال بالنظام. يرجى المحاولة مرة أخرى لاحقاً'
+      ? 'فشل في الاتصال بالخادم. يرجى المحاولة مرة أخرى لاحقاً'
       : 'Failed to connect to server. Please try again later');
   }
 

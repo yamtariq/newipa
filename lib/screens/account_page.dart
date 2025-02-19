@@ -143,80 +143,55 @@ class _AccountPageState extends State<AccountPage> {
 
         if (!didAuthenticate) return;
 
-        // 💡 Clear biometric status from both SharedPreferences and SecureStorage
-        final storage = const FlutterSecureStorage();
-        
-        // Clear from SharedPreferences
+        // Clear biometric status from SharedPreferences
         await prefs.remove('biometrics_enabled_$nationalId');
         await prefs.remove('biometrics_enabled'); // Clear old key too
-        await prefs.remove('biometric_user_id');
-        await prefs.remove('device_user_id');
-        
-        // Clear from SecureStorage
-        await storage.delete(key: 'biometrics_enabled');
-        await storage.delete(key: 'biometric_user_id');
-        await storage.delete(key: 'device_user_id');
-        
         setState(() => _isBiometricsEnabled = false);
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.isArabic 
-                  ? 'تم تعطيل المصادقة بالسمات الحيوية بنجاح'
-                  : 'Biometric authentication disabled successfully',
-              style: const TextStyle(color: Colors.white),
-            ),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
+      } else {
+        // Enable biometrics
+        final bool didAuthenticate = await _localAuth.authenticate(
+          localizedReason: widget.isArabic 
+              ? 'يرجى الموافقة لتمكين المصادقة بالسمات الحيوية'
+              : 'Please authenticate to enable biometric login',
+          options: const AuthenticationOptions(
+            stickyAuth: true,
+            biometricOnly: true,
           ),
         );
-        return;
-      }
-      
-      // Enable biometrics
-      final bool didAuthenticate = await _localAuth.authenticate(
-        localizedReason: widget.isArabic 
-            ? 'يرجى الموافقة لتمكين المصادقة بالسمات الحيوية'
-            : 'Please authenticate to enable biometric login',
-        options: const AuthenticationOptions(
-          stickyAuth: true,
-          biometricOnly: true,
-        ),
-      );
 
-      if (!didAuthenticate) return;
+        if (!didAuthenticate) return;
 
-      try {
-        await _authService.enableBiometric(nationalId);
-        await prefs.setBool('biometrics_enabled_$nationalId', true);
-        setState(() => _isBiometricsEnabled = true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.isArabic 
-                  ? 'تم تفعيل المصادقة بالسمات الحيوية بنجاح'
-                  : 'Biometric authentication enabled successfully',
-              style: const TextStyle(color: Colors.white),
+        try {
+          await _authService.enableBiometric(nationalId);
+          await prefs.setBool('biometrics_enabled_$nationalId', true);
+          setState(() => _isBiometricsEnabled = true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                widget.isArabic 
+                    ? 'تم تفعيل المصادقة بالسمات الحيوية بنجاح'
+                    : 'Biometric authentication enabled successfully',
+                style: const TextStyle(color: Colors.white),
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 3),
             ),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      } catch (e) {
-        print('Error enabling biometrics: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.isArabic 
-                  ? 'حدث خطأ أثناء تفعيل المصادقة بالسمات الحيوية'
-                  : 'Error enabling biometric authentication',
-              style: const TextStyle(color: Colors.white),
+          );
+        } catch (e) {
+          print('Error enabling biometrics: $e');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                widget.isArabic 
+                    ? 'حدث خطأ أثناء تفعيل المصادقة بالسمات الحيوية'
+                    : 'Error enabling biometric authentication',
+                style: const TextStyle(color: Colors.white),
+              ),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
             ),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+          );
+        }
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
