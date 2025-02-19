@@ -9,6 +9,7 @@ import '../../screens/main_page.dart';
 import '../../screens/loans_page.dart';
 import '../../screens/loans_page_ar.dart';
 import '../../providers/theme_provider.dart';
+import '../../screens/customer_service_screen.dart';
 import 'package:provider/provider.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -37,6 +38,7 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
   bool get isArabic => widget.isArabic;
   bool _isLoading = true;
   String? _error;
+  bool _shouldContactSupport = false;
   double _maxFinanceAmount = 0;
   double _maxEMI = 0;
   double _totalRepayment = 0;
@@ -50,48 +52,88 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
   double _originalInterest = 0;
   int _originalTenure = 60;
 
-  // 💡 Add APR variable
-  double _apr = 0;
-  
-  // 💡 Add APR calculation method
-  double _calculateAPR(double principal, double emi, int tenureMonths) {
-    // Convert monthly payment and loan amount to yearly figures
-    double yearlyPayment = emi * 12;
-    
-    // Use Newton-Raphson method to find APR
-    double guess = _flatRate * 100; // Start with flat rate as initial guess
-    double tolerance = 0.0001;
-    int maxIterations = 100;
-    
-    for (int i = 0; i < maxIterations; i++) {
-      double f = principal * (guess / 100) - yearlyPayment * (1 - pow(1 + guess / 100, -tenureMonths / 12));
-      double fPrime = principal - yearlyPayment * (-tenureMonths / 12) * pow(1 + guess / 100, -tenureMonths / 12 - 1);
-      
-      double newGuess = guess - f / fPrime;
-      
-      if ((newGuess - guess).abs() < tolerance) {
-        return newGuess;
-      }
-      
-      guess = newGuess;
-    }
-    
-    return guess;
-  }
-
   @override
   void initState() {
     super.initState();
     print('\n=== LOAN OFFER SCREEN - INITIALIZATION ===');
     print('Timestamp: ${DateTime.now()}');
     print('Response Data:');
-    widget.userData.forEach((key, value) {
-      print('$key: $value');
-    });
-
-    // Extract values from response
+    print('User Data: ${const JsonEncoder.withIndent('  ').convert(widget.userData)}');
+    
+    // 💡 First check for errors in the response
+    if (widget.userData['success'] == false) {
+      print('\nResponse indicates failure. Checking error details...');
+      setState(() => _shouldContactSupport = true); // All error cases need customer care link
+      
+      // Check if there are any errors in the response
+      if (widget.userData['errors'] != null && widget.userData['errors'] is List && widget.userData['errors'].isNotEmpty) {
+        final error = widget.userData['errors'][0];
+        print('Error details: ${const JsonEncoder.withIndent('  ').convert(error)}');
+        
+        // Case 1: Already have active application
+        if (error['errorCode'] == '2-201') {
+          print('Detected error code 2-201: Active application exists');
+          
+          // 💡 Extract application ID from error description
+          String applicationId = '';
+          final errorDesc = error['errorDesc']?.toString() ?? '';
+          final applicationIdMatch = RegExp(r'Application Id (\d+)').firstMatch(errorDesc);
+          if (applicationIdMatch != null) {
+            applicationId = applicationIdMatch.group(1) ?? '';
+          }
+          
+          setState(() {
+            _error = widget.isArabic 
+              ? 'لديك طلب نشط بالفعل في النظام برقم $applicationId. يرجى التواصل مع خدمة العملاء لمزيد من التفاصيل.'
+              : 'You already have an active application in pipeline (Application #$applicationId). Please contact customer care for more details.';
+            _isLoading = false;
+          });
+          print('=== LOAN OFFER SCREEN - END (ACTIVE APPLICATION) ===\n');
+          return;
+        }
+        
+        // Case 2: Not eligible
+        if (error['errorDesc']?.toString().toLowerCase().contains('not eligible') == true) {
+          print('Detected not eligible case from error description');
+          setState(() {
+            _error = widget.isArabic 
+              ? 'عذراً، لم تتم الموافقة على طلبك في هذا الوقت. يرجى التواصل مع خدمة العملاء لمزيد من التفاصيل.'
+              : 'Unfortunately your application is not approved at this time. Please contact customer care for more details.';
+            _isLoading = false;
+          });
+          print('=== LOAN OFFER SCREEN - END (NOT ELIGIBLE) ===\n');
+          return;
+        }
+        
+        // Case 3: Other errors
+        print('Unhandled error case. Using generic error message');
+        setState(() {
+          _error = widget.isArabic 
+            ? 'حدث خطأ غير متوقع. يرجى التواصل مع خدمة العملاء لمزيد من التفاصيل.'
+            : 'An unexpected error occurred. Please contact customer care for more details.';
+          _isLoading = false;
+        });
+        print('=== LOAN OFFER SCREEN - END (GENERIC ERROR) ===\n');
+        return;
+      }
+      
+      // If no specific error details, show generic error
+      print('No specific error details found. Using generic error message');
+      setState(() {
+        _error = widget.isArabic 
+          ? 'حدث خطأ غير متوقع. يرجى التواصل مع خدمة العملاء لمزيد من التفاصيل.'
+          : 'An unexpected error occurred. Please contact customer care for more details.';
+        _isLoading = false;
+      });
+      print('=== LOAN OFFER SCREEN - END (NO ERROR DETAILS) ===\n');
+      return;
+    }
+    
+    // Case 4: Approved with eligibleAmount - proceed with offer screen
     if (widget.userData['result'] != null) {
+      print('\nProcessing approved case with eligible amount');
       final result = widget.userData['result'];
+      
       setState(() {
         _isLoading = false;
         _error = null;
@@ -110,18 +152,19 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
         tenure = 60; // Default tenure
         _originalTenure = tenure;
         
-        // Set flat rate
-        _flatRate = 0.0795; // 5% flat rate
-        
-        // Calculate total repayment and interest
-        _totalRepayment = financeAmount * (1 + (_flatRate * tenure / 12));
-        _interest = _totalRepayment - financeAmount;
-        
-        // 💡 Calculate APR
-        _apr = _calculateAPR(financeAmount, emi, tenure);
-        
+        // 💡 Calculate total repayment from EMI and tenure
+        _totalRepayment = emi * tenure;
         _originalTotalRepayment = _totalRepayment;
+        
+        // 💡 Calculate interest (total repayment - principal)
+        _interest = _totalRepayment - financeAmount;
         _originalInterest = _interest;
+        
+        // 💡 Calculate flat rate using the formula:
+        // Flat Rate = (Interest) / (Principal × Years)
+        _flatRate = _interest / (financeAmount * (tenure / 12));
+        // Round to 4 decimal places
+        _flatRate = double.parse(_flatRate.toStringAsFixed(4));
         
         print('\nInitialized values:');
         print('Finance Amount: $financeAmount');
@@ -129,58 +172,22 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
         print('Tenure: $tenure');
         print('Total Repayment: $_totalRepayment');
         print('Interest: $_interest');
-        print('Flat Rate: $_flatRate');
-        print('APR: $_apr%');
+        print('Calculated Flat Rate: $_flatRate');
       });
-    } else if (widget.userData['finance_amount'] != null) {
-      setState(() {
-        _isLoading = false;
-        _error = null;
-        
-        // Set finance amount from direct format
-        _maxFinanceAmount = double.tryParse(widget.userData['finance_amount'].toString()) ?? 0;
-        financeAmount = _maxFinanceAmount;
-        _originalFinanceAmount = _maxFinanceAmount;
-        
-        // Set EMI from direct format
-        _maxEMI = double.tryParse(widget.userData['emi'].toString()) ?? 0;
-        emi = _maxEMI;
-        _originalEMI = _maxEMI;
-        
-        // Set tenure
-        tenure = 60; // Default tenure
-        _originalTenure = tenure;
-        
-        // Set flat rate
-        _flatRate = 0.05; // 5% flat rate
-        
-        // Calculate total repayment and interest
-        _totalRepayment = financeAmount * (1 + (_flatRate * tenure / 12));
-        _interest = _totalRepayment - financeAmount;
-        
-        // 💡 Calculate APR
-        _apr = _calculateAPR(financeAmount, emi, tenure);
-        
-        _originalTotalRepayment = _totalRepayment;
-        _originalInterest = _interest;
-        
-        print('\nInitialized values:');
-        print('Finance Amount: $financeAmount');
-        print('EMI: $emi');
-        print('Tenure: $tenure');
-        print('Total Repayment: $_totalRepayment');
-        print('Interest: $_interest');
-        print('Flat Rate: $_flatRate');
-        print('APR: $_apr%');
-      });
-    } else {
-      setState(() {
-        _isLoading = false;
-        _error = isArabic 
-          ? 'عذراً، لم نتمكن من معالجة طلبك في هذا الوقت'
-          : 'Sorry, we could not process your request at this time';
-      });
+      print('=== LOAN OFFER SCREEN - END (APPROVED) ===\n');
+      return;
     }
+    
+    // If we reach here, something unexpected happened
+    print('\nUnexpected case: No eligible amount found');
+    setState(() {
+      _shouldContactSupport = true;
+      _error = widget.isArabic 
+        ? 'حدث خطأ غير متوقع. يرجى التواصل مع خدمة العملاء لمزيد من التفاصيل.'
+        : 'An unexpected error occurred. Please contact customer care for more details.';
+      _isLoading = false;
+    });
+    print('=== LOAN OFFER SCREEN - END (UNEXPECTED CASE) ===\n');
   }
 
   // Add helper methods for loan calculations using flat rate
@@ -259,9 +266,6 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
         }
       }
 
-      // 💡 Update APR
-      _apr = _calculateAPR(financeAmount, emi, tenure);
-
       print('DEBUG - Finance Update:');
       print('Requested Amount: $value');
       print('Final Amount: $financeAmount');
@@ -269,7 +273,6 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
       print('Total Repayment: $_totalRepayment');
       print('Interest: $_interest');
       print('Using Flat Rate: $_flatRate');
-      print('APR: $_apr%');
     });
   }
 
@@ -304,9 +307,6 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
         }
       }
 
-      // 💡 Update APR
-      _apr = _calculateAPR(financeAmount, emi, tenure);
-
       print('DEBUG - Tenure Update:');
       print('New Tenure: $value months');
       print('Finance Amount: $financeAmount');
@@ -314,7 +314,6 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
       print('Total Repayment: $_totalRepayment');
       print('Interest: $_interest');
       print('Using Flat Rate: $_flatRate');
-      print('APR: $_apr%');
     });
   }
 
@@ -346,22 +345,50 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
       final client = HttpClient()
         ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
 
-      final request = await client.postUrl(Uri.parse(Constants.endpointFinnoneUpdateAmount));
+      // 💡 Prepare proxy request with structured format
+      final targetUrl = Uri.parse(Constants.endpointFinnoneUpdateAmount).toString();
+      print('\nTarget URL before encoding: $targetUrl');
       
-      // Add headers - combining bank headers and proxy API key
+      final proxyRequest = {
+        'TargetUrl': targetUrl,
+        'Method': 'POST',
+        'InternalHeaders': {
+          ...Constants.bankApiHeaders,
+          'Content-Type': 'application/json',
+        },
+        'Body': updateAmountData
+      };
+
+      final proxyUrl = Uri.parse('${Constants.apiBaseUrl}/proxy/forward');
+      print('\nProxy URL: $proxyUrl');
+      
+      final request = await client.postUrl(proxyUrl);
+      
+      // Add proxy headers
       final headers = {
-        ...Constants.bankApiHeaders,  // Bank headers (Authorization, X-APP-ID, etc.)
-        'api-key': Constants.apiKey,  // Proxy API key
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'x-api-key': Constants.apiKey,
       };
       
+      // Log request details
+      print('\n=== UPDATE AMOUNT REQUEST DETAILS ===');
+      print('Proxy Endpoint: ${Constants.apiBaseUrl}/proxy/forward');
+      print('Target URL: ${Constants.endpointFinnoneUpdateAmount}');
+      print('Headers:');
+      headers.forEach((key, value) {
+        print('$key: ${key.toLowerCase() == 'authorization' ? '[REDACTED]' : value}');
+      });
+      print('\nProxy Request Body:');
+      print(const JsonEncoder.withIndent('  ').convert(proxyRequest));
+
+      // Add headers
       headers.forEach((key, value) {
         request.headers.set(key, value);
       });
-
-      // Add body - using jsonEncode only once
-      final jsonBody = jsonEncode(updateAmountData);
-      print('DEBUG - Request Body: $jsonBody');
-      request.write(jsonBody);
+      
+      // Add body
+      request.write(jsonEncode(proxyRequest));
       
       final response = await request.close();
       final responseBody = await response.transform(utf8.decoder).join();
@@ -369,6 +396,12 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
       print('DEBUG - UpdateAmount API Response:');
       print('Status Code: ${response.statusCode}');
       print('Response Body: $responseBody');
+
+      // 💡 Handle empty response
+      if (responseBody.isEmpty) {
+        print('\nEmpty response body received');
+        throw Exception('Empty response received from server');
+      }
 
       if (response.statusCode != 200) {
         throw Exception('Failed to update amount: ${response.statusCode}');
@@ -889,48 +922,31 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
 
     return Scaffold(
       backgroundColor: isDarkMode ? Color(Constants.darkBackgroundColor) : Colors.white,
-      body: Stack(
-        children: [
-          // Gradient Background
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor).withOpacity(0.1),
-                  Color(isDarkMode ? Constants.darkBackgroundColor : Constants.lightBackgroundColor),
-                ],
+      body: WillPopScope(  // 💡 Add WillPopScope to prevent back navigation
+        onWillPop: () async => false,  // 💡 Prevent back key
+        child: Stack(
+          children: [
+            // Gradient Background
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor).withOpacity(0.1),
+                    Color(isDarkMode ? Constants.darkBackgroundColor : Constants.lightBackgroundColor),
+                  ],
+                ),
               ),
             ),
-          ),
-          SafeArea(
-            child: Column(
-              children: [
-                // Back Button and Title Row
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0, left: 8.0, right: 8.0),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Row(
-                        mainAxisAlignment: isArabic ? MainAxisAlignment.end : MainAxisAlignment.start,
-                        children: [
-                          IconButton(
-                            onPressed: () {
-                              if (Navigator.canPop(context)) {
-                                Navigator.pop(context);
-                              }
-                            },
-                            icon: Icon(
-                              isArabic ? Icons.arrow_forward_ios : Icons.arrow_back_ios,
-                              color: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
-                            ),
-                          ),
-                        ],
-                      ),
-                      // Title
-                      Text(
+            SafeArea(
+              child: Column(
+                children: [
+                  // 💡 Title Row (removed back button)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0, left: 8.0, right: 8.0),
+                    child: Center(  // 💡 Center the title
+                      child: Text(
                         isArabic ? 'عرض التمويل' : 'Loan Offer',
                         style: TextStyle(
                           fontSize: 24,
@@ -938,511 +954,478 @@ class _LoanOfferScreenState extends State<LoanOfferScreen> {
                           color: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
-                // Content
-                if (_error != null)
-                  Expanded(
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.error_outline,
-                              color: Color(isDarkMode ? Constants.darkErrorColor : Constants.lightErrorColor),
-                              size: 48,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              _error!,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: isDarkMode ? Colors.white : Colors.black,
+                  // Content
+                  if (_error != null)
+                    Expanded(
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                color: Color(isDarkMode ? Constants.darkErrorColor : Constants.lightErrorColor),
+                                size: 48,
                               ),
-                            ),
-                            const SizedBox(height: 24),
-                            ElevatedButton(
-                              onPressed: () {
-                                Navigator.pop(context);
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
-                              ),
-                              child: Text(isArabic ? 'رجوع' : 'Go Back'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  )
-                else if (!canShowFinanceDetails && !_isLoading)
-                  Expanded(
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.warning_amber_rounded,
-                              color: Colors.orange,
-                              size: 48,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              isArabic 
-                                ? 'عذراً، لا يمكن تقديم عرض تمويل في الوقت الحالي'
-                                : 'Sorry, we cannot provide a finance offer at this time',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: isDarkMode ? Colors.white : Colors.black,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            ElevatedButton(
-                              onPressed: () {
-                                Navigator.pop(context);
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
-                              ),
-                              child: Text(isArabic ? 'رجوع' : 'Go Back'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Opacity(
-                        opacity: _isLoading ? 0.6 : 1.0,
-                        child: IgnorePointer(
-                          ignoring: _isLoading,
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(16.0, 12.0, 16.0, 16.0),
-                            child: Column(
-                              crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                              children: [
-                                // Finance Details Card
-                                Container(
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: Color(isDarkMode ? Constants.darkSurfaceColor : Constants.lightSurfaceColor),
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Color(isDarkMode ? Constants.darkPrimaryShadowColor : Constants.lightPrimaryShadowColor),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 3),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        isArabic ? 'تفاصيل التمويل' : 'Finance Details',
-                                        textAlign: isArabic ? TextAlign.right : TextAlign.left,
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      
-                                      // Finance Amount Section
-                                      Text(
-                                        isArabic ? 'مبلغ التمويل' : 'Finance Amount',
-                                        textAlign: isArabic ? TextAlign.right : TextAlign.left,
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Container(
-                                        width: double.infinity,
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                        decoration: BoxDecoration(
-                                          color: const Color(Constants.primaryColorValue).withOpacity(0.05),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment: isArabic ? MainAxisAlignment.end : MainAxisAlignment.start,
-                                          children: <Widget>[
-                                            Text(
-                                              isArabic ? 'ريال ' : 'SAR ',
-                                              textAlign: isArabic ? TextAlign.right : TextAlign.left,
-                                              style: const TextStyle(
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.bold,
-                                                color: Color(0xFF00A650),
-                                              ),
-                                            ),
-                                            Text(
-                                              ' ' + financeAmount.toStringAsFixed(2),
-                                              textAlign: isArabic ? TextAlign.right : TextAlign.left,
-                                              style: const TextStyle(
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.bold,
-                                                color: Color(0xFF00A650),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Directionality(
-                                        textDirection: TextDirection.ltr,
-                                        child: SliderTheme(
-                                          data: SliderThemeData(
-                                            activeTrackColor: Color(0xFF008040),
-                                            inactiveTrackColor: Color(0xFF008040).withOpacity(0.1),
-                                            thumbColor: Color(0xFF008040),
-                                            overlayColor: Color(0xFF008040).withOpacity(0.2),
-                                          ),
-                                          child: Slider(
-                                            value: safeFinanceAmount,
-                                            min: 10000.0,
-                                            max: max(_maxFinanceAmount, 10000.0).toDouble(),
-                                            onChanged: _updateFinanceAmount,
-                                            // Use the safeFinanceDivisions here
-                                            divisions: safeFinanceDivisions,
-                                            label: isArabic 
-                                              ? '${safeFinanceAmount.toStringAsFixed(0)} ريال'
-                                              : 'SAR ${safeFinanceAmount.toStringAsFixed(0)}',
-                                          ),
-                                        ),
-                                      ),
-                                      
-                                      const SizedBox(height: 16),
-                                      
-                                      // EMI Section
-                                      Text(
-                                        isArabic ? 'القسط الشهري' : 'Monthly Installment (EMI)',
-                                        textAlign: isArabic ? TextAlign.right : TextAlign.left,
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Container(
-                                        width: double.infinity,
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                        decoration: BoxDecoration(
-                                          color: const Color(Constants.primaryColorValue).withOpacity(0.05),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment: isArabic ? MainAxisAlignment.end : MainAxisAlignment.start,
-                                          children: <Widget>[
-                                            Text(
-                                              isArabic ? 'ريال ' : 'SAR ',
-                                              textAlign: isArabic ? TextAlign.right : TextAlign.left,
-                                              style: const TextStyle(
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.bold,
-                                                color: Color(Constants.primaryColorValue),
-                                              ),
-                                            ),
-                                            Text(
-                                              ' ' + emi.toStringAsFixed(2),
-                                              textAlign: isArabic ? TextAlign.right : TextAlign.left,
-                                              style: const TextStyle(
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.bold,
-                                                color: Color(Constants.primaryColorValue),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      
-                                      const SizedBox(height: 16),
-                                      
-                                      // Tenure Section
-                                      Text(
-                                        isArabic ? 'مدة التمويل' : 'Tenure (Months)',
-                                        textAlign: isArabic ? TextAlign.right : TextAlign.left,
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Container(
-                                        width: double.infinity,
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                        decoration: BoxDecoration(
-                                          color: const Color(Constants.primaryColorValue).withOpacity(0.05),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment: isArabic ? MainAxisAlignment.end : MainAxisAlignment.start,
-                                          children: <Widget>[
-                                            Text(
-                                              isArabic ? ' شهر' : ' $tenure',
-                                              textAlign: isArabic ? TextAlign.right : TextAlign.left,
-                                              style: const TextStyle(
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.bold,
-                                                color: Color(Constants.primaryColorValue),
-                                              ),
-                                            ),
-                                            Text(
-                                              isArabic ? ' $tenure' : ' Months',
-                                              textAlign: isArabic ? TextAlign.left : TextAlign.right,
-                                              style: const TextStyle(
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.bold,
-                                                color: Color(Constants.primaryColorValue),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Directionality(
-                                        textDirection: TextDirection.ltr,
-                                        child: SliderTheme(
-                                          data: SliderThemeData(
-                                            activeTrackColor: Color(0xFF008040),
-                                            inactiveTrackColor: Color(0xFF008040).withOpacity(0.1),
-                                            thumbColor: Color(0xFF008040),
-                                            overlayColor: Color(0xFF008040).withOpacity(0.2),
-                                          ),
-                                          child: Slider(
-                                            value: safeTenure,
-                                            min: 12.0,
-                                            max: 60.0,
-                                            onChanged: (value) => _updateTenure(value.round()),
-                                            divisions: 48, // Fixed non-zero divisions
-                                            label: isArabic
-                                              ? '${safeTenure.round()} شهر'
-                                              : '${safeTenure.round()} months',
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      
-                                      // Total Repayment Section
-                                      Text(
-                                        isArabic ? 'إجمالي المبلغ المستحق' : 'Total Repayment Amount',
-                                        textAlign: isArabic ? TextAlign.right : TextAlign.left,
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Container(
-                                        width: double.infinity,
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                        decoration: BoxDecoration(
-                                          color: const Color(Constants.primaryColorValue).withOpacity(0.05),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              mainAxisAlignment: isArabic ? MainAxisAlignment.end : MainAxisAlignment.start,
-                                              children: <Widget>[
-                                                Text(
-                                                  isArabic ? 'ريال ' : 'SAR ',
-                                                  textAlign: isArabic ? TextAlign.right : TextAlign.left,
-                                                  style: const TextStyle(
-                                                    fontSize: 18,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Color(Constants.primaryColorValue),
-                                                  ),
-                                                ),
-                                                Text(
-                                                  ' ' + _totalRepayment.toStringAsFixed(2),
-                                                  textAlign: isArabic ? TextAlign.right : TextAlign.left,
-                                                  style: const TextStyle(
-                                                    fontSize: 18,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Color(Constants.primaryColorValue),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              isArabic 
-                                                ? '(يشمل الفائدة: ${_interest.toStringAsFixed(2)} ريال)'
-                                                : '(Including Interest: SAR ${_interest.toStringAsFixed(2)})',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey[600],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      
-                                      // 💡 APR Section
-                                      Text(
-                                        isArabic ? 'معدل النسبة السنوي' : 'Annual Percentage Rate (APR)',
-                                        textAlign: isArabic ? TextAlign.right : TextAlign.left,
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Container(
-                                        width: double.infinity,
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                        decoration: BoxDecoration(
-                                          color: Color(isDarkMode ? Constants.darkFormBackgroundColor : Constants.lightFormBackgroundColor),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment: isArabic ? MainAxisAlignment.end : MainAxisAlignment.start,
-                                          children: <Widget>[
-                                            Text(
-                                              '${_apr.toStringAsFixed(2)}%',
-                                              textAlign: isArabic ? TextAlign.right : TextAlign.left,
-                                              style: TextStyle(
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.bold,
-                                                color: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        isArabic 
-                                          ? 'معدل النسبة السنوي يشمل جميع الرسوم والتكاليف'
-                                          : 'APR includes all fees and charges',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _error!,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: isDarkMode ? Colors.white : Colors.black,
                                 ),
-                                const SizedBox(height: 24),
-
-                                // Action Buttons
-                                Row(
+                              ),
+                              const SizedBox(height: 24),
+                              if (_shouldContactSupport)
+                                Column(
                                   children: [
-                                    Expanded(
-                                      child: SizedBox(
-                                        height: 48,
-                                        child: ElevatedButton(
-                                          onPressed: !_isLoading ? _showDeclineConfirmation : null,
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.red,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            elevation: 2,
-                                            shadowColor: Colors.red.withOpacity(0.3),
-                                          ),
-                                          child: Text(
-                                            isArabic ? 'رفض' : 'Decline',
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.white,
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        Navigator.pushReplacement(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => CustomerServiceScreen(
+                                              isArabic: widget.isArabic,
+                                              source: 'loan_application',
+                                              applicationNumber: widget.userData['application_number']?.toString(),
                                             ),
                                           ),
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
+                                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        elevation: 2,
+                                        shadowColor: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor).withOpacity(0.3),
+                                      ),
+                                      child: Text(
+                                        widget.isArabic ? 'تواصل مع خدمة العملاء' : 'Contact Customer Service',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: SizedBox(
-                                        height: 48,
-                                        child: ElevatedButton(
-                                          onPressed: _showCongratulationsDialog,
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(0xFF00A650),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            elevation: 2,
-                                            shadowColor: const Color(0xFF00A650).withOpacity(0.3),
-                                          ),
-                                          child: Text(
-                                            isArabic ? 'موافق' : 'Approve',
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
+                                    const SizedBox(height: 16),
                                   ],
                                 ),
-                              ],
+                              ElevatedButton(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.grey,
+                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  elevation: 2,
+                                  shadowColor: Colors.grey.withOpacity(0.3),
+                                ),
+                                child: Text(
+                                  widget.isArabic ? 'رجوع' : 'Go Back',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    )
+                  else if (!canShowFinanceDetails && !_isLoading)
+                    Expanded(
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.warning_amber_rounded,
+                                color: Colors.orange,
+                                size: 48,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                isArabic 
+                                  ? 'عذراً، لا يمكن تقديم عرض تمويل في الوقت الحالي'
+                                  : 'Sorry, we cannot provide a finance offer at this time',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: isDarkMode ? Colors.white : Colors.black,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              ElevatedButton(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
+                                ),
+                                child: Text(isArabic ? 'رجوع' : 'Go Back'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    )
+                  else if (canShowFinanceDetails || _isLoading)
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Opacity(
+                          opacity: _isLoading ? 0.6 : 1.0,
+                          child: IgnorePointer(
+                            ignoring: _isLoading,
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(16.0, 12.0, 16.0, 16.0),
+                              child: Column(
+                                crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                children: [
+                                  // Finance Details Card
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Color(isDarkMode ? Constants.darkSurfaceColor : Constants.lightSurfaceColor),
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Color(isDarkMode ? Constants.darkPrimaryShadowColor : Constants.lightPrimaryShadowColor),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          isArabic ? 'تفاصيل التمويل' : 'Finance Details',
+                                          textAlign: isArabic ? TextAlign.right : TextAlign.left,
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        
+                                        // Finance Amount Section
+                                        Text(
+                                          isArabic ? 'مبلغ التمويل' : 'Finance Amount',
+                                          textAlign: isArabic ? TextAlign.right : TextAlign.left,
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: const Color(Constants.primaryColorValue).withOpacity(0.05),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment: isArabic ? MainAxisAlignment.end : MainAxisAlignment.start,
+                                            children: <Widget>[
+                                              Text(
+                                                isArabic ? 'ريال ' : 'SAR ',
+                                                textAlign: isArabic ? TextAlign.right : TextAlign.left,
+                                                style: const TextStyle(
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(0xFF00A650),
+                                                ),
+                                              ),
+                                              Text(
+                                                ' ' + financeAmount.toStringAsFixed(2),
+                                                textAlign: isArabic ? TextAlign.right : TextAlign.left,
+                                                style: const TextStyle(
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(0xFF00A650),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Directionality(
+                                          textDirection: TextDirection.ltr,
+                                          child: SliderTheme(
+                                            data: SliderThemeData(
+                                              activeTrackColor: Color(0xFF008040),
+                                              inactiveTrackColor: Color(0xFF008040).withOpacity(0.1),
+                                              thumbColor: Color(0xFF008040),
+                                              overlayColor: Color(0xFF008040).withOpacity(0.2),
+                                            ),
+                                            child: Slider(
+                                              value: safeFinanceAmount,
+                                              min: 10000.0,
+                                              max: max(_maxFinanceAmount, 10000.0).toDouble(),
+                                              onChanged: _updateFinanceAmount,
+                                              // Use the safeFinanceDivisions here
+                                              divisions: safeFinanceDivisions,
+                                              label: isArabic 
+                                                ? '${safeFinanceAmount.toStringAsFixed(0)} ريال'
+                                                : 'SAR ${safeFinanceAmount.toStringAsFixed(0)}',
+                                            ),
+                                          ),
+                                        ),
+                                        
+                                        const SizedBox(height: 16),
+                                        
+                                        // EMI Section
+                                        Text(
+                                          isArabic ? 'القسط الشهري' : 'Monthly Installment (EMI)',
+                                          textAlign: isArabic ? TextAlign.right : TextAlign.left,
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: const Color(Constants.primaryColorValue).withOpacity(0.05),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment: isArabic ? MainAxisAlignment.end : MainAxisAlignment.start,
+                                            children: <Widget>[
+                                              Text(
+                                                isArabic ? 'ريال ' : 'SAR ',
+                                                textAlign: isArabic ? TextAlign.right : TextAlign.left,
+                                                style: const TextStyle(
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(Constants.primaryColorValue),
+                                                ),
+                                              ),
+                                              Text(
+                                                ' ' + emi.toStringAsFixed(2),
+                                                textAlign: isArabic ? TextAlign.right : TextAlign.left,
+                                                style: const TextStyle(
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(Constants.primaryColorValue),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        
+                                        const SizedBox(height: 16),
+                                        
+                                        // Tenure Section
+                                        Text(
+                                          isArabic ? 'مدة التمويل' : 'Tenure (Months)',
+                                          textAlign: isArabic ? TextAlign.right : TextAlign.left,
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: const Color(Constants.primaryColorValue).withOpacity(0.05),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment: isArabic ? MainAxisAlignment.end : MainAxisAlignment.start,
+                                            children: <Widget>[
+                                              Text(
+                                                isArabic ? ' شهر' : ' $tenure',
+                                                textAlign: isArabic ? TextAlign.right : TextAlign.left,
+                                                style: const TextStyle(
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(Constants.primaryColorValue),
+                                                ),
+                                              ),
+                                              Text(
+                                                isArabic ? ' $tenure' : ' Months',
+                                                textAlign: isArabic ? TextAlign.left : TextAlign.right,
+                                                style: const TextStyle(
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(Constants.primaryColorValue),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Directionality(
+                                          textDirection: TextDirection.ltr,
+                                          child: SliderTheme(
+                                            data: SliderThemeData(
+                                              activeTrackColor: Color(0xFF008040),
+                                              inactiveTrackColor: Color(0xFF008040).withOpacity(0.1),
+                                              thumbColor: Color(0xFF008040),
+                                              overlayColor: Color(0xFF008040).withOpacity(0.2),
+                                            ),
+                                            child: Slider(
+                                              value: safeTenure,
+                                              min: 12.0,
+                                              max: 60.0,
+                                              onChanged: (value) => _updateTenure(value.round()),
+                                              divisions: 48, // Fixed non-zero divisions
+                                              label: isArabic
+                                                ? '${safeTenure.round()} شهر'
+                                                : '${safeTenure.round()} months',
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        
+                                        // Total Repayment Section
+                                        Text(
+                                          isArabic ? 'إجمالي المبلغ المستحق' : 'Total Repayment Amount',
+                                          textAlign: isArabic ? TextAlign.right : TextAlign.left,
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: const Color(Constants.primaryColorValue).withOpacity(0.05),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                mainAxisAlignment: isArabic ? MainAxisAlignment.end : MainAxisAlignment.start,
+                                                children: <Widget>[
+                                                  Text(
+                                                    isArabic ? 'ريال ' : 'SAR ',
+                                                    textAlign: isArabic ? TextAlign.right : TextAlign.left,
+                                                    style: const TextStyle(
+                                                      fontSize: 18,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Color(Constants.primaryColorValue),
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    ' ' + _totalRepayment.toStringAsFixed(2),
+                                                    textAlign: isArabic ? TextAlign.right : TextAlign.left,
+                                                    style: const TextStyle(
+                                                      fontSize: 18,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Color(Constants.primaryColorValue),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                isArabic 
+                                                  ? '(يشمل الفائدة: ${_interest.toStringAsFixed(2)} ريال)'
+                                                  : '(Including Interest: SAR ${_interest.toStringAsFixed(2)})',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey[600],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+
+                                  // Action Buttons
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: SizedBox(
+                                          height: 48,
+                                          child: ElevatedButton(
+                                            onPressed: !_isLoading ? _showDeclineConfirmation : null,
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.red,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              elevation: 2,
+                                              shadowColor: Colors.red.withOpacity(0.3),
+                                            ),
+                                            child: Text(
+                                              isArabic ? 'رفض' : 'Decline',
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: SizedBox(
+                                          height: 48,
+                                          child: ElevatedButton(
+                                            onPressed: _showCongratulationsDialog,
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFF00A650),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              elevation: 2,
+                                              shadowColor: const Color(0xFF00A650).withOpacity(0.3),
+                                            ),
+                                            child: Text(
+                                              isArabic ? 'موافق' : 'Approve',
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-              ],
-            ),
-          ),
-          // Loading Overlay
-          if (_isLoading)
-            Container(
-              color: (isDarkMode ? Colors.black : Colors.white).withOpacity(0.3),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: Color(isDarkMode ? Constants.darkSurfaceColor : Constants.lightSurfaceColor),
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Color(isDarkMode ? Constants.darkPrimaryShadowColor : Constants.lightPrimaryShadowColor),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        isArabic ? 'جاري المعالجة...' : 'Processing...',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                ],
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }

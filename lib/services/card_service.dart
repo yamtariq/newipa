@@ -120,10 +120,56 @@ class CardService {
       print('1. Input User Data:');
       print(const JsonEncoder.withIndent('  ').convert(userData));
       
-      // 💡 Get stored data from SharedPreferences only
+      // 💡 Get stored data from both SharedPreferences and SecureStorage
       final prefs = await SharedPreferences.getInstance();
-      final storedUserDataStr = prefs.getString('user_data');
+      String? dateOfBirth;
+
+      // 💡 Try to get DOB from all possible sources
+      print('\n=== CHECKING DOB FROM ALL SOURCES ===');
       
+      // Check registration data in SharedPreferences
+      final registrationDataStr = prefs.getString('registration_data');
+      if (registrationDataStr != null) {
+        final registrationData = jsonDecode(registrationDataStr);
+        if (registrationData['userData']?['dateOfBirth'] != null) {
+          dateOfBirth = registrationData['userData']['dateOfBirth'];
+          print('Found DOB in registration_data: $dateOfBirth');
+        }
+      }
+
+      // If not found, check user_data in SharedPreferences
+      if (dateOfBirth == null) {
+        final userDataStr = prefs.getString('user_data');
+        if (userDataStr != null) {
+          final userData = jsonDecode(userDataStr);
+          if (userData['date_of_birth'] != null) {
+            dateOfBirth = userData['date_of_birth'];
+            print('Found DOB in user_data: $dateOfBirth');
+          }
+        }
+      }
+
+      // If still not found, check SecureStorage
+      if (dateOfBirth == null) {
+        try {
+          dateOfBirth = await _secureStorage.read(key: 'date_of_birth');
+          if (dateOfBirth != null) {
+            print('Found DOB in SecureStorage: $dateOfBirth');
+          }
+        } catch (e) {
+          print('Error reading from SecureStorage: $e');
+        }
+      }
+
+      // If still not found, throw error
+      if (dateOfBirth == null) {
+        throw Exception('Date of birth not found in any storage location');
+      }
+
+      print('Final DOB being used: $dateOfBirth');
+
+      // Get the rest of the stored user data
+      final storedUserDataStr = prefs.getString('user_data');
       if (storedUserDataStr == null) {
         throw Exception('User data not found in storage');
       }
@@ -172,7 +218,7 @@ class CardService {
       // 💡 Prepare request data with existing data structure
       final requestData = {
         "nationnalID": storedUserData['national_id'],
-        "dob": formatHijriDate(storedUserData['date_of_birth']),
+        "dob": formatHijriDate(dateOfBirth),
         "doe": formatHijriDate(storedUserData['id_expiry_date']),
         "finPurpose": "BUF",
         "language": isArabic ? 1 : 0,
@@ -202,8 +248,8 @@ class CardService {
 
       // Add debug logging for date fields
       print('\n2. Date Fields Debug:');
-      print('Date of Birth: ${storedUserData['date_of_birth']}');
-      print('Formatted DOB: ${formatHijriDate(storedUserData['date_of_birth'])}');
+      print('Date of Birth: ${dateOfBirth}');
+      print('Formatted DOB: ${formatHijriDate(dateOfBirth)}');
       print('ID Expiry Date: ${storedUserData['id_expiry_date']}');
       print('Formatted DOE: ${formatHijriDate(storedUserData['id_expiry_date'])}');
 
@@ -286,6 +332,25 @@ class CardService {
       try {
         final jsonResponse = json.decode(responseBody);
         print(const JsonEncoder.withIndent('  ').convert(jsonResponse));
+        
+        // 💡 If successful, determine card type based on eligibleAmount
+        if (jsonResponse['success'] && jsonResponse['result']?['eligibleAmount'] != null) {
+          final eligibleAmount = double.tryParse(jsonResponse['result']['eligibleAmount'].toString()) ?? 0;
+          print('\nDetermining card type based on eligible amount: $eligibleAmount');
+          
+          try {
+            final cardTypeData = await _getCardTypeForAmount(eligibleAmount);
+            // Add card type to response
+            jsonResponse['card_type'] = cardTypeData['type'];
+            jsonResponse['card_type_ar'] = cardTypeData['typeAr'];
+            print('Determined card type: ${cardTypeData['type']}');
+            print('Determined card type (Arabic): ${cardTypeData['typeAr']}');
+          } catch (e) {
+            print('Error determining card type: $e');
+            // Don't throw here, just log the error as this is not critical
+          }
+        }
+        
         return jsonResponse;
       } catch (e) {
         print('Error parsing response: $e');
@@ -340,20 +405,50 @@ class CardService {
       final finnoneClient = HttpClient()
         ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
 
-      final finnoneRequest = await finnoneClient.postUrl(Uri.parse(Constants.endpointFinnoneUpdateAmount));
+      // 💡 Prepare proxy request with structured format
+      final targetUrl = Uri.parse(Constants.endpointFinnoneUpdateAmount).toString();
+      print('\nTarget URL before encoding: $targetUrl');
       
-      // Add headers
+      final proxyRequest = {
+        'TargetUrl': targetUrl,
+        'Method': 'POST',
+        'InternalHeaders': {
+          ...Constants.bankApiHeaders,
+          'Content-Type': 'application/json',
+        },
+        'Body': finnoneUpdateData
+      };
+
+      final proxyUrl = Uri.parse('${Constants.apiBaseUrl}/proxy/forward');
+      print('\nProxy URL: $proxyUrl');
+      
+      final finnoneRequest = await finnoneClient.postUrl(proxyUrl);
+      
+      // 💡 Add proxy headers
       final headers = {
-        ...Constants.bankApiHeaders,
-        'api-key': Constants.apiKey,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'x-api-key': Constants.apiKey,
       };
       
+      // Log request details
+      print('\n=== FINNONE UPDATE AMOUNT REQUEST DETAILS ===');
+      print('Proxy Endpoint: ${Constants.apiBaseUrl}/proxy/forward');
+      print('Target URL: ${Constants.endpointFinnoneUpdateAmount}');
+      print('Headers:');
+      headers.forEach((key, value) {
+        print('$key: ${key.toLowerCase() == 'authorization' ? '[REDACTED]' : value}');
+      });
+      print('\nProxy Request Body:');
+      print(const JsonEncoder.withIndent('  ').convert(proxyRequest));
+
+      // Set headers and send request
       headers.forEach((key, value) {
         finnoneRequest.headers.set(key, value);
       });
-
+      
       // Add body
-      finnoneRequest.write(jsonEncode(finnoneUpdateData));
+      finnoneRequest.write(jsonEncode(proxyRequest));
       
       final finnoneResponse = await finnoneRequest.close();
       final finnoneResponseBody = await finnoneResponse.transform(utf8.decoder).join();
@@ -376,13 +471,6 @@ class CardService {
       final client = HttpClient()
         ..badCertificateCallback = ((X509Certificate cert, String host, int port) => true);
 
-      final request = await client.postUrl(Uri.parse(Constants.endpointUpdateCustomer));
-      
-      // 💡 Combine both proxy and bank headers
-      headers.forEach((key, value) {
-        request.headers.set(key, value);
-      });
-
       // 💡 Prepare request body
       final requestBody = {
         'nationnalID': cardData['national_id'],
@@ -394,8 +482,50 @@ class CardService {
       print('\n4. UpdateCustomer Request Body:');
       print(const JsonEncoder.withIndent('  ').convert(requestBody));
 
+      // 💡 Prepare proxy request with structured format
+      final updateCustomerTargetUrl = Uri.parse(Constants.endpointUpdateCustomer).toString();
+      print('\nTarget URL before encoding: $updateCustomerTargetUrl');
+      
+      final updateCustomerProxyRequest = {
+        'TargetUrl': updateCustomerTargetUrl,
+        'Method': 'POST',
+        'InternalHeaders': {
+          ...Constants.bankApiHeaders,
+          'Content-Type': 'application/json',
+        },
+        'Body': requestBody
+      };
+
+      final updateCustomerProxyUrl = Uri.parse('${Constants.apiBaseUrl}/proxy/forward');
+      print('\nProxy URL: $updateCustomerProxyUrl');
+      
+      final request = await client.postUrl(updateCustomerProxyUrl);
+      
+      // 💡 Add proxy headers
+      final updateCustomerHeaders = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'x-api-key': Constants.apiKey,
+      };
+      
+      // Log request details
+      print('\n=== UPDATE CUSTOMER REQUEST DETAILS ===');
+      print('Proxy Endpoint: ${Constants.apiBaseUrl}/proxy/forward');
+      print('Target URL: ${Constants.endpointUpdateCustomer}');
+      print('Headers:');
+      updateCustomerHeaders.forEach((key, value) {
+        print('$key: ${key.toLowerCase() == 'authorization' ? '[REDACTED]' : value}');
+      });
+      print('\nProxy Request Body:');
+      print(const JsonEncoder.withIndent('  ').convert(updateCustomerProxyRequest));
+
+      // Set headers and send request
+      updateCustomerHeaders.forEach((key, value) {
+        request.headers.set(key, value);
+      });
+      
       // Add body
-      request.write(jsonEncode(requestBody));
+      request.write(jsonEncode(updateCustomerProxyRequest));
       
       final response = await request.close();
       final responseBody = await response.transform(utf8.decoder).join();

@@ -4,25 +4,22 @@ workflows:
     max_build_duration: 120
     instance_type: mac_mini_m2
     environment:
-      flutter: stable
+      flutter: 3.16.9
       xcode: latest
       cocoapods: default
       vars:
         BUNDLE_ID: "com.nayifat.nayifatApp"
     scripts:
-      - name: Clean and Setup
+      - name: Build Preparation
         script: |
           flutter clean
           flutter pub get
           
-      - name: Remove iOS directory
+      - name: Install CocoaPods
         script: |
-          rm -rf ios
-          
-      - name: Create fresh iOS project
-        script: |
-          flutter create --platforms ios .
-          flutter pub get
+          cd ios
+          pod install
+          cd ..
           
       - name: Set iOS deployment target
         script: |
@@ -30,18 +27,9 @@ workflows:
           LC_ALL=C find . -type f -name "*.pbxproj" -exec sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 12.0/IPHONEOS_DEPLOYMENT_TARGET = 14.0/g' {} +
           cd ..
           
-      - name: Install CocoaPods
-        script: |
-          cd ios
-          pod repo update
-          rm -rf Pods Podfile.lock
-          pod cache clean --all
-          pod install --repo-update
-          cd ..
-          
       - name: Build unsigned IPA
         script: |
-          flutter build ipa --release --no-codesign --no-tree-shake-icons
+          flutter build ipa --no-codesign --no-tree-shake-icons --dart-define=BUILD_MODE=production
           
     artifacts:
       - build/ios/ipa/*.ipa

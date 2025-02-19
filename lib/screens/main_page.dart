@@ -715,36 +715,39 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
         ? Constants.darkLabelTextColor 
         : Constants.lightLabelTextColor);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(
-                  text: widget.isArabic ? 'مرحباً ' : 'Welcome ',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.normal,
-                    color: textColor,
-                  ),
-                ),
-                if (userName != null)
+    return Directionality(
+      textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text.rich(
+              TextSpan(
+                children: [
                   TextSpan(
-                    text: userName!,
+                    text: widget.isArabic ? 'مرحباً ' : 'Welcome ',
                     style: TextStyle(
                       fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.normal,
                       color: textColor,
                     ),
                   ),
-              ],
+                  if (userName != null)
+                    TextSpan(
+                      text: userName!,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
-          _buildAuthButtons(),
-        ],
+            _buildAuthButtons(),
+          ],
+        ),
       ),
     );
   }
@@ -935,30 +938,6 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                                 },
                               );
                             }).toList(),
-                          ),
-                        ),
-
-                        // 💡 Add Check Storage Button
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                          child: ElevatedButton(
-                            onPressed: _checkLocalStorage,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: primaryColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.storage),
-                                SizedBox(width: 8),
-                                Text(widget.isArabic ? 'فحص التخزين المحلي' : 'Check Local Storage'),
-                              ],
-                            ),
                           ),
                         ),
 
@@ -1447,52 +1426,54 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(color: primaryColor.withOpacity(0.3)),
                               ),
-                              child: Row(
+                              child: Directionality(
                                 textDirection: widget.isArabic ? TextDirection.rtl : TextDirection.ltr,
-                                children: <Widget>[
-                                  Container(
-                                    width: 60,
-                                    decoration: BoxDecoration(
-                                      color: primaryColor.withOpacity(0.1),
-                                      borderRadius: BorderRadius.horizontal(
-                                        left: widget.isArabic ? Radius.zero : const Radius.circular(8),
-                                        right: widget.isArabic ? const Radius.circular(8) : Radius.zero,
+                                child: Row(
+                                  children: <Widget>[
+                                    Container(
+                                      width: 60,
+                                      decoration: BoxDecoration(
+                                        color: primaryColor.withOpacity(0.1),
+                                        borderRadius: BorderRadius.horizontal(
+                                          left: widget.isArabic ? Radius.zero : const Radius.circular(8),
+                                          right: widget.isArabic ? const Radius.circular(8) : Radius.zero,
+                                        ),
                                       ),
-                                    ),
-                                    child: Center(
-                                      child: Icon(
-                                        Icons.calculate,
-                                        color: Color(isDarkMode 
-                                            ? Constants.darkLabelTextColor 
-                                            : Constants.lightLabelTextColor),
-                                        size: 36,
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                                      child: Text(
-                                        widget.isArabic ? 'حاسبة التمويل' : 'Loan Calculator',
-                                        style: TextStyle(
+                                      child: Center(
+                                        child: Icon(
+                                          Icons.calculate,
                                           color: Color(isDarkMode 
                                               ? Constants.darkLabelTextColor 
                                               : Constants.lightLabelTextColor),
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w500,
+                                          size: 36,
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(16.0),
-                                    child: Icon(
-                                      widget.isArabic ? Icons.chevron_right : Icons.chevron_right,
-                                      color: primaryColor,
-                                      size: 20,
+                                    Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                                        child: Text(
+                                          widget.isArabic ? 'حاسبة التمويل' : 'Loan Calculator',
+                                          style: TextStyle(
+                                            color: Color(isDarkMode 
+                                                ? Constants.darkLabelTextColor 
+                                                : Constants.lightLabelTextColor),
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                    Padding(
+                                      padding: const EdgeInsets.all(16.0),
+                                      child: Icon(
+                                        Icons.chevron_right,
+                                        color: primaryColor,
+                                        size: 20,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -1855,7 +1836,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     // Show only Sign Off when session is active
     if (hasActiveSession) {
       return Container(
-        margin: const EdgeInsets.only(left: 8),
+        margin: EdgeInsets.only(right: widget.isArabic ? 8 : 0, left: widget.isArabic ? 0 : 8), // 💡 RTL-aware margin
         child: TextButton(
           onPressed: _handleSignOff,
           style: TextButton.styleFrom(
@@ -1883,7 +1864,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
       return Row(
         children: [
           Container(
-            margin: const EdgeInsets.only(left: 8),
+            margin: EdgeInsets.only(right: widget.isArabic ? 8 : 0, left: widget.isArabic ? 0 : 8), // 💡 RTL-aware margin
             child: TextButton(
               onPressed: () => _navigateToPage('/signin'),
               style: TextButton.styleFrom(
@@ -1905,7 +1886,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
             ),
           ),
           Container(
-            margin: const EdgeInsets.only(left: 8),
+            margin: EdgeInsets.only(right: widget.isArabic ? 8 : 0, left: widget.isArabic ? 0 : 8), // 💡 RTL-aware margin
             child: TextButton(
               onPressed: _handleSignOutDevice,
               style: TextButton.styleFrom(
@@ -1934,7 +1915,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     return Row(
       children: [
         Container(
-          margin: const EdgeInsets.only(left: 8),
+          margin: EdgeInsets.only(right: widget.isArabic ? 8 : 0, left: widget.isArabic ? 0 : 8), // 💡 RTL-aware margin
           child: TextButton(
             onPressed: () => _navigateToPage('/signin'),
             style: TextButton.styleFrom(
@@ -1956,7 +1937,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
           ),
         ),
         Container(
-          margin: const EdgeInsets.only(left: 8),
+          margin: EdgeInsets.only(right: widget.isArabic ? 8 : 0, left: widget.isArabic ? 0 : 8), // 💡 RTL-aware margin
           child: TextButton(
             onPressed: () => _navigateToPage('/register'),
             style: TextButton.styleFrom(
@@ -1998,34 +1979,6 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
 
     } catch (e) {
       print('-----STORAGE DATA----- Error logging storage data: $e');
-    }
-  }
-
-  // 💡 Add function to check local storage contents
-  Future<void> _checkLocalStorage() async {
-    try {
-      print('\n=== T_LocalStorage_START ===');
-      
-      // Check SharedPreferences
-      print('\nT_LocalStorage_SharedPreferences:');
-      final prefs = await SharedPreferences.getInstance();
-      final keys = prefs.getKeys();
-      for (String key in keys) {
-        final value = prefs.get(key);
-        print('T_LocalStorage_SP_$key: $value');
-      }
-      
-      // Check SecureStorage
-      print('\nT_LocalStorage_SecureStorage:');
-      final secureStorage = const FlutterSecureStorage();
-      final allSecureValues = await secureStorage.readAll();
-      allSecureValues.forEach((key, value) {
-        print('T_LocalStorage_SS_$key: $value');
-      });
-      
-      print('\n=== T_LocalStorage_END ===');
-    } catch (e) {
-      print('T_LocalStorage_ERROR: $e');
     }
   }
 

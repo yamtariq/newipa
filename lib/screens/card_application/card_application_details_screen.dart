@@ -11,6 +11,7 @@ import '../../providers/theme_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/document_upload_service.dart';
 import '../../services/card_service.dart';
+import 'package:lottie/lottie.dart';
 
 class CardApplicationDetailsScreen extends StatefulWidget {
   final bool isArabic;
@@ -20,7 +21,7 @@ class CardApplicationDetailsScreen extends StatefulWidget {
   State<CardApplicationDetailsScreen> createState() => _CardApplicationDetailsScreenState();
 }
 
-class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScreen> {
+class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScreen> with SingleTickerProviderStateMixin {
   final _secureStorage = const FlutterSecureStorage();
   final _cardService = CardService();
   bool _isLoading = true;
@@ -29,11 +30,22 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
   bool _salaryChanged = false;
   bool _consentAccepted = false;
   bool get isArabic => widget.isArabic;
+  late final AnimationController _rotationController;
 
   @override
   void initState() {
     super.initState();
     _fetchUserData();
+    _rotationController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _rotationController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchUserData() async {
@@ -343,7 +355,7 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
     }
   }
 
-  Widget _buildUploadOverlay(BuildContext context, {required bool isArabic}) {
+  Widget _buildLoadingOverlay() {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final primaryColor = Color(themeProvider.isDarkMode 
         ? Constants.darkPrimaryColor 
@@ -355,140 +367,87 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
         ? Constants.darkLabelTextColor 
         : Constants.lightLabelTextColor);
 
-    return Container(
-      color: Colors.black54,
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-          decoration: BoxDecoration(
-            color: surfaceColor,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: primaryColor.withOpacity(0.2),
-                blurRadius: 20,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 48,
-                height: 48,
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
-                  strokeWidth: 3,
+    return Stack(
+      children: [
+        // Semi-transparent background
+        Container(
+          color: Colors.black.withOpacity(0.5),
+        ),
+        // Loading content
+        Center(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: surfaceColor,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: primaryColor.withOpacity(0.2),
+                  blurRadius: 20,
+                  offset: const Offset(0, 5),
                 ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                isArabic ? 'جاري تحميل المستند' : 'Uploading document',
-                style: TextStyle(
-                  color: textColor,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  decoration: TextDecoration.none,
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Top fading logo
+                SizedBox(
+                  width: 150,
+                  height: 150,
+                  child: Lottie.asset(
+                    'assets/animations/loan_processing.json',
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      print('Error loading animation: $error');
+                      return const CircularProgressIndicator();
+                    },
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                isArabic ? 'يرجى الانتظار' : 'Please wait',
-                style: TextStyle(
-                  color: textColor.withOpacity(0.7),
-                  fontSize: 14,
-                  decoration: TextDecoration.none,
+                const SizedBox(height: 24),
+                Text(
+                  isArabic ? 'جاري معالجة طلبك' : 'Processing Your Application',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                Text(
+                  isArabic 
+                    ? 'يرجى الانتظار بينما نقوم بتجهيز عرض البطاقة الخاص بك'
+                    : 'Please wait while we prepare your card offer',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: textColor.withOpacity(0.7),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                // Bottom rotating logo
+                SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: RotationTransition(
+                    turns: _rotationController,
+                    child: Image.asset(
+                      themeProvider.isDarkMode
+                        ? 'assets/images/nayifat-circle-grey.png'
+                        : 'assets/images/nayifatlogocircle-nobg.png',
+                      width: 40,
+                      height: 40,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
+      ],
     );
-  }
-
-  Future<void> _pickFile(String field) async {
-    print('Picking file for field: $field');
-    print('Current uploaded files before picking: $_uploadedFiles');
-    try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
-        allowCompression: true,
-        withData: true,
-        onFileLoading: (FilePickerStatus status) {
-          if (status == FilePickerStatus.picking) {
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (BuildContext context) => _buildUploadOverlay(context, isArabic: isArabic),
-            );
-          } else {
-            Navigator.of(context).pop();
-          }
-        },
-      );
-
-      if (result != null) {
-        final file = result.files.single;
-        // Check file size (max 10MB)
-        if (file.size > 10 * 1024 * 1024) {
-          _showError(isArabic ? 'يجب أن يكون حجم الملف أقل من 10 ميجابايت' : 'File size must be less than 10MB');
-          return;
-        }
-
-        // 💡 Upload document to server
-        final documentUploadService = DocumentUploadService();
-        final nationalId = _userData['national_id']?.toString() ?? '';
-        
-        if (nationalId.isEmpty) {
-          _showError(isArabic ? 'لم يتم العثور على رقم الهوية' : 'National ID not found');
-          return;
-        }
-
-        // Show loading dialog
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext context) => _buildUploadOverlay(context, isArabic: isArabic),
-        );
-
-        // Upload document
-        final success = await documentUploadService.uploadDocument(
-          nationalId: nationalId,
-          documentType: field,
-          filePath: file.path!,
-          fileName: file.name,
-          productType: 'card',
-        );
-
-        // Hide loading dialog
-        Navigator.of(context).pop();
-
-        if (success) {
-          setState(() {
-            _uploadedFiles[field] = file.name;
-            print('File picked and uploaded successfully. Updated uploaded files: $_uploadedFiles');
-            // Only reset salary changed flag for salary document
-            if (field == 'salary') {
-              _salaryChanged = false;
-            }
-          });
-        } else {
-          _showError(isArabic 
-            ? 'فشل تحميل المستند. الرجاء المحاولة مرة أخرى'
-            : 'Failed to upload document. Please try again');
-        }
-      } else {
-        print('User canceled file picking');
-      }
-    } catch (e) {
-      print('Error picking file: $e');
-      _showError(isArabic 
-        ? 'خطأ في اختيار الملف: ${e.toString()}'
-        : 'Error picking file: ${e.toString()}');
-    }
   }
 
   Widget _buildUpdateDialog(String field, String currentValue) {
@@ -698,7 +657,7 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
                           showDialog(
                             context: context,
                             barrierDismissible: false,
-                            builder: (BuildContext context) => _buildUploadOverlay(context, isArabic: isArabic),
+                            builder: (BuildContext context) => _buildLoadingOverlay(),
                           );
 
                           // Upload document
@@ -1183,147 +1142,151 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
     }
   }
 
-  Future<void> _handleNextButtonClick() async {
-    try {
-      // 💡 Validate name on card first
-      if (_userData['nameOnCard']?.toString().trim().isEmpty ?? true) {
-        _showError(isArabic 
-          ? 'الاسم على البطاقة مطلوب'
-          : 'Name on card is required');
-        return;
-      }
+  Widget _buildUploadOverlay(BuildContext context, {required bool isArabic}) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final primaryColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkPrimaryColor 
+        : Constants.lightPrimaryColor);
+    final surfaceColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkSurfaceColor 
+        : Constants.lightSurfaceColor);
+    final textColor = Color(themeProvider.isDarkMode 
+        ? Constants.darkLabelTextColor 
+        : Constants.lightLabelTextColor);
 
-      if (!RegExp(r'^[A-Z\s]+$').hasMatch(_userData['nameOnCard'])) {
-        _showError(isArabic 
-          ? 'يجب أن يحتوي الاسم على أحرف إنجليزية كبيرة فقط'
-          : 'Name must contain only capital English letters');
-        return;
-      }
-
-      if (_userData['nameOnCard'].length > 26) {
-        _showError(isArabic
-          ? 'يجب ألا يتجاوز الاسم 26 حرفاً'
-          : 'Name cannot exceed 26 characters');
-        return;
-      }
-
-      setState(() => _isLoading = true);
-
-      print('\n=== CARD APPLICATION REQUEST START ===');
-      print('Preparing request data...');
-      
-      // Log all user data being sent
-      print('\nUser Data being sent:');
-      print('- Name: ${_userData['name']}');
-      print('- Arabic Name: ${_userData['arabic_name']}');
-      print('- National ID: ${_userData['national_id']}');
-      print('- Email: ${_userData['email']}');
-      print('- Phone: ${_userData['phone']}');
-      print('- Date of Birth: ${_userData['date_of_birth']}');
-      print('- Salary: ${_userData['salary']}');
-      print('- Food Expense: ${_userData['food_expense']}');
-      print('- Transportation Expense: ${_userData['transportation_expense']}');
-      print('- Other Liabilities: ${_userData['other_liabilities']}');
-      print('- Dependents: ${_userData['dependents']}');
-      print('- Name on Card: ${_userData['nameOnCard']}');
-      
-      print('\nUploaded Documents:');
-      _uploadedFiles.forEach((key, value) {
-        print('- $key: $value');
-      });
-
-      // Call the card service to create customer request
-      print('\nCalling CardService.createCustomerCardRequest...');
-      final response = await _cardService.createCustomerCardRequest(_userData, isArabic);
-      
-      print('\nAPI Response received:');
-      print('Response Data: $response');
-
-      if (!mounted) return;
-
-      setState(() => _isLoading = false);
-
-      // 💡 Handle null response
-      if (response == null) {
-        _showError(isArabic 
-          ? 'حدث خطأ أثناء إنشاء طلب البطاقة'
-          : 'Error creating card request: No response received');
-        return;
-      }
-
-      // 💡 Handle error response
-      if (response['status'] == 'error') {
-        print('\nError in response:');
-        print('Status: ${response['status']}');
-        print('Message: ${response['message']}');
-        print('=== CARD APPLICATION REQUEST END (WITH ERROR) ===\n');
-        
-        // If it's a server error or requires support contact, navigate to card offer screen with error details
-        if (response['error_type'] == 'SERVER_ERROR' || 
-            response['error_type'] == 'NOT_ELIGIBLE' || 
-            response['should_contact_support'] == true) {
-          if (!mounted) return;
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => CardOfferScreen(
-                userData: {
-                  ...response,
-                  'national_id': _userData['national_id'],
-                  'nameOnCard': _userData['nameOnCard'],
-                },
-                isArabic: isArabic,
-                maxCreditLimit: 0,
-                minCreditLimit: 0,
+    return Container(
+      color: Colors.black54,
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+          decoration: BoxDecoration(
+            color: surfaceColor,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: primaryColor.withOpacity(0.2),
+                blurRadius: 20,
+                offset: const Offset(0, 5),
               ),
-            ),
-          );
-          return;
-        }
-        
-        // For other errors, show error message
-        _showError(isArabic 
-          ? (response['message_ar'] ?? response['message'] ?? 'حدث خطأ أثناء إنشاء طلب البطاقة')
-          : (response['message'] ?? 'Error creating card request'));
-        return;
-      }
-
-      print('\nSuccessful response:');
-      print('Credit Limit: ${response['credit_limit']}');
-      print('Application Number: ${response['application_number']}');
-      print('=== CARD APPLICATION REQUEST END (SUCCESS) ===\n');
-
-      // Navigate to offer screen
-      if (!mounted) return;
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CardOfferScreen(
-            userData: {
-              ...response, // Include all response data
-              'national_id': _userData['national_id'],  // Add national_id
-              'application_number': response['application_number'],
-              'card_type': response['card_type'],
-              'card_type_ar': response['card_type_ar'],
-              'nameOnCard': _userData['nameOnCard'], // Pass name on card
-            },
-            isArabic: isArabic,
-            maxCreditLimit: response['credit_limit']?.toInt() ?? 0,
-            minCreditLimit: 0,
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                  strokeWidth: 3,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                isArabic ? 'جاري تحميل المستند' : 'Uploading document',
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isArabic ? 'يرجى الانتظار' : 'Please wait',
+                style: TextStyle(
+                  color: textColor.withOpacity(0.7),
+                  fontSize: 14,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ],
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _pickFile(String field) async {
+    print('Picking file for field: $field');
+    print('Current uploaded files before picking: $_uploadedFiles');
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+        allowCompression: true,
+        withData: true,
+        onFileLoading: (FilePickerStatus status) {
+          if (status == FilePickerStatus.picking) {
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (BuildContext context) => _buildUploadOverlay(context, isArabic: isArabic),
+            );
+          } else {
+            Navigator.of(context).pop();
+          }
+        },
       );
 
+      if (result != null) {
+        final file = result.files.single;
+        // Check file size (max 10MB)
+        if (file.size > 10 * 1024 * 1024) {
+          _showError(isArabic ? 'يجب أن يكون حجم الملف أقل من 10 ميجابايت' : 'File size must be less than 10MB');
+          return;
+        }
+
+        // 💡 Upload document to server
+        final documentUploadService = DocumentUploadService();
+        final nationalId = _userData['national_id']?.toString() ?? '';
+        
+        if (nationalId.isEmpty) {
+          _showError(isArabic ? 'لم يتم العثور على رقم الهوية' : 'National ID not found');
+          return;
+        }
+
+        // Show loading dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) => _buildUploadOverlay(context, isArabic: isArabic),
+        );
+
+        // Upload document
+        final success = await documentUploadService.uploadDocument(
+          nationalId: nationalId,
+          documentType: field,
+          filePath: file.path!,
+          fileName: file.name,
+          productType: 'card',
+        );
+
+        // Hide loading dialog
+        Navigator.of(context).pop();
+
+        if (success) {
+          setState(() {
+            _uploadedFiles[field] = file.name;
+            print('File picked and uploaded successfully. Updated uploaded files: $_uploadedFiles');
+            // Only reset salary changed flag for salary document
+            if (field == 'salary') {
+              _salaryChanged = false;
+            }
+          });
+        } else {
+          _showError(isArabic 
+            ? 'فشل تحميل المستند. الرجاء المحاولة مرة أخرى'
+            : 'Failed to upload document. Please try again');
+        }
+      } else {
+        print('User canceled file picking');
+      }
     } catch (e) {
-      print('\nException caught:');
-      print('Error: $e');
-      print('Stack trace: ${StackTrace.current}');
-      print('=== CARD APPLICATION REQUEST END (WITH EXCEPTION) ===\n');
-      
-      setState(() => _isLoading = false);
+      print('Error picking file: $e');
       _showError(isArabic 
-        ? 'حدث خطأ أثناء إنشاء طلب البطاقة' 
-        : 'Error creating card request: $e');
+        ? 'خطأ في اختيار الملف: ${e.toString()}'
+        : 'Error picking file: ${e.toString()}');
     }
   }
 
@@ -1346,7 +1309,7 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
     if (_isLoading) {
       return Scaffold(
         backgroundColor: backgroundColor,
-        body: Center(child: CircularProgressIndicator(color: primaryColor)),
+        body: _buildLoadingOverlay(),
       );
     }
 
@@ -1607,5 +1570,149 @@ class _CardApplicationDetailsScreenState extends State<CardApplicationDetailsScr
         ),
       ),
     );
+  }
+
+  Future<void> _handleNextButtonClick() async {
+    try {
+      // 💡 Validate name on card first
+      if (_userData['nameOnCard']?.toString().trim().isEmpty ?? true) {
+        _showError(isArabic 
+          ? 'الاسم على البطاقة مطلوب'
+          : 'Name on card is required');
+        return;
+      }
+
+      if (!RegExp(r'^[A-Z\s]+$').hasMatch(_userData['nameOnCard'])) {
+        _showError(isArabic 
+          ? 'يجب أن يحتوي الاسم على أحرف إنجليزية كبيرة فقط'
+          : 'Name must contain only capital English letters');
+        return;
+      }
+
+      if (_userData['nameOnCard'].length > 26) {
+        _showError(isArabic
+          ? 'يجب ألا يتجاوز الاسم 26 حرفاً'
+          : 'Name cannot exceed 26 characters');
+        return;
+      }
+
+      setState(() => _isLoading = true);
+
+      print('\n=== CARD APPLICATION REQUEST START ===');
+      print('Preparing request data...');
+      
+      // Log all user data being sent
+      print('\nUser Data being sent:');
+      print('- Name: ${_userData['name']}');
+      print('- Arabic Name: ${_userData['arabic_name']}');
+      print('- National ID: ${_userData['national_id']}');
+      print('- Email: ${_userData['email']}');
+      print('- Phone: ${_userData['phone']}');
+      print('- Date of Birth: ${_userData['date_of_birth']}');
+      print('- Salary: ${_userData['salary']}');
+      print('- Food Expense: ${_userData['food_expense']}');
+      print('- Transportation Expense: ${_userData['transportation_expense']}');
+      print('- Other Liabilities: ${_userData['other_liabilities']}');
+      print('- Dependents: ${_userData['dependents']}');
+      print('- Name on Card: ${_userData['nameOnCard']}');
+      
+      print('\nUploaded Documents:');
+      _uploadedFiles.forEach((key, value) {
+        print('- $key: $value');
+      });
+
+      // Call the card service to create customer request
+      print('\nCalling CardService.createCustomerCardRequest...');
+      final response = await _cardService.createCustomerCardRequest(_userData, isArabic);
+      
+      print('\nAPI Response received:');
+      print('Response Data: $response');
+
+      if (!mounted) return;
+
+      setState(() => _isLoading = false);
+
+      // 💡 Handle null response
+      if (response == null) {
+        _showError(isArabic 
+          ? 'حدث خطأ أثناء إنشاء طلب البطاقة'
+          : 'Error creating card request: No response received');
+        return;
+      }
+
+      // 💡 Handle error response
+      if (response['status'] == 'error') {
+        print('\nError in response:');
+        print('Status: ${response['status']}');
+        print('Message: ${response['message']}');
+        print('=== CARD APPLICATION REQUEST END (WITH ERROR) ===\n');
+        
+        // If it's a server error or requires support contact, navigate to card offer screen with error details
+        if (response['error_type'] == 'SERVER_ERROR' || 
+            response['error_type'] == 'NOT_ELIGIBLE' || 
+            response['should_contact_support'] == true) {
+          if (!mounted) return;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => CardOfferScreen(
+                userData: {
+                  ...response,
+                  'national_id': _userData['national_id'],
+                  'nameOnCard': _userData['nameOnCard'],
+                },
+                isArabic: isArabic,
+                maxCreditLimit: 0,
+                minCreditLimit: 0,
+              ),
+            ),
+          );
+          return;
+        }
+        
+        // For other errors, show error message
+        _showError(isArabic 
+          ? (response['message_ar'] ?? response['message'] ?? 'حدث خطأ أثناء إنشاء طلب البطاقة')
+          : (response['message'] ?? 'Error creating card request'));
+        return;
+      }
+
+      print('\nSuccessful response:');
+      print('Credit Limit: ${response['credit_limit']}');
+      print('Application Number: ${response['application_number']}');
+      print('=== CARD APPLICATION REQUEST END (SUCCESS) ===\n');
+
+      // Navigate to offer screen
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CardOfferScreen(
+            userData: {
+              ...response, // Include all response data
+              'national_id': _userData['national_id'],  // Add national_id
+              'application_number': response['application_number'],
+              'card_type': response['card_type'],
+              'card_type_ar': response['card_type_ar'],
+              'nameOnCard': _userData['nameOnCard'], // Pass name on card
+            },
+            isArabic: isArabic,
+            maxCreditLimit: response['credit_limit']?.toInt() ?? 0,
+            minCreditLimit: 0,
+          ),
+        ),
+      );
+
+    } catch (e) {
+      print('\nException caught:');
+      print('Error: $e');
+      print('Stack trace: ${StackTrace.current}');
+      print('=== CARD APPLICATION REQUEST END (WITH EXCEPTION) ===\n');
+      
+      setState(() => _isLoading = false);
+      _showError(isArabic 
+        ? 'حدث خطأ أثناء إنشاء طلب البطاقة' 
+        : 'Error creating card request: $e');
+    }
   }
 } 

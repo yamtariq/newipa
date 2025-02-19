@@ -45,45 +45,97 @@ class _CardOfferScreenState extends State<CardOfferScreen> {
   void initState() {
     super.initState();
     
+    print('\n=== CARD OFFER SCREEN INITIALIZATION - START ===');
+    print('User Data: ${const JsonEncoder.withIndent('  ').convert(widget.userData)}');
+    
     // 💡 First check for errors in the response
     if (widget.userData['success'] == false) {
-      _error = widget.isArabic 
-        ? 'عذراً، لا يمكن المتابعة'
-        : 'Sorry, cannot proceed';
+      print('\nResponse indicates failure. Checking error details...');
+      _shouldContactSupport = true; // All error cases need customer care link
       
       // Check if there are any errors in the response
       if (widget.userData['errors'] != null && widget.userData['errors'] is List && widget.userData['errors'].isNotEmpty) {
         final error = widget.userData['errors'][0];
+        print('Error details: ${const JsonEncoder.withIndent('  ').convert(error)}');
+        
+        // Case 1: Already have active application
         if (error['errorCode'] == '2-201') {
-          // This is a case where card request is already in process
+          print('Detected error code 2-201: Active application exists');
+          
+          // 💡 Extract application ID from error description
+          String applicationId = '';
+          final errorDesc = error['errorDesc']?.toString() ?? '';
+          final applicationIdMatch = RegExp(r'Application Id (\d+)').firstMatch(errorDesc);
+          if (applicationIdMatch != null) {
+            applicationId = applicationIdMatch.group(1) ?? '';
+          }
+          
           _error = widget.isArabic 
-            ? 'طلب البطاقة قيد المعالجة بالفعل. يرجى التواصل مع خدمة العملاء لمزيد من المعلومات.'
-            : 'Card request is already in process. Please contact customer support for more information.';
-          _shouldContactSupport = true;
-        } else {
-          // Handle other error cases
-          _error = widget.isArabic 
-            ? (error['errorDesc'] ?? 'حدث خطأ غير متوقع')
-            : (error['errorDesc'] ?? 'An unexpected error occurred');
+            ? 'لديك طلب نشط بالفعل في النظام برقم $applicationId. يرجى التواصل مع خدمة العملاء لمزيد من التفاصيل.'
+            : 'You already have an active application in pipeline (Application #$applicationId). Please contact customer care for more details.';
+          print('=== CARD OFFER SCREEN INITIALIZATION - END (ACTIVE APPLICATION) ===\n');
+          return;
         }
+        
+        // Case 2: Not eligible
+        if (error['errorDesc']?.toString().toLowerCase().contains('not eligible') == true) {
+          print('Detected not eligible case from error description');
+          _error = widget.isArabic 
+            ? 'عذراً، لم تتم الموافقة على طلبك في هذا الوقت. يرجى التواصل مع خدمة العملاء لمزيد من التفاصيل.'
+            : 'Unfortunately your application is not approved at this time. Please contact customer care for more details.';
+          print('=== CARD OFFER SCREEN INITIALIZATION - END (NOT ELIGIBLE) ===\n');
+          return;
+        }
+        
+        // Case 3: Other errors
+        print('Unhandled error case. Using generic error message');
+        _error = widget.isArabic 
+          ? 'حدث خطأ غير متوقع. يرجى التواصل مع خدمة العملاء لمزيد من التفاصيل.'
+          : 'An unexpected error occurred. Please contact customer care for more details.';
+        print('=== CARD OFFER SCREEN INITIALIZATION - END (GENERIC ERROR) ===\n');
+        return;
       }
+      
+      // If no specific error details, show generic error
+      print('No specific error details found. Using generic error message');
+      _error = widget.isArabic 
+        ? 'حدث خطأ غير متوقع. يرجى التواصل مع خدمة العملاء لمزيد من التفاصيل.'
+        : 'An unexpected error occurred. Please contact customer care for more details.';
+      print('=== CARD OFFER SCREEN INITIALIZATION - END (NO ERROR DETAILS) ===\n');
       return;
     }
     
-    // 💡 If no errors, proceed with normal initialization
-    _creditLimit = widget.userData['eligibleAmount'] != null 
-      ? int.tryParse(widget.userData['eligibleAmount'].toString()) ?? widget.maxCreditLimit
-      : widget.maxCreditLimit;
+    // Case 4: Approved with eligibleAmount - proceed with offer screen
+    if (widget.userData['result']?['eligibleAmount'] != null) {
+      print('\nProcessing approved case with eligible amount');
+      _creditLimit = int.tryParse(widget.userData['result']['eligibleAmount'].toString()) ?? widget.maxCreditLimit;
+      print('Initial credit limit: $_creditLimit');
+      
+      // 💡 Ensure credit limit is within bounds
+      if (_creditLimit < 2000) _creditLimit = 2000;
+      print('Adjusted credit limit: $_creditLimit');
+      
+      _cardType = widget.userData['card_type'];
+      _cardTypeAr = widget.userData['card_type_ar'];
+      _applicationNumber = widget.userData['result']['applicationId'];
+      
+      print('Card Type: $_cardType');
+      print('Card Type (Arabic): $_cardTypeAr');
+      print('Application Number: $_applicationNumber');
+      print('=== CARD OFFER SCREEN INITIALIZATION - END (APPROVED) ===\n');
+      return;
+    }
     
-    // 💡 Ensure credit limit is within bounds
-    if (_creditLimit < 2000) _creditLimit = 2000;
-    if (_creditLimit > 50000) _creditLimit = 50000;
-    
-    _cardType = widget.userData['card_type']; // Get card type from userData
-    _cardTypeAr = widget.userData['card_type_ar']; // Get Arabic card type from userData
-    _applicationNumber = widget.userData['application_number'];
+    // If we reach here, something unexpected happened
+    print('\nUnexpected case: No eligible amount found');
+    _shouldContactSupport = true;
+    _error = widget.isArabic 
+      ? 'حدث خطأ غير متوقع. يرجى التواصل مع خدمة العملاء لمزيد من التفاصيل.'
+      : 'An unexpected error occurred. Please contact customer care for more details.';
+    print('=== CARD OFFER SCREEN INITIALIZATION - END (UNEXPECTED CASE) ===\n');
   }
 
+  // 💡 Update credit limit method to respect new minimum
   void _updateCreditLimit(double value) {
     setState(() {
       _creditLimit = value.round();
@@ -111,7 +163,7 @@ class _CardOfferScreenState extends State<CardOfferScreen> {
             Text(widget.isArabic ? messageAr : message),
             const SizedBox(height: 16),
             Text(widget.isArabic ? 'رقم الطلب: $applicationNo' : 'Application #: $applicationNo'),
-            Text(widget.isArabic ? 'الحالة: $status' : 'Status: $status'),
+            
           ],
         ),
         actions: [
@@ -204,8 +256,8 @@ class _CardOfferScreenState extends State<CardOfferScreen> {
               const SizedBox(height: 16),
               Text(
                 widget.isArabic 
-                  ? 'حد الائتمان المقدم: ${_creditLimit.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} ريال'
-                  : 'Offered Credit Limit: SAR ${_creditLimit.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                  ? 'حد البطاقة: ${_creditLimit.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} ريال'
+                  : 'Card Limit: SAR ${_creditLimit.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
                 textDirection: TextDirection.ltr,
               ),
             ],
@@ -335,48 +387,31 @@ class _CardOfferScreenState extends State<CardOfferScreen> {
     
     return Scaffold(
       backgroundColor: isDarkMode ? Color(Constants.darkBackgroundColor) : Color(Constants.lightBackgroundColor),
-      body: Stack(
-        children: [
-          // Gradient Background
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor).withOpacity(0.1),
-                  Color(isDarkMode ? Constants.darkBackgroundColor : Constants.lightBackgroundColor),
-                ],
+      body: WillPopScope(  // 💡 Add WillPopScope to prevent back navigation
+        onWillPop: () async => false,  // 💡 Prevent back key
+        child: Stack(
+          children: [
+            // Gradient Background
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor).withOpacity(0.1),
+                    Color(isDarkMode ? Constants.darkBackgroundColor : Constants.lightBackgroundColor),
+                  ],
+                ),
               ),
             ),
-          ),
-          SafeArea(
-            child: Column(
-              children: [
-                // Back Button and Title Row
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0, left: 8.0, right: 8.0),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Row(
-                        mainAxisAlignment: widget.isArabic ? MainAxisAlignment.end : MainAxisAlignment.start,
-                        children: [
-                          IconButton(
-                            onPressed: () {
-                              if (Navigator.canPop(context)) {
-                                Navigator.pop(context);
-                              }
-                            },
-                            icon: Icon(
-                              widget.isArabic ? Icons.arrow_forward_ios : Icons.arrow_back_ios,
-                              color: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
-                            ),
-                          ),
-                        ],
-                      ),
-                      // Title
-                      Text(
+            SafeArea(
+              child: Column(
+                children: [
+                  // 💡 Title Row (removed back button)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0, left: 8.0, right: 8.0),
+                    child: Center(  // 💡 Center the title
+                      child: Text(
                         widget.isArabic ? 'عرض البطاقة' : 'Card Offer',
                         style: TextStyle(
                           fontSize: 24,
@@ -384,295 +419,310 @@ class _CardOfferScreenState extends State<CardOfferScreen> {
                           color: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                // Content
-                if (_error != null)
-                  Expanded(
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.error_outline,
-                              color: Color(isDarkMode ? Constants.darkErrorColor : Constants.lightErrorColor),
-                              size: 48,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              _error!,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: isDarkMode ? Colors.white : Colors.black,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            if (_shouldContactSupport)
-                              Column(
-                                children: [
-                                  Text(
-                                    widget.isArabic 
-                                      ? 'يرجى التواصل مع خدمة العملاء للمزيد من المعلومات'
-                                      : 'Please contact customer service for more information',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      Navigator.pushReplacement(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => CustomerServiceScreen(
-                                            isArabic: widget.isArabic,
-                                            source: 'card_application',
-                                            applicationNumber: widget.userData['application_number']?.toString(),
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
-                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                    ),
-                                    child: Text(
-                                      widget.isArabic ? 'تواصل مع خدمة العملاء' : 'Contact Customer Service',
-                                      style: const TextStyle(fontSize: 16),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: () {
-                                Navigator.pop(context);
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.grey,
-                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                              ),
-                              child: Text(widget.isArabic ? 'رجوع' : 'Go Back'),
-                            ),
-                          ],
-                        ),
-                      ),
                     ),
-                  )
-                else
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: Opacity(
-                        opacity: _isLoading ? 0.6 : 1.0,
-                        child: IgnorePointer(
-                          ignoring: _isLoading,
+                  ),
+                  // Content
+                  if (_error != null)
+                    Expanded(
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
                           child: Column(
-                            crossAxisAlignment: widget.isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              // Card Offer Details
-                              Card(
-                                margin: const EdgeInsets.symmetric(horizontal: 4),
-                                color: Color(isDarkMode ? Constants.darkSurfaceColor : Constants.lightSurfaceColor),
-                                elevation: 4,
-                                shadowColor: Color(isDarkMode ? Constants.darkPrimaryShadowColor : Constants.lightPrimaryShadowColor),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(16),
-                                  child: Column(
-                                    crossAxisAlignment: widget.isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                                    children: [
-                                      // Card Type
-                                      Text(
-                                        widget.isArabic ? 'نوع البطاقة' : 'Card Type',
-                                        style: Theme.of(context).textTheme.titleMedium,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        widget.isArabic 
-                                          ? (_cardTypeAr ?? 'بطاقة المكافآت')
-                                          : (_cardType ?? 'Rewards Card'),
-                                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                          color: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      // Card Limit
-                                      Text(
-                                        widget.isArabic ? 'حد الائتمان المقدم' : 'Offered Credit Limit',
-                                        style: Theme.of(context).textTheme.titleLarge,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Container(
-                                        width: double.infinity,
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                        decoration: BoxDecoration(
-                                          color: const Color(Constants.primaryColorValue).withOpacity(0.05),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment: widget.isArabic ? MainAxisAlignment.end : MainAxisAlignment.start,
-                                          children: <Widget>[
-                                            Text(
-                                              widget.isArabic ? 'ريال ' : 'SAR ',
-                                              textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
-                                              style: const TextStyle(
-                                                fontSize: 24,
-                                                fontWeight: FontWeight.bold,
-                                                color: Color(0xFF00A650),
-                                              ),
-                                            ),
-                                            Text(
-                                              _creditLimit.toString().replaceAllMapped(
-                                                RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-                                                (Match m) => '${m[1]},'
-                                              ),
-                                              textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
-                                              style: const TextStyle(
-                                                fontSize: 24,
-                                                fontWeight: FontWeight.bold,
-                                                color: Color(0xFF00A650),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      // 💡 Add Credit Limit Slider
-                                      Directionality(
-                                        textDirection: TextDirection.ltr,
-                                        child: SliderTheme(
-                                          data: SliderThemeData(
-                                            activeTrackColor: const Color(0xFF00A650),
-                                            inactiveTrackColor: const Color(0xFF00A650).withOpacity(0.1),
-                                            thumbColor: const Color(0xFF00A650),
-                                            overlayColor: const Color(0xFF00A650).withOpacity(0.2),
-                                            trackHeight: 4.0,
-                                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8.0),
-                                            overlayShape: const RoundSliderOverlayShape(overlayRadius: 16.0),
-                                          ),
-                                          child: Column(
-                                            children: [
-                                              Slider(
-                                                value: _creditLimit.toDouble(),
-                                                min: 2000,
-                                                max: 50000,
-                                                onChanged: _updateCreditLimit,
-                                                divisions: 48, // (50000 - 2000) / 1000
-                                              ),
-                                              // 💡 Add min/max labels
-                                              Padding(
-                                                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                                                child: Row(
-                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                  children: [
-                                                    Text(
-                                                      widget.isArabic ? '2,000 ريال' : 'SAR 2,000',
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                                      ),
-                                                    ),
-                                                    Text(
-                                                      widget.isArabic ? '50,000 ريال' : 'SAR 50,000',
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 24),
-                                    ],
-                                  ),
+                              Icon(
+                                Icons.error_outline,
+                                color: Color(isDarkMode ? Constants.darkErrorColor : Constants.lightErrorColor),
+                                size: 48,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _error!,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: isDarkMode ? Colors.white : Colors.black,
                                 ),
                               ),
                               const SizedBox(height: 24),
-                              
-                              // Action Buttons
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: CustomButton(
-                                      onPressed: _isLoading ? null : _showDeclineConfirmation,
-                                      text: widget.isArabic ? 'رفض' : 'Decline',
-                                      backgroundColor: Colors.red,
+                              if (_shouldContactSupport)
+                                Column(
+                                  children: [
+                                    
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        Navigator.pushReplacement(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => CustomerServiceScreen(
+                                              isArabic: widget.isArabic,
+                                              source: 'card_application',
+                                              applicationNumber: widget.userData['application_number']?.toString(),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
+                                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        elevation: 2,
+                                        shadowColor: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor).withOpacity(0.3),
+                                      ),
+                                      child: Text(
+                                        widget.isArabic ? 'تواصل مع خدمة العملاء' : 'Contact Customer Service',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
                                     ),
+                                  ],
+                                ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.grey,
+                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: CustomButton(
-                                      onPressed: _isLoading ? null : _showCongratulationsDialog,
-                                      text: widget.isArabic ? 'موافق' : 'Accept',
-                                      backgroundColor: Colors.green,
-                                    ),
+                                  elevation: 2,
+                                  shadowColor: Colors.grey.withOpacity(0.3),
+                                ),
+                                child: Text(
+                                  widget.isArabic ? 'رجوع' : 'Go Back',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
                                   ),
-                                ],
+                                ),
                               ),
                             ],
                           ),
                         ),
                       ),
+                    )
+                  else
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Opacity(
+                          opacity: _isLoading ? 0.6 : 1.0,
+                          child: IgnorePointer(
+                            ignoring: _isLoading,
+                            child: Column(
+                              crossAxisAlignment: widget.isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                              children: [
+                                // Card Offer Details
+                                Card(
+                                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                                  color: Color(isDarkMode ? Constants.darkSurfaceColor : Constants.lightSurfaceColor),
+                                  elevation: 4,
+                                  shadowColor: Color(isDarkMode ? Constants.darkPrimaryShadowColor : Constants.lightPrimaryShadowColor),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(16),
+                                    child: Column(
+                                      crossAxisAlignment: widget.isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                      children: [
+                                        // Card Type
+                                        Text(
+                                          widget.isArabic ? 'نوع البطاقة' : 'Card Type',
+                                          style: Theme.of(context).textTheme.titleMedium,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          widget.isArabic 
+                                            ? (_cardTypeAr ?? 'بطاقة المكافآت')
+                                            : (_cardType ?? 'Rewards Card'),
+                                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                            color: Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        // Card Limit
+                                        Text(
+                                          widget.isArabic ? 'الحد الائتماني للبطاقة' : 'Card Limit',
+                                          style: Theme.of(context).textTheme.titleLarge,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: const Color(Constants.primaryColorValue).withOpacity(0.05),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment: widget.isArabic ? MainAxisAlignment.end : MainAxisAlignment.start,
+                                            children: <Widget>[
+                                              Text(
+                                                widget.isArabic ? 'ريال ' : 'SAR ',
+                                                textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
+                                                style: const TextStyle(
+                                                  fontSize: 24,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(0xFF00A650),
+                                                ),
+                                              ),
+                                              Text(
+                                                _creditLimit.toString().replaceAllMapped(
+                                                  RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                                                  (Match m) => '${m[1]},'
+                                                ),
+                                                textAlign: widget.isArabic ? TextAlign.right : TextAlign.left,
+                                                style: const TextStyle(
+                                                  fontSize: 24,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(0xFF00A650),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        // 💡 Add Credit Limit Slider
+                                        Directionality(
+                                          textDirection: TextDirection.ltr,
+                                          child: SliderTheme(
+                                            data: SliderThemeData(
+                                              activeTrackColor: const Color(0xFF00A650),
+                                              inactiveTrackColor: const Color(0xFF00A650).withOpacity(0.1),
+                                              thumbColor: const Color(0xFF00A650),
+                                              overlayColor: const Color(0xFF00A650).withOpacity(0.2),
+                                              trackHeight: 4.0,
+                                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8.0),
+                                              overlayShape: const RoundSliderOverlayShape(overlayRadius: 16.0),
+                                            ),
+                                            child: Column(
+                                              children: [
+                                                Slider(
+                                                  value: _creditLimit.toDouble(),
+                                                  min: 2000,
+                                                  max: widget.userData['result']?['eligibleAmount'] != null 
+                                                    ? double.tryParse(widget.userData['result']['eligibleAmount'].toString()) ?? 50000 
+                                                    : 50000,
+                                                  onChanged: _updateCreditLimit,
+                                                  divisions: 48, // (50000 - 2000) / 1000
+                                                ),
+                                                // 💡 Add min/max labels
+                                                Padding(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                                  child: Row(
+                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                    children: [
+                                                      Text(
+                                                        widget.isArabic ? '2,000 ريال' : 'SAR 2,000',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                                        ),
+                                                      ),
+                                                      Text(
+                                                        widget.isArabic 
+                                                          ? '${widget.userData['result']?['eligibleAmount'] ?? "50,000"} ريال' 
+                                                          : 'SAR ${widget.userData['result']?['eligibleAmount'] ?? "50,000"}',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 24),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
+                                
+                                // Action Buttons
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: CustomButton(
+                                        onPressed: _isLoading ? null : _showDeclineConfirmation,
+                                        text: widget.isArabic ? 'رفض' : 'Decline',
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: CustomButton(
+                                        onPressed: _isLoading ? null : _showCongratulationsDialog,
+                                        text: widget.isArabic ? 'موافق' : 'Accept',
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
-          // Loading Overlay
-          if (_isLoading)
-            Container(
-              color: (isDarkMode ? Colors.black : Colors.white).withOpacity(0.3),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: Color(isDarkMode ? Constants.darkSurfaceColor : Constants.lightSurfaceColor),
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Color(isDarkMode ? Constants.darkPrimaryShadowColor : Constants.lightPrimaryShadowColor),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
+            // Loading Overlay
+            if (_isLoading)
+              Container(
+                color: (isDarkMode ? Colors.black : Colors.white).withOpacity(0.3),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    decoration: BoxDecoration(
+                      color: Color(isDarkMode ? Constants.darkSurfaceColor : Constants.lightSurfaceColor),
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color(isDarkMode ? Constants.darkPrimaryShadowColor : Constants.lightPrimaryShadowColor),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        widget.isArabic ? 'جاري المعالجة...' : 'Processing...',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: isDarkMode ? Colors.white : Colors.black,
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Color(isDarkMode ? Constants.darkPrimaryColor : Constants.lightPrimaryColor),
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+                        Text(
+                          widget.isArabic ? 'جاري المعالجة...' : 'Processing...',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

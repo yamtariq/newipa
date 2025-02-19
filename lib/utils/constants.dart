@@ -229,6 +229,7 @@ class Constants {
   static String endpointCreateCustomer = 
       'https://172.22.226.203:9443/api/Bank/CreateCustomer';
 
+  // 💡 Finnone API Endpoints - Direct URLs (proxy handling in implementation)
   static String endpointFinnoneUpdateAmount = 
       'http://172.22.226.189:100/api/v1/Finnone/UpdateAmount';
 

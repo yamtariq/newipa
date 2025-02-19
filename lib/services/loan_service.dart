@@ -159,13 +159,20 @@ class LoanService {
       // 💡 Format dates to match API requirements (yyyy/mm/dd)
       String formatHijriDate(String? inputDate) {
         if (inputDate == null) return '1444/01/01';
+        
+        // If already in yyyy-mm-dd format, just replace - with /
+        if (RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(inputDate)) {
+          return inputDate.replaceAll('-', '/');
+        }
+        
         final parts = inputDate.split('-');
         if (parts.length == 3) {
-          // 💡 Ensure each part is padded with leading zeros
-          final day = parts[0].padLeft(2, '0');
-          final month = parts[1].padLeft(2, '0');
-          final year = parts[2].padLeft(4, '0');
-          // Return in yyyy/mm/dd format
+          // Input is in dd-mm-yyyy format
+          final day = parts[0];
+          final month = parts[1];
+          final year = parts[2];
+          
+          // Return in yyyy/mm/dd format without padding year
           return '$year/$month/$day';
         }
         return inputDate;
@@ -322,14 +329,15 @@ class LoanService {
 
       if (!responseData['success']) {
         print('\nRequest unsuccessful');
-        return {
-          'status': 'error',
-          'message': responseData['errors']?.join(', ') ?? 'Unknown error occurred',
-        };
+        return responseData;  // 💡 Simply return the raw response
       }
 
+      // Case 4: Approved with eligibleAmount - proceed with offer screen
       final result = responseData['result'];
-      
+      if (result == null || result['eligibleAmount'] == null) {
+        return responseData;  // 💡 Simply return the raw response
+      }
+
       // 💡 Calculate flat rate
       double financeAmount = double.tryParse(result['eligibleAmount'] ?? '0') ?? 0;
       double emi = double.tryParse(result['eligibleEmi'] ?? '0') ?? 0;
@@ -349,14 +357,16 @@ class LoanService {
       }
 
       final mappedResponse = {
-        'status': 'success',
-        'decision': result['applicationStatus'] == 'APPROVED' ? 'approved' : 'rejected',
-        'finance_amount': financeAmount,
-        'emi': emi,
-        'flat_rate': flatRate,
-        'application_number': result['applicationId'],
-        'request_id': result['requestId'],
-        'customer_id': result['customerId'],
+        'success': true,
+        'result': {
+          'applicationStatus': result['applicationStatus'] ?? 'APPROVED',
+          'eligibleAmount': financeAmount,
+          'eligibleEmi': emi,
+          'flatRate': flatRate,
+          'applicationId': result['applicationId'],
+          'requestId': result['requestId'],
+          'customerId': result['customerId'],
+        }
       };
 
       print('\nFinal Mapped Response:');

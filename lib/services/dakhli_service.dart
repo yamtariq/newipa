@@ -102,24 +102,44 @@ class DakhliService {
         
         if (responseData['success'] == true) {
           print('Successfully fetched salary data');
-          print('Raw data before transformation: ${responseData['result']['data']}');
           
-          // Transform the response to our expected format
-          final employmentData = responseData['result']['data'] as List;
+          // 💡 Initialize transformed data structure
+          Map<String, List<Map<String, dynamic>>> transformedData = {'salaries': []};
           
-          // 💡 Log each employment record as we process it
-          final transformedData = {
-            'salaries': employmentData.map((emp) => {
-              'amount': emp['payslipInfo']['netSalary'],
-              'employer': emp['employerInfo']['agencyName'],
-              'status': 'ACTIVE', // Status is implied by presence in response
-              'fullName': emp['personalInfo']['employeeNameEn'],
-              'workingMonths': _calculateWorkingMonths(emp['employmentInfo']['agencyEmploymentDate']),
-              'basicWage': emp['payslipInfo']['basicSalary'],
-              'housingAllowance': '0', // Not provided in new response
-              'otherAllowance': emp['payslipInfo']['totalAllownces'],
-            }).toList(),
-          };
+          // 💡 Try new structure first (nested with personalInfo, payslipInfo etc)
+          if (responseData['result']['data'] != null) {
+            print('Processing new data structure');
+            final dakhliData = responseData['result']['data'] as List;
+            
+            transformedData['salaries'] = dakhliData.map((record) => {
+              'amount': double.parse(record['payslipInfo']['netSalary'].toString()),
+              'employer': record['employerInfo']['agencyName'],
+              'status': record['employmentInfo']['employeeJobTitle']?.toString() ?? 'UNKNOWN',
+              'fullName': record['personalInfo']['employeeNameEn'],
+              'workingMonths': _calculateWorkingMonths(record['employmentInfo']['agencyEmploymentDate']),
+              'basicWage': double.parse(record['payslipInfo']['basicSalary'].toString()),
+              'housingAllowance': _extractAllowance(record['payslipInfo'], 'housing'),
+              'otherAllowance': double.parse(record['payslipInfo']['totalAllownces'].toString()),
+            }).toList();
+          } 
+          // 💡 Try old structure (employmentStatusInfo)
+          else if (responseData['result']['employmentStatusInfo'] != null) {
+            print('Processing old data structure');
+            final employmentData = responseData['result']['employmentStatusInfo'] as List;
+            
+            transformedData['salaries'] = employmentData.map((emp) => {
+              'amount': _calculateTotalAmount(emp),
+              'employer': emp['employerName'],
+              'status': emp['employmentStatus'] ?? 'UNKNOWN',
+              'fullName': emp['fullName'],
+              'workingMonths': int.parse(emp['workingMonths'].toString()),
+              'basicWage': double.parse(emp['basicWage'].toString()),
+              'housingAllowance': double.parse(emp['housingAllowance'].toString()),
+              'otherAllowance': double.parse(emp['otherAllowance'].toString()),
+            }).toList();
+          } else {
+            throw Exception('Unrecognized data structure in response');
+          }
 
           print('Transformed salary data: $transformedData');
 
@@ -274,6 +294,38 @@ class DakhliService {
     } catch (e) {
       print('❌ Error calculating working months: $e');
       return 0;
+    }
+  }
+
+  // 💡 Helper method to safely calculate total amount
+  double _calculateTotalAmount(Map<String, dynamic> emp) {
+    try {
+      return double.parse(emp['basicWage'].toString()) +
+             double.parse(emp['housingAllowance'].toString()) +
+             double.parse(emp['otherAllowance'].toString());
+    } catch (e) {
+      print('❌ Error calculating total amount: $e');
+      return 0.0;
+    }
+  }
+
+  // 💡 Helper method to extract specific allowance from payslip
+  double _extractAllowance(Map<String, dynamic> payslipInfo, String type) {
+    try {
+      // Try to find housing allowance in different possible fields
+      if (type == 'housing') {
+        final possibleFields = ['housingAllowance', 'housing', 'سكن', 'بدل_سكن'];
+        for (final field in possibleFields) {
+          if (payslipInfo.containsKey(field)) {
+            return double.parse(payslipInfo[field].toString());
+          }
+        }
+      }
+      // If no specific housing allowance found, it might be included in total allowances
+      return 0.0;
+    } catch (e) {
+      print('❌ Error extracting $type allowance: $e');
+      return 0.0;
     }
   }
 }
